@@ -304,6 +304,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     const settings = readAutomation(ws);
     if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
   };
+  let closing = false;
   const plugins = createPluginService({
     fetchIndex: (url, options) => window.webContents.session.fetch(url, options),
     archive: join(hostResources, "app.asar"),
@@ -322,7 +323,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     onChanged: async () => {
       ai = makeBackgroundAi();
       ask.relocate(ws.root);
-      await startAutomation();
+      if (!closing) await startAutomation();
     },
   });
   let notifyCreator = () => {};
@@ -442,14 +443,17 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   // Network checks never gate the first screen; downloading and restarting stay explicit.
   const firstUpdateCheck = setTimeout(() => void updater.checkAutomatically(), 15000);
   const updateChecks = setInterval(() => void updater.checkAutomatically(), 24 * 60 * 60 * 1000);
-  let closing = false;
   app.on("before-quit", (event) => {
     if (closing) return;
     event.preventDefault();
     closing = true;
     clearTimeout(firstUpdateCheck);
     clearInterval(updateChecks);
-    void Promise.allSettled([server.close(), ai.close()]).finally(() => app.quit());
+    void plugins
+      .settled()
+      .catch(() => {})
+      .then(() => Promise.allSettled([server.close(), ai.close()]))
+      .finally(() => app.quit());
   });
   await startAutomation().catch((error) => dialog.showErrorBox("自动任务", String(error)));
 }

@@ -96,6 +96,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
         )
       : [];
   let changing = false;
+  let pendingChange;
   let recoveryError;
   const states = new Map();
   const refreshStates = () => {
@@ -128,82 +129,85 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
   };
   refreshStates();
   // All mutations share the same desktop/sdk pair, including market installs and removals.
-  const change = async (operation) => {
+  const change = (operation) => {
     if (changing)
       throw new KaituError(
         "插件正在变更，请等完成 / Plugins are changing. Wait for completion.",
         "PLUGIN_BUSY",
       );
     changing = true;
-    let shouldResume = false;
-    try {
-      await beforeChange();
-      shouldResume = true;
-      const saved = PROFILES.map((profile) => ({
-        profile,
-        existed: existsSync(profileDir(profile)),
-        files: Object.fromEntries(
-          ["package.json", "pnpm-lock.yaml"].map((name) => {
-            const file = join(profileDir(profile), name);
-            return [name, existsSync(file) ? readFileSync(file) : null];
-          }),
-        ),
-      }));
-      let recovered = true;
-      const restore = ({ profile, files }) => {
-        for (const [name, bytes] of Object.entries(files)) {
-          const file = join(profileDir(profile), name);
-          if (bytes === null) rmSync(file, { force: true });
-          else writeFileSync(file, bytes);
-        }
-      };
+    pendingChange = (async () => {
+      let shouldResume = false;
       try {
-        return await operation();
-      } catch (cause) {
-        const errors = [];
-        for (const row of saved) {
-          try {
-            if (!row.existed) {
-              rmSync(profileDir(row.profile), { recursive: true, force: true });
-              continue;
+        await beforeChange();
+        shouldResume = true;
+        const saved = PROFILES.map((profile) => ({
+          profile,
+          existed: existsSync(profileDir(profile)),
+          files: Object.fromEntries(
+            ["package.json", "pnpm-lock.yaml"].map((name) => {
+              const file = join(profileDir(profile), name);
+              return [name, existsSync(file) ? readFileSync(file) : null];
+            }),
+          ),
+        }));
+        let recovered = true;
+        const restore = ({ profile, files }) => {
+          for (const [name, bytes] of Object.entries(files)) {
+            const file = join(profileDir(profile), name);
+            if (bytes === null) rmSync(file, { force: true });
+            else writeFileSync(file, bytes);
+          }
+        };
+        try {
+          return await operation();
+        } catch (cause) {
+          const errors = [];
+          for (const row of saved) {
+            try {
+              if (!row.existed) {
+                rmSync(profileDir(row.profile), { recursive: true, force: true });
+                continue;
+              }
+              restore(row);
+              if (row.files["package.json"])
+                await run(row.profile, [
+                  "install",
+                  "--offline",
+                  "--ignore-scripts",
+                  row.files["pnpm-lock.yaml"] ? "--frozen-lockfile" : "--no-lockfile",
+                ]);
+              restore(row);
+            } catch (error) {
+              errors.push(error);
             }
-            restore(row);
-            if (row.files["package.json"])
-              await run(row.profile, [
-                "install",
-                "--offline",
-                "--ignore-scripts",
-                row.files["pnpm-lock.yaml"] ? "--frozen-lockfile" : "--no-lockfile",
-              ]);
-            restore(row);
-          } catch (error) {
-            errors.push(error);
+          }
+          if (errors.length) {
+            recovered = false;
+            shouldResume = false;
+            recoveryError = new KaituError(
+              `插件变更及恢复失败，引擎保持停止 / Plugin change and recovery failed; engines remain stopped: ${cause.message}；${errors.map((error) => error.message).join("；")}`,
+              "PLUGIN_RECOVERY",
+            );
+            throw recoveryError;
+          }
+          throw cause;
+        } finally {
+          refreshStates();
+          if (recovered) {
+            shouldResume = false;
+            await onChanged();
           }
         }
-        if (errors.length) {
-          recovered = false;
-          shouldResume = false;
-          recoveryError = new KaituError(
-            `插件变更失败，原插件恢复失败；引擎保持停止：${cause.message}；${errors.map((error) => error.message).join("；")}`,
-            "PLUGIN_RECOVERY",
-          );
-          throw recoveryError;
-        }
-        throw cause;
       } finally {
-        refreshStates();
-        if (recovered) {
-          shouldResume = false;
-          await onChanged();
+        try {
+          if (shouldResume) await onChanged();
+        } finally {
+          changing = false;
         }
       }
-    } finally {
-      try {
-        if (shouldResume) await onChanged();
-      } finally {
-        changing = false;
-      }
-    }
+    })();
+    return pendingChange;
   };
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   let market;
@@ -240,6 +244,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
     return refreshing;
   };
   return {
+    settled: () => pendingChange ?? Promise.resolve(),
     open(open) {
       if (recoveryError) throw recoveryError;
       if (changing)
@@ -394,7 +399,8 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       });
     },
     async setEnabled(name, enabled) {
-      if (!this.state(name).installed) throw new KaituError("这个插件未完整安装", "PLUGIN");
+      if (!this.state(name).installed)
+        throw new KaituError("这个插件未完整安装 / This plugin is incompletely installed.", "PLUGIN");
       return change(async () => {
         for (const profile of PROFILES) setBundle(profile, name, enabled === true);
       });

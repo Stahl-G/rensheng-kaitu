@@ -132,8 +132,15 @@ test("主进程等生成关闭；不同作品和市场变更共用协调，确�
         throw new Error("Must not reopen the host during installation");
       }),
     ).toThrow("插件正在变更");
+    let settled = false;
+    const waiting = f.plugins.settled().then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
     release();
     await installing;
+    await waiting;
     expect(f.plugins.state(first.name)).toMatchObject({ installed: true, enabled: true, incomplete: false });
     expect(f.plugins.explore().some((page: { name: string }) => page.name === first.name)).toBe(true);
     await f.plugins.setEnabled(first.name, false);
