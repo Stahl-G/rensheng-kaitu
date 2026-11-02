@@ -165,7 +165,8 @@ export function projectionManifest(input: ProjectionInputs): ProjectionManifest 
     const listed = children(input, path);
     if (path === input.root || path === input.state)
       entries.set(path, directoryFingerprint(input, path, item, listed));
-    for (const entry of listed) walk(join(path, entry.name));
+    const directory = path.endsWith(sep) ? path : `${path}${sep}`;
+    for (const entry of listed) walk(`${directory}${entry.name}`);
   };
   walk(resolve(input.root));
   walk(resolve(input.state));
