@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { KaituError } from "../core/dist/index.js";
 
@@ -124,6 +124,7 @@ const manifest = (files) => {
  */
 export function createCreatorService({ directory, plugins }) {
   const installing = new Set();
+  const drafts = new Map();
   const location = (area, id, revision) => {
     if (!uuid.test(id) || !uuid.test(revision)) fail("页面草稿标识无效");
     const parent = join(directory, area, id);
@@ -152,7 +153,44 @@ export function createCreatorService({ directory, plugins }) {
       access: "host-process",
     };
   };
+  // Recover only the small manifest inventory once at startup; status reads stay in memory.
+  const draftRoot = join(directory, "drafts");
+  if (
+    existsSync(draftRoot) &&
+    !lstatSync(directory).isSymbolicLink() &&
+    !lstatSync(draftRoot).isSymbolicLink()
+  )
+    for (const id of readdirSync(draftRoot).filter((id) => uuid.test(id))) {
+      try {
+        if (lstatSync(join(draftRoot, id)).isSymbolicLink()) continue;
+        const revisions = readdirSync(join(draftRoot, id)).filter((revision) => uuid.test(revision));
+        revisions.sort(
+          (a, b) => lstatSync(join(draftRoot, id, b)).mtimeMs - lstatSync(join(draftRoot, id, a)).mtimeMs,
+        );
+        for (const revision of revisions) {
+          try {
+            const source = location("drafts", id, revision);
+            const file = join(source, "package.json");
+            if (lstatSync(file).isSymbolicLink()) continue;
+            const pkg = JSON.parse(readFileSync(file, "utf8"));
+            if (
+              pkg.name !== `kaitu-created-${id}` ||
+              pkg.version !== `0.0.0-${revision}` ||
+              typeof pkg.kaitu?.explore?.title !== "string"
+            )
+              continue;
+            drafts.set(id, { id, revision, title: pkg.kaitu.explore.title, name: pkg.name });
+            break;
+          } catch {
+            /* Try an older completed revision. */
+          }
+        }
+      } catch {
+        /* An interrupted or externally modified draft does not hide other pages. */
+      }
+    }
   return {
+    list: () => [...drafts.values()],
     identity() {
       const id = randomUUID();
       return { id, name: `kaitu-created-${id}` };
@@ -175,7 +213,9 @@ export function createCreatorService({ directory, plugins }) {
       const source = join(parent, revision);
       mkdirSync(source);
       writeFiles(source, files);
-      return inspect(id, revision);
+      const draft = inspect(id, revision);
+      drafts.set(id, { id, revision, title: draft.title, name: draft.name });
+      return draft;
     },
     inspect,
     async install({ id, revision, digest: approved, confirmed }) {
