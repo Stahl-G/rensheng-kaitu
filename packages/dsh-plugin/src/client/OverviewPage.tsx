@@ -124,6 +124,7 @@ export function OverviewPage(props: OverviewPageProps) {
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
   const [pluginModules, setPluginModules] = useState<ExploreModule[]>([]);
+  const [pluginEpoch, setPluginEpoch] = useState(0);
   const [preferencesFailed, setPreferencesFailed] = useState(false);
   const [preferencesAttempt, setPreferencesAttempt] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry starts a fresh read and cancels the previous effect.
@@ -166,6 +167,7 @@ export function OverviewPage(props: OverviewPageProps) {
         setPreferencesFailed(true);
       });
     function retry() {
+      setPluginEpoch((epoch) => epoch + 1);
       setPreferencesAttempt((attempt) => attempt + 1);
     }
     window.addEventListener("kaitu:plugins-changed", retry);
@@ -179,6 +181,7 @@ export function OverviewPage(props: OverviewPageProps) {
       <Overview
         {...props}
         pluginModules={pluginModules}
+        pluginEpoch={pluginEpoch}
         locale={locale}
         setLocale={setLocale}
         followSystem={followSystem}
@@ -200,6 +203,7 @@ export function OverviewPage(props: OverviewPageProps) {
 
 function Overview({
   pluginModules,
+  pluginEpoch,
   locale,
   setLocale,
   followSystem,
@@ -210,6 +214,7 @@ function Overview({
   ...props
 }: OverviewPageProps & {
   pluginModules: ExploreModule[];
+  pluginEpoch: number;
   locale: Locale | null;
   setLocale: (locale: Locale) => void;
   followSystem: boolean;
@@ -1673,7 +1678,11 @@ function Overview({
         {pluginModules
           .filter((entry) => openedPlugins.includes(entry.id))
           .map((entry) => (
-            <div key={entry.id} className={css.child} hidden={view !== "explore" || explore !== entry.id}>
+            <div
+              key={`${entry.id}:${pluginEpoch}`}
+              className={css.child}
+              hidden={view !== "explore" || explore !== entry.id}
+            >
               <ExplorePluginFrame
                 id={entry.id}
                 title={t(entry.title[0] ?? "", entry.title[1] ?? "")}
