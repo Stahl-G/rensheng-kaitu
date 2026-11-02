@@ -10,7 +10,15 @@ const fail = (message) => {
 const validPath = (path) =>
   typeof path === "string" &&
   path.length < 240 &&
-  path.split("/").every((part) => /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part) && part !== "node_modules");
+  path
+    .split("/")
+    .every(
+      (part) =>
+        /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(part) &&
+        !part.endsWith(".") &&
+        part.toLowerCase() !== "node_modules" &&
+        !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part),
+    );
 const digest = (files) =>
   createHash("sha256")
     .update(

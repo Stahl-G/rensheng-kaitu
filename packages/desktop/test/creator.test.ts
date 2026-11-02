@@ -76,6 +76,10 @@ test("生成文件不能逃出受管目录，脚本依赖与源码或安装副�
       "nested\\outside.js",
       ".npmrc",
       "node_modules/payload.js",
+      "NODE_MODULES/payload.js",
+      "CON.txt",
+      "assets/NUL",
+      "assets/file.",
     ])
       expect(() => service.stage({ ...bundle(), [path]: "synthetic" })).toThrow();
     for (const extra of [{ scripts: { prepare: "node index.js" } }, { dependencies: { unknown: "*" } }]) {
