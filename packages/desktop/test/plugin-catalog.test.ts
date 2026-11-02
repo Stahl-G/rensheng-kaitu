@@ -6,6 +6,18 @@ import { expect, test, vi } from "vitest";
 // @ts-expect-error Desktop adapters are native ESM.
 import { createPluginService } from "../plugins.mjs";
 
+// Exercise catalog refresh with a compatible bundled fixture, without changing the published catalog.
+vi.mock("../../../docs/site/plugins/index.json", async (original) => {
+  const { default: index } = await original<{
+    default: { plugins: { versions: { engines: { dsh: string } }[] }[] };
+  }>();
+  const fixture = structuredClone(index);
+  for (const plugin of fixture.plugins)
+    for (const version of plugin.versions)
+      if (version.engines.dsh === "0.2.1-rc.3") version.engines.dsh = "0.2.1-rc.5";
+  return { default: fixture };
+});
+
 test("目录区分实际版本与可更新版本，卸载状态仍保留重装入口，未知版本不降级", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-plugin-catalog-"));
   const archive = join(root, "archive");
@@ -19,9 +31,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
   mkdirSync(join(archive, "dsh/node_modules/@deepseek-ai"), { recursive: true });
   symlinkSync(market, join(archive, "dsh/node_modules/@deepseek-ai/dsh-plugin-market-index"), "junction");
   mkdirSync(installed, { recursive: true });
-  const bundledCatalog = JSON.parse(
-    readFileSync(new URL("../../../docs/site/plugins/index.json", import.meta.url), "utf8"),
-  );
+  const bundledCatalog = (await import("../../../docs/site/plugins/index.json")).default;
   const template = bundledCatalog.plugins.find(
     (entry: { name: string }) => entry.name === "kaitu-novel-workspace",
   );
@@ -130,7 +140,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#59b5ed8a911cd6f2a5feccd8ec569a57856bcde2",
     });
     const future = (version: string, dsh: string) => ({ ...template.versions[0], version, engines: { dsh } });
-    expect(await refreshNovel([future("0.4.0", ">=0.2.1-rc.4 <0.3.0")])).toMatchObject({
+    expect(await refreshNovel([future("0.4.0", ">=0.2.1-rc.6 <0.3.0")])).toMatchObject({
       version: "0.3.3-rc.1",
     });
     const available = [future("9.0.0", ">=0.3.0"), future("0.4.0", ">=0.2.0 <0.3.0"), ...template.versions];
@@ -141,7 +151,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       join(profile, "node_modules", novel, "package.json"),
       JSON.stringify({ name: novel, version: "0.1.2" }),
     );
-    expect(await refreshNovel([future("0.4.0", "0.2.1-rc.3")])).toMatchObject({
+    expect(await refreshNovel([future("0.4.0", "0.2.1-rc.5")])).toMatchObject({
       version: "0.4.0",
       installedVersion: "0.1.2",
       updateAvailable: true,

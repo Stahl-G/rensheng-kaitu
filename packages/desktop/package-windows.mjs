@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import { productCopyright, withProductCopyright } from "./brand.mjs";
 import { rewriteArchive } from "./package-archive.mjs";
 import { writePayload } from "./package-payload.mjs";
+import { DSH_VERSION } from "./payload-loader.mjs";
 import { readUpdateConfig } from "./update-config.mjs";
 
 const directory = dirname(fileURLToPath(import.meta.url));
@@ -47,7 +48,7 @@ const updateConfig = readUpdateConfig({
     values["update-public-key"] ??
     (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
 });
-const dshVersion = "0.2.1-rc.3";
+const dshVersion = DSH_VERSION;
 if (manifest.version !== dshVersion || manifest.main !== "lib/main.js")
   throw new Error(`输入必须是 DSH ${dshVersion} 官方 Windows 桌面包`);
 const appDir = join(output, "win-unpacked");

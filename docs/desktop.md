@@ -11,7 +11,7 @@ pnpm build
 node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --dmg
 ```
 
-输入为已安装的 DSH **0.2.1-rc.3、arm64** 应用；脚本拒绝其他内核版本。后处理工具默认来自
+输入为已安装的 DSH **0.2.1-rc.5、arm64** 应用；脚本拒绝其他内核版本。后处理工具默认来自
 `~/Developer/deepseek-harness-rc2` 已安装的依赖，另需 macOS 的 Xcode Command Line Tools。
 输入应用和 DSH 源码保持只读，输出为 `dist/Kaitu.app`、`dist/Kaitu.dmg`。
 省略 `--dmg` 只生成应用。未设置签名变量时使用 ad-hoc 签名。
@@ -28,18 +28,18 @@ node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --d
 
 发布前预检、版本范围冻结、中断恢复与完成标准，统一遵循 [HANDOFF.md 的发版规则](HANDOFF.md)。
 
-DSH 固定为 `0.2.1-rc.3`，宿主接口版本为 `2`。功能更新不修改 `.app`，不更换 Electron、DSH、原生启动器或协议桥接。
+DSH 固定为 `0.2.1-rc.5`，宿主接口版本为 `3`。功能更新不修改 `.app`，不更换 Electron、DSH、原生启动器或协议桥接。
 界面、资料服务、开图工具与技能一起更新，保证前后端同版。启动后在后台检查一次，此后每 24 小时检查，不阻塞首屏。
 发现新版会显示更新提示，用户点击下载，下载后自行选择立即或稍后重启；设置中可关闭自动检查，也可恢复上一版功能。
 恢复功能版本不恢复用户资料；需要回退资料时使用资料的版本历史。
 
 首次安装须使用带 `kaitu-loader.mjs` 的新宿主。旧 App 没有该加载器，不能只靠功能包取得更新能力。
-更新包放在本机 App 状态目录的 `updates/dsh-0.2.1-rc.3-host-2/`，不放工作区或同步盘。
+更新包放在本机 App 状态目录的 `updates/dsh-0.2.1-rc.5-host-3/`，不放工作区或同步盘。
 启动器仍从签名 App 读取。功能包的 `node_modules` 只链接宿主中的固定 DSH 桥接，包内不能分发内核依赖。
 
 发布配置是只含公钥的 JSON：`{"feedUrl":"https://你的发布地址/latest.json","publicKey":"PEM 格式 Ed25519 公钥"}`。
 Mac 和 Windows 打包宿主默认嵌入 `packages/desktop/update-public-key.pem` 中经批准的公开验签公钥，也支持 `--update-public-key <Ed25519公钥文件>` 指定公钥。当前代码配置的 GitHub Releases 正式版兼容频道为：
-`https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.3-host-2/latest.json`。
+`https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.5-host-3/latest.json`。
 这是独立的兼容频道，不依赖 GitHub 的 latest Release，也不固定到 0.1.1。应用版本的 Release 保存不可覆盖的 `kaitu-features.zip`；频道 Release 只更新签名 `latest.json`，指向新的版本 ZIP。
 频道 Release 标为预发布，避免成为官网或 GitHub 的最新应用版本；它只是分发入口，清单内容只指向已发布的正式功能版本，不向正式版用户推送 RC。
 将来更换 DSH 或宿主接口时创建新的兼容频道，保留旧频道的最后一个兼容版本，不能用不兼容清单覆盖旧频道。
@@ -190,9 +190,9 @@ Calendar 的脚本接口不提供账户选择；新建日历所属账户随本�
 6. 确认「开图」日历位于 iCloud 账户，在 iPhone 和手表核对事件与提醒。
    本次自动检查与浏览器验收没有操作真实 Calendar.app，也未验证设备同步、系统授权弹窗或正式签名产物的授权归属。
 
-## 当前 DSH 0.2.1-rc.3 适配
+## 当前 DSH 0.2.1-rc.5 适配
 
-当前内核与 npm 引擎固定为 `0.2.1-rc.3`，`HOST_API=2`。宿主通过就绪流提供经过鉴权的插件页地址，独立功能包必须同时匹配这两个版本。rc.2 / host-1 安装不能直接接受 rc.3 / host-2 功能包；升级内核须重新安装完整宿主。DSH 插件也须在 rc.3 宿主上验证。
+当前候选内核与 npm 引擎固定为 `0.2.1-rc.5`，`HOST_API=3`。宿主通过就绪流提供经过鉴权的插件页地址，独立功能包必须同时匹配这两个版本。rc.3 / host-3 安装不能接受 rc.5 / host-3 功能包；升级内核须重新安装完整宿主。RC5 原生启动、打包与插件安装交互仍待隔离 Mac 验收，本分支未发布。
 
 ## 历史：DSH 0.2.1-rc.2 适配与验证
 

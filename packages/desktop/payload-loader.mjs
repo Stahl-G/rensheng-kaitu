@@ -15,7 +15,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 // Host 3 includes the native canvas runtime required by life-map payloads.
 // Host 2 cannot acquire native dependencies through a feature update.
 export const HOST_API = 3;
-export const DSH_VERSION = "0.2.1-rc.3";
+export const DSH_VERSION = "0.2.1-rc.5";
 
 export function updateRoot(state) {
   return join(state, "updates", `dsh-${DSH_VERSION}-host-${HOST_API}`);
