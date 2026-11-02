@@ -488,9 +488,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     await pauseNoteIndex(ws);
     await pollPending;
   }
-  function resumeWatching() {
+  async function resumeWatching() {
     if (closed) {
-      disposeNoteIndex(ws);
+      await disposeNoteIndex(ws);
       return;
     }
     if (!watchingPaused) return;
@@ -708,7 +708,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                         return await productRequest(ws, method, args, options.ask, calendarPush);
                       } finally {
                         try {
-                          resumeWatching();
+                          await resumeWatching();
                           if (relocate && !closed) await options.onWorkspaceChanged?.();
                         } finally {
                           if (!closed) {
@@ -896,7 +896,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                 });
               } finally {
                 try {
-                  resumeWatching();
+                  await resumeWatching();
                   if (ws.root !== oldRoot) {
                     aiChild?.kill();
                     aiChild = undefined;
@@ -942,7 +942,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                 return await restore(ws, field(data, "version"));
               } finally {
                 try {
-                  resumeWatching();
+                  await resumeWatching();
                 } finally {
                   if (!closed) {
                     options.ask?.relocate(ws.root);
@@ -1056,19 +1056,35 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
-    disposeNoteIndex(ws);
+    const errors: unknown[] = [];
+    try {
+      await disposeNoteIndex(ws);
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       await exclusive(async () => {
         await calendarQueue;
         await saveExternal();
       });
-    } finally {
-      await home.close({ refresh: true });
+    } catch (error) {
+      errors.push(error);
     }
-    for (const upload of uploads.values()) discardUpload(ws, upload.file);
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    );
+    try {
+      await home.close({ refresh: true });
+      for (const upload of uploads.values()) discardUpload(ws, upload.file);
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length > 1) throw new AggregateError(errors, "UI shutdown failed");
+    if (errors.length) throw errors[0];
   };
   try {
     await new Promise<void>((resolve, reject) => {
