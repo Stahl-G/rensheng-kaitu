@@ -82,7 +82,10 @@ export function createLocalAsk({
     workspaceKey: workspaceKeyFor(ws.root),
     workspaceKeyFor,
     runtime: (mode, reader, textOnly) => connection.runtime(mode, reader, textOnly),
-    settings: (resolveImages) => connection.settings(resolveImages),
+    settings: async (resolveImages) => ({
+      ...(await connection.settings(resolveImages)),
+      creatorAvailable: true,
+    }),
     // 本机 Agent 的模型列表走 ACP；内置服务商仍由 connection 转给 SDK。
     models: (input) => connection.models(input),
     configure: (input) => connection.configure(input),

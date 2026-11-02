@@ -28,9 +28,16 @@ export function pageBundle(name, answer) {
     fail("页面图标无效，请重新生成 / Invalid icon. Generate again.");
   const client = `window.__ModuleLoader__.load({ id: ${JSON.stringify(name)}, factory(require) {
 const React = require('react'); const h = React.createElement;
-const Page = (${value.code});
+let Page;
+try { Page = (${value.code}); if (typeof Page !== 'function') throw new Error('Invalid page component'); }
+catch (error) { Page = () => h('p', { role: 'alert' }, '页面无法打开，请在问问重新生成 / Page could not open. Regenerate in Ask.'); }
+class PageBoundary extends React.Component {
+constructor(props) { super(props); this.state = { failed: false }; }
+static getDerivedStateFromError() { return { failed: true }; }
+render() { return this.state.failed ? h('p', { role: 'alert' }, '页面无法打开，请在问问重新生成 / Page could not open. Regenerate in Ask.') : h(Page); }
+}
 return { inject: ['slots'], apply(ctx) {
-ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: ${JSON.stringify(name)} }, Page));
+ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: ${JSON.stringify(name)} }, PageBoundary));
 } }; } });\n`;
   // Parse without evaluation. Neither Host nor Client candidate code executes during generation/review.
   try {

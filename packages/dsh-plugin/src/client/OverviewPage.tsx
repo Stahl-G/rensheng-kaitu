@@ -107,6 +107,7 @@ export interface OverviewPageProps
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
     onOrganize?: (source: string) => Promise<void>,
+    onExplore?: () => void,
   ) => ReactNode;
 }
 const modules = [
@@ -1706,6 +1707,7 @@ function Overview({
                 setReviewMatter(matter);
                 setHomeSubmit(undefined);
               },
+              () => setView("explore"),
             )}
           </div>
         )}
