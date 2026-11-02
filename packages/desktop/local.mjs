@@ -19,6 +19,8 @@ import { readWorkspaceConfig } from "../core/dist/sync-files.js";
 import { createAiProcess } from "./ai-process.mjs";
 import { productCopyright } from "./brand.mjs";
 import { createCalendarExecutor } from "./calendar-executor.mjs";
+import { createPageGenerator } from "./creator-generation.mjs";
+import { createCreatorService } from "./creator.mjs";
 import { assertDesktopIsolation, desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
 import { createPluginService } from "./plugins.mjs";
@@ -87,6 +89,34 @@ export function createLocalAsk({
     support: (method, input) => connection.support(method, input),
     dispose: () => sdk.closeSupport(),
   });
+}
+
+export function createDesktopCreator({ directory, ask, plugins, notify }) {
+  const creator = createCreatorService({ directory, plugins });
+  const generator = createPageGenerator({ creator, ask, onChanged: notify });
+  return async (action, input) => {
+    if (action === "status")
+      return {
+        supported: true,
+        job: generator.status(),
+        pages: creator.list().map((page) => ({ ...page, ...plugins.state(page.name) })),
+      };
+    const value = JSON.parse(input ?? "{}");
+    if (action === "generate") return generator.start(value);
+    if (action === "review") return creator.inspect(value.id, value.revision);
+    if (generator.status().status === "generating")
+      throw new Error("请等页面生成结束 / Wait for page generation to finish.");
+    try {
+      if (action === "install") return await creator.install(value);
+      const page = creator.list().find((page) => page.id === value.id);
+      if (!page) throw new Error("页面草稿不存在 / Page draft not found.");
+      if (action === "enable") return await plugins.setEnabled(page.name, value.enabled === true);
+      if (action === "remove") return await plugins.remove(page.name);
+      throw new Error("无效页面操作 / Invalid page action.");
+    } finally {
+      notify();
+    }
+  };
 }
 
 const LOADING = `<!doctype html><meta charset="utf-8"><title>人生开图</title>
@@ -281,14 +311,26 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     home: aiHome,
     // desktop profile 只能在 DSH 进程不用它时改：先停后台 AI 和问问的引擎，装好再重新加载。
     beforeChange: async () => {
-      await ai.close();
       await ask.prepareRelocation();
+      try {
+        await ai.close();
+      } catch (error) {
+        ask.relocate(ws.root);
+        throw error;
+      }
     },
     onChanged: async () => {
       ai = makeBackgroundAi();
       ask.relocate(ws.root);
       await startAutomation();
     },
+  });
+  let notifyCreator = () => {};
+  const creatorRequest = createDesktopCreator({
+    directory: join(state, "creator"),
+    ask,
+    plugins,
+    notify: () => notifyCreator(),
   });
   const server = await startUi(ws, {
     speech: speech.request,
@@ -299,6 +341,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     systemLocale: app.getPreferredSystemLanguages()[0] || "en",
     desktopUpdate: (action) => updater.request(action),
     plugins: async (action, input) => {
+      if (action.startsWith("creator-")) return creatorRequest(action.slice("creator-".length), input);
       if (action === "explore") return plugins.explore();
       if (action === "page")
         return plugins.page(input, server.url, () => ai.open({ background: true, waitForUrl: true }));
@@ -307,7 +350,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
         : action === "remove"
           ? plugins.remove(input)
           : action === "open"
-            ? ai.open()
+            ? plugins.open(() => ai.open())
             : plugins.list(input === "refresh");
     },
     pickDirectory: async () => {
@@ -331,6 +374,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
       throw new Error("请在问问页面连接内置 AI");
     },
   });
+  notifyCreator = server.notify;
   step("server");
   // 打开资料时用户关了窗口：应用已经在退出，不再接着装窗口。
   if (window.isDestroyed()) return;

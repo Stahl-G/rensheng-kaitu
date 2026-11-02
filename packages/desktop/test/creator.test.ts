@@ -42,7 +42,6 @@ test("草稿跨实例保留，确认后交给既有安装器，失败可重试�
         }),
     );
     const pending = service.install({ ...draft, confirmed: true });
-    await expect(service.install({ ...draft, confirmed: true })).rejects.toThrow("正在安装");
     const spec = install.mock.calls.at(-1)?.[0] as unknown as string;
     const installed = spec.slice("file:".length);
     expect(readFileSync(join(installed, "index.js"), "utf8")).toBe(draft.files["index.js"]);
@@ -57,7 +56,9 @@ test("草稿跨实例保留，确认后交给既有安装器，失败可重试�
     expect(readFileSync(join(installed, "client.js"), "utf8")).toBe(draft.files["client.js"]);
     await expect(service.install({ ...draft, confirmed: true })).rejects.toThrow("源码已改变");
     await make().install({ ...next, confirmed: true });
-    expect(install).toHaveBeenLastCalledWith(expect.stringContaining(next.revision));
+    expect(install).toHaveBeenLastCalledWith(expect.stringContaining(next.revision), {
+      verify: expect.any(Function),
+    });
   } finally {
     release();
     rmSync(root, { recursive: true, force: true });

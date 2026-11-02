@@ -123,7 +123,6 @@ const manifest = (files) => {
  * plugins 是现有双 profile 服务，负责停引擎、安装和恢复，失败原样交回。
  */
 export function createCreatorService({ directory, plugins }) {
-  const installing = new Set();
   const drafts = new Map();
   const location = (area, id, revision) => {
     if (!uuid.test(id) || !uuid.test(revision)) fail("页面草稿标识无效");
@@ -222,26 +221,25 @@ export function createCreatorService({ directory, plugins }) {
       if (confirmed !== true) fail("请先确认安装这个页面");
       const review = inspect(id, revision);
       if (review.digest !== approved) fail("页面源码已改变，请重新审阅并确认");
-      if (installing.has(id)) fail("这个页面正在安装，请等待完成");
-      installing.add(id);
+      // 从刚读入的已确认内容做稳定安装副本，后续修改草稿不影响安装内容。
+      const target = join(directory, "packages", id, revision);
+      ensureDirectories(join(directory, "packages"), join(directory, "packages", id));
       try {
-        // 从刚读入的已确认内容做稳定安装副本，后续修改草稿不影响安装内容。
-        const target = join(directory, "packages", id, revision);
-        ensureDirectories(join(directory, "packages"), join(directory, "packages", id));
-        try {
-          mkdirSync(target);
-          writeFiles(target, review.files);
-        } catch (error) {
-          if (error.code !== "EEXIST") throw error;
-        }
-        if (digest(readFiles(location("packages", id, revision))) !== approved)
-          fail("安装副本已改变，请重新生成草稿");
-        await plugins.install(`file:${target}`);
-        // 当前安装服务没有 Client 生效回执，调用方仍须刷新并核对页面。
-        return { name: review.name, revision, installation: "completed", activation: "unverified" };
-      } finally {
-        installing.delete(id);
+        mkdirSync(target);
+        writeFiles(target, review.files);
+      } catch (error) {
+        if (error.code !== "EEXIST") throw error;
       }
+      if (digest(readFiles(location("packages", id, revision))) !== approved)
+        fail("安装副本已改变，请重新生成草稿");
+      await plugins.install(`file:${target}`, {
+        verify: () => {
+          if (digest(readFiles(location("packages", id, revision))) !== approved)
+            fail("安装源码已改变，请重新生成并确认 / Installation source changed. Regenerate and confirm.");
+        },
+      });
+      // 当前安装服务没有 Client 生效回执，调用方仍须刷新并核对页面。
+      return { name: review.name, revision, installation: "completed", activation: "unverified" };
     },
   };
 }

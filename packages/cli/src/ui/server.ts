@@ -1130,5 +1130,5 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     child.on("error", () => console.error(`请在浏览器打开 ${url}`));
     child.unref();
   }
-  return { url, port, close };
+  return { url, port, close, notify };
 }

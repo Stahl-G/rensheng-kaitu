@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { delimiter, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -95,6 +95,116 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
           (name) => !name.startsWith("@deepseek-ai/"),
         )
       : [];
+  let changing = false;
+  let recoveryError;
+  const states = new Map();
+  const refreshStates = () => {
+    states.clear();
+    const names = new Set(profiles().flatMap((profile) => Object.keys(manifest(profile).dependencies ?? {})));
+    for (const name of names) {
+      const rows = PROFILES.map((profile) => {
+        const data = existsSync(join(profileDir(profile), "package.json")) ? manifest(profile) : {};
+        let version;
+        try {
+          version = JSON.parse(
+            readFileSync(join(profileDir(profile), "node_modules", name, "package.json"), "utf8"),
+          ).version;
+        } catch {
+          /* Interrupted package. */
+        }
+        return {
+          installed: name in (data.dependencies ?? {}),
+          enabled: data.dsh?.profile?.bundles?.includes(name) === true,
+          version,
+        };
+      });
+      states.set(name, {
+        installed: rows.every((row) => row.installed),
+        enabled: rows.every((row) => row.enabled),
+        version: rows[0].version,
+        incomplete: rows.some((row) => !row.installed || !row.version || row.version !== rows[0].version),
+      });
+    }
+  };
+  refreshStates();
+  // All mutations share the same desktop/sdk pair, including market installs and removals.
+  const change = async (operation) => {
+    if (changing)
+      throw new KaituError(
+        "插件正在变更，请等完成 / Plugins are changing. Wait for completion.",
+        "PLUGIN_BUSY",
+      );
+    changing = true;
+    let shouldResume = false;
+    try {
+      await beforeChange();
+      shouldResume = true;
+      const saved = PROFILES.map((profile) => ({
+        profile,
+        existed: existsSync(profileDir(profile)),
+        files: Object.fromEntries(
+          ["package.json", "pnpm-lock.yaml"].map((name) => {
+            const file = join(profileDir(profile), name);
+            return [name, existsSync(file) ? readFileSync(file) : null];
+          }),
+        ),
+      }));
+      let recovered = true;
+      const restore = ({ profile, files }) => {
+        for (const [name, bytes] of Object.entries(files)) {
+          const file = join(profileDir(profile), name);
+          if (bytes === null) rmSync(file, { force: true });
+          else writeFileSync(file, bytes);
+        }
+      };
+      try {
+        return await operation();
+      } catch (cause) {
+        const errors = [];
+        for (const row of saved) {
+          try {
+            if (!row.existed) {
+              rmSync(profileDir(row.profile), { recursive: true, force: true });
+              continue;
+            }
+            restore(row);
+            if (row.files["package.json"])
+              await run(row.profile, [
+                "install",
+                "--offline",
+                "--ignore-scripts",
+                row.files["pnpm-lock.yaml"] ? "--frozen-lockfile" : "--no-lockfile",
+              ]);
+            restore(row);
+          } catch (error) {
+            errors.push(error);
+          }
+        }
+        if (errors.length) {
+          recovered = false;
+          shouldResume = false;
+          recoveryError = new KaituError(
+            `插件变更失败，原插件恢复失败；引擎保持停止：${cause.message}；${errors.map((error) => error.message).join("；")}`,
+            "PLUGIN_RECOVERY",
+          );
+          throw recoveryError;
+        }
+        throw cause;
+      } finally {
+        refreshStates();
+        if (recovered) {
+          shouldResume = false;
+          await onChanged();
+        }
+      }
+    } finally {
+      try {
+        if (shouldResume) await onChanged();
+      } finally {
+        changing = false;
+      }
+    }
+  };
   const text = (value) => (typeof value === "string" ? value : (value?.zh ?? value?.en ?? ""));
   let market;
   let bundled;
@@ -130,10 +240,20 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
     return refreshing;
   };
   return {
+    open(open) {
+      if (recoveryError) throw recoveryError;
+      if (changing)
+        throw new KaituError(
+          "插件正在变更，请等完成 / Plugins are changing. Wait for completion.",
+          "PLUGIN_BUSY",
+        );
+      return open();
+    },
+    state: (name) => states.get(name) ?? { installed: false, enabled: false, incomplete: false },
     async page(id, workbenchOrigin, open) {
       const entry = this.explore().find((item) => item.id === id);
       if (!entry) throw new KaituError("这个模块已卸载", "PLUGIN");
-      const { url } = await open();
+      const { url } = await this.open(open);
       const target = new URL(url);
       if (
         target.protocol !== "http:" ||
@@ -151,31 +271,36 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
       return target.href;
     },
     explore() {
-      const entries = installed().flatMap((name) => {
-        try {
-          const pkg = JSON.parse(
-            readFileSync(join(profileDir("desktop"), "node_modules", name, "package.json"), "utf8"),
-          );
-          const entry = pkg.kaitu?.explore;
-          if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
-          const pair = (value) =>
-            typeof value === "string"
-              ? [value, value]
-              : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
-          return [
-            {
-              id: `plugin:${name}`,
-              name,
-              page: entry.page,
-              title: pair(entry.title),
-              description: pair(entry.description),
-              icon: typeof entry.icon === "string" ? entry.icon : "◇",
-            },
-          ];
-        } catch {
-          return [];
-        }
-      });
+      const bundles = existsSync(join(profileDir("desktop"), "package.json"))
+        ? manifest("desktop").dsh?.profile?.bundles
+        : undefined;
+      const entries = installed()
+        .filter((name) => !bundles || bundles.includes(name))
+        .flatMap((name) => {
+          try {
+            const pkg = JSON.parse(
+              readFileSync(join(profileDir("desktop"), "node_modules", name, "package.json"), "utf8"),
+            );
+            const entry = pkg.kaitu?.explore;
+            if (!entry || typeof entry.page !== "string" || !entry.page || !text(entry.title)) return [];
+            const pair = (value) =>
+              typeof value === "string"
+                ? [value, value]
+                : [value?.zh ?? value?.en ?? "", value?.en ?? value?.zh ?? ""];
+            return [
+              {
+                id: `plugin:${name}`,
+                name,
+                page: entry.page,
+                title: pair(entry.title),
+                description: pair(entry.description),
+                icon: typeof entry.icon === "string" ? entry.icon : "◇",
+              },
+            ];
+          } catch {
+            return [];
+          }
+        });
       return entries;
     },
     async list(refresh = false) {
@@ -245,33 +370,34 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
         }));
       return [...catalog, ...extra];
     },
-    async install(spec) {
+    async install(spec, { verify = () => {} } = {}) {
       if (typeof spec !== "string" || !spec.trim()) throw new KaituError("请选择要安装的插件", "PLUGIN");
-      await beforeChange();
-      try {
+      return change(async () => {
         await prepareProfiles();
         for (const profile of PROFILES) {
           const before = Object.keys(manifest(profile).dependencies ?? {});
+          verify();
           await run(profile, ["add", spec]);
           for (const name of Object.keys(manifest(profile).dependencies ?? {}))
             if (!before.includes(name)) setBundle(profile, name, true);
         }
-      } finally {
-        await onChanged();
-      }
+      });
     },
     async remove(name) {
       if (!installed().includes(name)) throw new KaituError("这个插件没有安装", "PLUGIN");
-      await beforeChange();
-      try {
+      return change(async () => {
         for (const profile of profiles()) {
           if (!(name in (manifest(profile).dependencies ?? {}))) continue;
           setBundle(profile, name, false);
           await run(profile, ["remove", name]);
         }
-      } finally {
-        await onChanged();
-      }
+      });
+    },
+    async setEnabled(name, enabled) {
+      if (!this.state(name).installed) throw new KaituError("这个插件未完整安装", "PLUGIN");
+      return change(async () => {
+        for (const profile of PROFILES) setBundle(profile, name, enabled === true);
+      });
     },
   };
 }
