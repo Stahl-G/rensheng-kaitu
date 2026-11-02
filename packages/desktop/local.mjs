@@ -22,6 +22,7 @@ import { createCalendarExecutor } from "./calendar-executor.mjs";
 import { assertDesktopIsolation, desktopPaths } from "./environment.mjs";
 import { createPayloadUpdater } from "./payload-update.mjs";
 import { createPluginService } from "./plugins.mjs";
+import { showPrivacyNotice } from "./privacy.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
 import { createSpeech } from "./speech.mjs";
 
@@ -219,6 +220,12 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   });
   app.on("window-all-closed", () => app.quit());
   const painted = new Promise((resolve) => window.once("ready-to-show", resolve));
+  const systemLocale = app.getPreferredSystemLanguages()[0] || "en";
+  // No workspace, local HTTP server, collectors, sync, weather, updates or AI before acknowledgment.
+  if (!(await showPrivacyNotice({ window, systemLocale }))) {
+    app.quit();
+    return;
+  }
   await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(LOADING)}`);
   await painted;
   window.show();
@@ -296,7 +303,23 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     open: false,
     webRoot: join(resources, "web"),
     ask,
-    systemLocale: app.getPreferredSystemLanguages()[0] || "en",
+    systemLocale,
+    privacyNotice: async () => {
+      const notice = new BrowserWindow({
+        parent: window,
+        modal: true,
+        title: "资料去向 / Where your data goes",
+        width: 820,
+        height: 800,
+        minWidth: 360,
+        minHeight: 580,
+        show: false,
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+      });
+      await showPrivacyNotice({ window: notice, systemLocale, review: true });
+      if (!notice.isDestroyed()) notice.close();
+      return null;
+    },
     desktopUpdate: (action) => updater.request(action),
     plugins: async (action, input) => {
       if (action === "explore") return plugins.explore();

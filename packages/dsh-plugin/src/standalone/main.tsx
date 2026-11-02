@@ -102,6 +102,7 @@ const props: OverviewPageProps = {
   organizerSeen: () => call("organizerSeen"),
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),
+  privacyNotice: () => call("privacyNotice"),
   plugins: (action, input) => call("plugins", action, input),
   configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
   exportWorkspace: () => call("exportWorkspace"),
