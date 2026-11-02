@@ -74,9 +74,8 @@ const items = [
 
 export function privacyNoticeHtml({ locale = "zh-CN", review = false } = {}) {
   const pair = ([zh, en]) => `<span lang="zh-CN">${zh}</span><span lang="en">${en}</span>`;
-  const script = `const review = ${review};
+  const script = `let full = ${review};
 const display = (focus = false) => {
-  const full = review || location.hash === '#policy';
   document.querySelector('#summary').hidden = full;
   document.querySelector('#policy').hidden = !full;
   document.querySelector('#summary-title').hidden = full;
@@ -88,7 +87,9 @@ const display = (focus = false) => {
   document.querySelector('.content').scrollTop = 0;
   if (focus) document.querySelector('h1').focus();
 };
-addEventListener('hashchange', () => display(true));
+for (const [id, policy] of [['policy-link', true], ['back', false]]) {
+  document.getElementById(id)?.addEventListener('click', event => { event.preventDefault(); full = policy; display(true); });
+}
 document.querySelector('select').addEventListener('change', event => { document.documentElement.lang = event.target.value; display(); });
 display();`;
   const hash = createHash("sha256").update(script).digest("base64");
@@ -124,12 +125,13 @@ export async function showPrivacyNotice({ window, systemLocale = "zh-CN", review
   const preferences = readPreferences();
   if (!review && preferences.privacyNoticeVersion === PRIVACY_NOTICE_VERSION) return true;
   const locale = preferences.locale ?? (/^zh\b/i.test(systemLocale) ? "zh-CN" : "en");
+  const contents = window.webContents;
   let finish;
   const result = new Promise((resolve) => {
     finish = resolve;
   });
   const cleanup = () => {
-    window.webContents.removeListener("will-navigate", navigate);
+    if (!contents.isDestroyed()) contents.removeListener("will-navigate", navigate);
     window.removeListener("closed", closed);
   };
   const closed = () => {
@@ -156,11 +158,12 @@ export async function showPrivacyNotice({ window, systemLocale = "zh-CN", review
       cleanup();
       finish(true);
     } catch {
-      void window.webContents.executeJavaScript("document.querySelector('#error').hidden = false");
+      if (!contents.isDestroyed())
+        void contents.executeJavaScript("document.querySelector('#error').hidden = false");
     }
   };
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  window.webContents.on("will-navigate", navigate);
+  contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  contents.on("will-navigate", navigate);
   window.once("closed", closed);
   try {
     await window.loadURL(
