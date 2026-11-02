@@ -91,13 +91,17 @@ export function Creator({
           setReview(null);
           setReceipt(t("已安装 · 页面待验证", "Installed · Page not verified"));
         }
-        if (["install", "enable", "remove"].includes(action))
-          window.dispatchEvent(new Event("kaitu:plugins-changed"));
-        await load();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         if (action === "install") setReview(null);
       } finally {
+        if (["install", "enable", "remove"].includes(action))
+          window.dispatchEvent(new Event("kaitu:plugins-changed"));
+        try {
+          await load();
+        } catch (err) {
+          setError((current) => current || String(err));
+        }
         setWorking("");
       }
     },
