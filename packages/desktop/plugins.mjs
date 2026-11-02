@@ -227,6 +227,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
             installed: names.includes(plugin.name),
             installedVersion: versions.get(plugin.name),
             updateAvailable:
+              latest !== undefined &&
               knownVersions.get(plugin.name)?.has(versions.get(plugin.name)) === true &&
               semver.gt(latest.version, versions.get(plugin.name)),
           };

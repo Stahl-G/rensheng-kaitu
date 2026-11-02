@@ -143,6 +143,12 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   await build({
     entryPoints: [join(directory, "sdk-web.mjs")],
     outfile: join(payload, "dist/sdk-web.mjs"),
+    // Root search-provider peers also see SIWC's RC3 graph; use the CLI's pinned runtime.
+    alias: {
+      "@deepseek-ai/dsh-llm": createRequire(join(root, "packages/cli/package.json")).resolve(
+        "@deepseek-ai/dsh-llm",
+      ),
+    },
     bundle: true,
     platform: "node",
     format: "esm",
