@@ -9,7 +9,13 @@ const summary = ({ id, revision, title, name }) => ({ id, revision, title, name 
 
 /** Build an ordinary DSH bundle; model output never supplies Host code or installation paths. */
 export function pageBundle(name, answer) {
-  const value = JSON.parse(answer.replace(/^\s*```(?:json)?\s*/, "").replace(/\s*```\s*$/, ""));
+  let value;
+  try {
+    value = JSON.parse(answer.replace(/^\s*```(?:json)?\s*/, "").replace(/\s*```\s*$/, ""));
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+  } catch {
+    fail("AI 返回的页面格式无效，请重新生成 / Invalid page JSON. Generate again.");
+  }
   for (const [key, limit] of [
     ["title", 80],
     ["description", 400],
@@ -27,7 +33,11 @@ return { inject: ['slots'], apply(ctx) {
 ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: ${JSON.stringify(name)} }, Page));
 } }; } });\n`;
   // Parse without evaluation. Neither Host nor Client candidate code executes during generation/review.
-  new Script(client, { filename: "client.js" });
+  try {
+    new Script(client, { filename: "client.js" });
+  } catch {
+    fail("AI 返回的页面代码语法有误，请重新生成 / Invalid page code syntax. Generate again.");
+  }
   const meta = JSON.stringify({ meta: { title: value.title, description: value.description } });
   return {
     "package.json": JSON.stringify({

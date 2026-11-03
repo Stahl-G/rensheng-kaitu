@@ -24,6 +24,7 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
   const closingStarted = new Promise<void>((resolve) => {
     closing = resolve;
   });
+  const prompts: string[] = [];
   let close = () =>
     new Promise<void>((resolve) => {
       release = resolve;
@@ -35,8 +36,17 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
       onNotification: (listener: typeof notify) => {
         notify = listener;
       },
-      request: async (method: string, params: { sessionId: string }) => {
+      request: async (
+        method: string,
+        params: { sessionId: string; contentBlocks: { type: string; text: string }[] },
+      ) => {
         if (method === "session/prompt") {
+          prompts.push(
+            params.contentBlocks
+              .filter((block) => block.type === "text")
+              .map((block) => block.text)
+              .join("\n"),
+          );
           notify("session.event", {
             sessionId: params.sessionId,
             event: {
@@ -64,7 +74,9 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
   const creator = createCreatorService({ directory: join(root, "creator"), plugins: { install } });
   const generator = createPageGenerator({ creator, ask });
   try {
-    expect(generator.start({ prompt: "合成阅读书架" }).status).toBe("generating");
+    const excerpt =
+      '用这段资料做阅读页，保持原文和数值：\n书名："星港来信"；已读120分钟；目标300分钟。\n这是测试片段。';
+    expect(generator.start({ prompt: excerpt }).status).toBe("generating");
     await closingStarted;
     expect(generator.status().status).toBe("generating");
     expect(creator.list()).toEqual([]);
@@ -74,6 +86,7 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
     await generator.settled();
     const { id, revision } = generator.status().draft;
     const review = creator.inspect(id, revision);
+    expect(prompts[0]).toContain(JSON.stringify(excerpt));
     expect(install).not.toHaveBeenCalled();
     expect(review.files["index.js"]).toBe("export function apply() {}\n");
     expect(createCreatorService({ directory: join(root, "creator"), plugins: { install } }).list()).toEqual(
@@ -104,6 +117,8 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
     await generator.settled();
     expect(generator.status().draft.name).toBe(review.name);
     expect(generator.status().draft.revision).not.toBe(revision);
+    expect(prompts[1]).toContain(JSON.stringify(review.files["client.js"]));
+    expect(creator.inspect(id, revision)).toEqual(review);
     expect(install).toHaveBeenCalledTimes(1);
   } finally {
     release();
@@ -142,10 +157,25 @@ test("本机 ACP、无效生成结果或关闭失败均不产生可安装草稿�
       close: vi.fn(async () => {}),
     };
     background.mockReturnValue(service);
-    generator.start({ prompt: "合成页面" });
-    await generator.settled();
-    expect(generator.status().status).toBe("failed");
-    expect(service.close).toHaveBeenCalled();
+    for (const text of [
+      "{invalid",
+      "null",
+      "[]",
+      JSON.stringify({ ...JSON.parse(answer), code: "function Page(){ return <p/>; }" }),
+    ]) {
+      service.events = () => [
+        { type: "assistant/message", data: { message: { content: [{ type: "text", text }] } } },
+      ];
+      generator.start({ prompt: "合成页面" });
+      await generator.settled();
+      expect(generator.status()).toMatchObject({
+        status: "failed",
+        error: expect.stringMatching(/请重新生成.*Generate again/),
+      });
+      expect(service.close).toHaveBeenCalled();
+      expect(creator.list()).toHaveLength(1);
+      expect(creator.inspect(original.id, original.revision)).toEqual(original);
+    }
     service.events = () => [
       { type: "assistant/message", data: { message: { content: [{ type: "text", text: answer }] } } },
     ];
