@@ -1,31 +1,197 @@
-name: CI
-
+name: SDK Windows stage diagnostic (do not merge)
 on:
   pull_request:
-  push:
-    branches: [main]
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
-
+    types: [opened]
+permissions:
+  contents: read
 jobs:
-  check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  diagnose:
+    if: github.head_ref == 'codex/dsh-rc5-sdk-diagnose-1104'
+    runs-on: windows-latest
+    env:
+      KAITU_DIAG_ROOT: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: 39f5770402d5bc3c01d3b43ac72b299d39fbbc3f
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
+        with:
+          version: '11.22.0'
+          package_json_file: package.json
+          run_install: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: '24.22.2'
           cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm --filter @kaitu/dsh-plugin build:testsite
       - run: pnpm typecheck
-      - run: pnpm test
+      - name: Prepare observation outside the fixed source tree
+        shell: pwsh
+        run: |
+          $harness = Join-Path $env:RUNNER_TEMP "sdk-stage-diagnostic"
+          New-Item -ItemType Directory -Force -Path (Join-Path $harness "artifacts") | Out-Null
+          $assembly = Join-Path $harness "ownership.dll"
+          if (!(Test-Path $assembly)) {
+            Add-Type -OutputAssembly $assembly -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          using System.Runtime.InteropServices.ComTypes;
+          using System.Text;
+          public static class SdkFileOwners {
+           [StructLayout(LayoutKind.Sequential)] public struct Unique { public uint pid; public FILETIME started; }
+           [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)] public struct Info {
+            public Unique process;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst=256)] public string app;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst=64)] public string service;
+            public uint type, status, session;
+            [MarshalAs(UnmanagedType.Bool)] public bool restartable;
+           }
+           [DllImport("rstrtmgr.dll",CharSet=CharSet.Unicode)] static extern uint RmStartSession(out uint h,uint flags,StringBuilder key);
+           [DllImport("rstrtmgr.dll")] static extern uint RmEndSession(uint h);
+           [DllImport("rstrtmgr.dll",CharSet=CharSet.Unicode)] static extern uint RmRegisterResources(uint h,uint files,string[] paths,uint apps,IntPtr processes,uint services,IntPtr names);
+           [DllImport("rstrtmgr.dll")] static extern uint RmGetList(uint h,out uint needed,ref uint count,[In,Out] Info[] infos,out uint reasons);
+           public static object Query(string[] paths) {
+            uint h; uint start=RmStartSession(out h,0,new StringBuilder(33));
+            if(start!=0)return new {startCode=start};
+            try {
+             uint register=RmRegisterResources(h,(uint)paths.Length,paths,0,IntPtr.Zero,0,IntPtr.Zero);
+             if(register!=0)return new {registerCode=register};
+             uint needed,count=0,reasons;uint first=RmGetList(h,out needed,ref count,null,out reasons);
+             if(first!=234)return new {listCode=first,count=count,owners=new Info[0]};
+             Info[] owners=new Info[needed];count=needed;uint second=RmGetList(h,out needed,ref count,owners,out reasons);
+             if(second!=0)return new {listCode=second,needed=needed};
+             Array.Resize(ref owners,(int)count);return new {listCode=second,owners=owners};
+            } finally {RmEndSession(h);}
+           }
+          }
+          '@
+          }
+          @'
+          import {createRequire} from "node:module";
+          import {resolve} from "node:path";
+          import {pathToFileURL} from "node:url";
+          const root=process.env.KAITU_DIAG_ROOT, dir=process.env.KAITU_DIAG_HARNESS;
+          const ts=createRequire(resolve(root,"package.json"))("typescript");
+          const {default:base}=await import(pathToFileURL(resolve(root,"vitest.config.ts")));
+          if(base.test.maxWorkers!==2||base.test.testTimeout!==15000||base.test.retry)throw Error("Unexpected worker/deadline/retry settings");
+          export default {...base,root,plugins:[...base.plugins,{name:"temporary-sdk-observation",enforce:"pre",transform(code,id){
+            const file=id.replaceAll("\\","/");
+            if(file.endsWith("/sdk-stream.test.ts")){
+              const source=ts.createSourceFile(id,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS), statements=new Map(), edits=[];
+              const visit=node=>{if(ts.isAwaitExpression(node)){let stmt=node.parent;while(stmt&&!ts.isExpressionStatement(stmt)&&!ts.isVariableStatement(stmt))stmt=stmt.parent;if(stmt)statements.set(stmt.getStart(source),stmt);}ts.forEachChild(node,visit);};visit(source);
+              for(const [start,stmt]of statements){const line=source.getLineAndCharacterOfPosition(start).line+1,label=`original-line-${line}`;edits.push({at:start,text:`globalThis.__sdkStage("before",${JSON.stringify(label)});`},{at:stmt.end,text:`globalThis.__sdkStage("after",${JSON.stringify(label)});`});}
+              for(const e of edits.sort((a,b)=>b.at-a.at))code=code.slice(0,e.at)+e.text+code.slice(e.at);
+              code=code.replace('const requests: Record<string, unknown>[] = [];','globalThis.__sdkRoot(root); const requests: Record<string, unknown>[] = [];');
+              code=code.replace('requests.push(body);','globalThis.__sdkTrace("provider.request",{stream:!!body.stream}); requests.push(body);');
+              code=code.replace('chunk({ content: "Synthetic " });','chunk({ content: "Synthetic " }); globalThis.__sdkTrace("provider.prefix.sent");');
+              code=code.replaceAll('finish = () => {','finish = () => { globalThis.__sdkTrace("provider.finish");');
+              code=code.replace('events.push(event);','globalThis.__sdkTrace("ask.event",{type:event.type,status:event.data?.status,textLength:event.data?.text?.length}); events.push(event);');
+              code=code.replace('rmSync(root, { recursive: true, force: true });','globalThis.__sdkCleanup(root,()=>rmSync(root, { recursive: true, force: true }));');
+              return {code,map:null};
+            }
+            if(file.endsWith("/packages/desktop/sdk-runtime.mjs")){
+              const source=ts.createSourceFile(id,code,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS),edits=[];
+              const visit=node=>{if(ts.isVariableStatement(node)&&node.declarationList.declarations.some(d=>ts.isIdentifier(d.name)&&d.name.text==="child"&&d.initializer&&ts.isCallExpression(d.initializer)&&d.initializer.expression.getText(source)==="spawn")){const helper=node.getText(source).includes("[helper, operation]");edits.push({at:node.getStart(source),text:`globalThis.__sdkTrace?.("spawn.call",{operation:${helper?'operation':'capabilities?"sdk-capabilities":"sdk-session"'}});`},{at:node.end,text:`globalThis.__sdkChild?.(child,{operation:${helper?'operation':'capabilities?"sdk-capabilities":"sdk-session"'},cwd:${helper?'process.cwd()':'home'},dshHome:home,localAppData:env.LOCALAPPDATA});`});}ts.forEachChild(node,visit);};visit(source);
+              if(edits.length!==4)throw Error("Expected two SDK spawn sites");for(const e of edits.sort((a,b)=>b.at-a.at))code=code.slice(0,e.at)+e.text+code.slice(e.at);return {code,map:null};
+            }
+            if(file.endsWith("/test/isolate-home.ts"))return {code:code.replace('rmSync(home, { recursive: true, force: true })','globalThis.__sdkCleanup(home,()=>rmSync(home, { recursive: true, force: true }))'),map:null};
+          }}],test:{...base.test,setupFiles:[resolve(dir,"setup.mjs"),...base.test.setupFiles],reporters:["default","json"],outputFile:{json:resolve(process.env.KAITU_DIAG_ARTIFACTS,"vitest.json")}}};
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "config.mjs")
+          @'
+          import {appendFileSync,closeSync,lstatSync,mkdirSync,openSync,readdirSync,writeFileSync} from "node:fs";
+          import {spawn} from "node:child_process";
+          import {join,resolve} from "node:path";
+          import {pathToFileURL} from "node:url";
+          const {beforeEach,afterAll}=await import(pathToFileURL(resolve(process.env.KAITU_DIAG_ROOT,"node_modules/vitest/dist/index.js")));
+          const out=process.env.KAITU_DIAG_ARTIFACTS, dir=process.env.KAITU_DIAG_HARNESS;
+          mkdirSync(out,{recursive:true});
+          let active=false,failed=false,seq=0,current="before-test",roots=new Set(),records=[],children=new Map(),probed=new Set();
+          const file=join(out,`sdk-${process.pid}.jsonl`);
+          const trace=(kind,data={})=>{if(!active)return;const row={pid:process.pid,seq:++seq,utc:new Date().toISOString(),at:performance.now(),kind,stage:current,...data};records.push(row);console.error("sdk-diag",JSON.stringify(row));if(failed)appendFileSync(file,JSON.stringify(row)+"\n");};
+          const flush=()=>writeFileSync(file,records.map(x=>JSON.stringify(x)).join("\n")+"\n");
+          const live=()=>[...children.values()].map(({child,...meta})=>({...meta,exitCode:child.exitCode,signalCode:child.signalCode,killed:child.killed}));
+          const inventory=path=>{const rows=[];const scan=(p,depth)=>{if(rows.length>=200)return;try{const s=lstatSync(p);rows.push({path:p,mode:s.mode,size:s.size,directory:s.isDirectory(),symlink:s.isSymbolicLink()});if(s.isDirectory()&&depth<4)for(const name of readdirSync(p))scan(join(p,name),depth+1);}catch(e){rows.push({path:p,error:e.code});}};scan(path,0);return rows;};
+          const snapshot=(kind,extra={})=>{trace(kind,{children:live(),directories:[...roots],...extra});flush();};
+          globalThis.__sdkTrace=trace;
+          globalThis.__sdkStage=(edge,label)=>{if(!active)return;current=`${edge}:${label}`;trace(`stage.${edge}`,{label});};
+          globalThis.__sdkRoot=root=>{if(active){roots.add(root);trace("test.root",{root});}};
+          globalThis.__sdkChild=(child,meta)=>{if(!active)return;const row={...meta,pid:child.pid,spawnAt:performance.now(),child};children.set(child.pid??`failed-${seq}`,row);trace("child.created",{...meta,childPid:child.pid});child.once("spawn",()=>trace("child.spawned",{childPid:child.pid,operation:meta.operation}));child.once("error",e=>trace("child.error",{childPid:child.pid,code:e.code,message:e.message}));child.once("exit",(code,signal)=>{row.exitAt=performance.now();trace("child.exit",{childPid:child.pid,operation:meta.operation,code,signal,ms:row.exitAt-row.spawnAt});});child.once("close",(code,signal)=>trace("child.close",{childPid:child.pid,operation:meta.operation,code,signal}));};
+          globalThis.__sdkCleanup=(path,remove)=>{
+            if(!active)return remove();trace("cleanup.begin",{path});
+            try{const value=remove();trace("cleanup.done",{path});return value;}
+            catch(e){failed=true;snapshot("cleanup.error",{path,error:{code:e.code,syscall:e.syscall,message:e.message,path:e.path}});
+              if(process.platform==="win32"&&!probed.has(path)){probed.add(path);const request=join(out,`ownership-${process.pid}-${seq}.request.json`),log=request+".log";writeFileSync(request,JSON.stringify({faultUtc:new Date().toISOString(),root:path,pids:[process.pid,...[...children.values()].map(x=>x.pid).filter(Boolean)]}));const fd=openSync(log,"w");const probe=spawn("pwsh",["-NoLogo","-NoProfile","-File",join(dir,"ownership.ps1"),"-Request",request],{cwd:dir,stdio:["ignore",fd,fd],windowsHide:true});closeSync(fd);probe.once("error",err=>trace("ownership.probe.error",{code:err.code,message:err.message}));probe.once("exit",code=>trace("ownership.probe.exit",{code}));probe.unref();trace("ownership.probe.started",{pid:probe.pid,request});}
+              trace("cleanup.remaining",{path,entries:inventory(path)}); flush(); throw e;
+            }
+          };
+          beforeEach(context=>{
+            active=context.task.file.filepath.replaceAll("\\","/").endsWith("/sdk-stream.test.ts");if(!active)return;
+            roots.add(process.env.HOME);trace("test.begin",{name:context.task.name});
+            context.signal.addEventListener("abort",()=>{failed=true;snapshot("test.aborted",{reason:String(context.signal.reason)});},{once:true});
+            context.onTestFailed(({errors})=>{failed=true;snapshot("test.failed",{errors:errors?.map(e=>({name:e.name,message:e.message}))});});
+          });
+          afterAll(()=>{if(active){snapshot("suite.afterAll");}});
+          process.on("exit",()=>{if(active){trace("worker.exit",{children:live()});flush();}});
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "setup.mjs")
+          @'
+          import {spawn,execFileSync} from "node:child_process";
+          import {closeSync,openSync,readFileSync,writeFileSync,writeSync} from "node:fs";
+          import {join} from "node:path";
+          import {createHash} from "node:crypto";
+          const root=process.env.KAITU_DIAG_ROOT,out=process.env.KAITU_DIAG_ARTIFACTS,dir=process.env.KAITU_DIAG_HARNESS;
+          const git=(...args)=>execFileSync("git",["-C",root,...args],{encoding:"utf8"}).trim();
+          const hash=()=>createHash("sha256").update(readFileSync(join(root,"pnpm-lock.yaml"))).digest("hex");
+          const metadata={sha:git("rev-parse","HEAD"),tree:git("rev-parse","HEAD^{tree}"),dirtyBefore:git("status","--porcelain"),lockBefore:hash(),node:process.version,runner:process.env.RUNNER_NAME,image:process.env.ImageVersion};
+          if(metadata.sha!=="39f5770402d5bc3c01d3b43ac72b299d39fbbc3f"||metadata.tree!=="5e8c8c6e0721524695ea6d13d03bfe3e768a5be3"||metadata.dirtyBefore)throw Error("Unexpected fixed source");
+          writeFileSync(join(out,"source.json"),JSON.stringify(metadata,null,2));
+          const fd=openSync(join(out,"tests.log"),"w"),child=spawn(process.execPath,[join(root,"node_modules/vitest/vitest.mjs"),"run","--config",join(dir,"config.mjs")],{cwd:root,env:process.env,stdio:["ignore","pipe","pipe"]});
+          for(const stream of [child.stdout,child.stderr])stream.on("data",data=>{writeSync(fd,data);process.stdout.write(data);});
+          child.once("error",error=>{metadata.error=String(error);});
+          child.once("close",code=>{closeSync(fd);metadata.exitCode=code;metadata.lockAfter=hash();metadata.dirtyAfter=git("status","--porcelain");writeFileSync(join(out,"source.json"),JSON.stringify(metadata,null,2));console.log("sdk-diagnostic-result",JSON.stringify(metadata));process.exitCode=code===0&&metadata.lockBefore===metadata.lockAfter&&!metadata.dirtyAfter?0:1;});
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "run.mjs")
+          @'
+          param([string]$Request)
+          $ErrorActionPreference = "Stop"
+          $assembly = Join-Path $PSScriptRoot "ownership.dll"
+          Add-Type -Path $assembly
+          $inputData = Get-Content -LiteralPath $Request -Raw | ConvertFrom-Json
+          $result = [ordered]@{ faultUtc=$inputData.faultUtc; queryStartedUtc=[DateTime]::UtcNow.ToString('o'); root=$inputData.root; directoryHandlesCovered=$false }
+          try {
+            $item = Get-Item -LiteralPath $inputData.root -Force
+            $acl = Get-Acl -LiteralPath $inputData.root
+            $result.attributes = $item.Attributes.ToString()
+            $result.owner = $acl.Owner
+            $result.acl = $acl.AccessToString
+            $files = @(Get-ChildItem -LiteralPath $inputData.root -File -Recurse -Force | Select-Object -First 200 -ExpandProperty FullName)
+            $result.files = $files
+            $result.fileOwners = if ($files.Count) { [SdkFileOwners]::Query([string[]]$files) } else { @{ note='No remaining regular files; directory handle ownership is not covered by Restart Manager.' } }
+          } catch { $result.queryError = $_.Exception.Message }
+          $result.processes = @(foreach ($processId in $inputData.pids) {
+            try { Get-Process -Id $processId -ErrorAction Stop | Select-Object Id,ProcessName,StartTime,HandleCount,CPU }
+            catch { @{ pid=$processId; error=$_.Exception.Message } }
+          })
+          $result.queryFinishedUtc = [DateTime]::UtcNow.ToString('o')
+          $result | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath ($Request+'.result.json') -Encoding utf8
+          $result | ConvertTo-Json -Depth 10
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "ownership.ps1")
+      - name: Run original full suite once with SDK observations
+        env:
+          KAITU_DIAG_HARNESS: ${{ runner.temp }}/sdk-stage-diagnostic
+          KAITU_DIAG_ARTIFACTS: ${{ runner.temp }}/sdk-stage-diagnostic/artifacts
+        shell: pwsh
+        run: |
+          node (Join-Path $env:KAITU_DIAG_HARNESS "run.mjs")
+          exit $LASTEXITCODE
+      - name: Preserve first diagnostic result, including failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sdk-stage-diagnostic-${{ github.run_id }}
+          path: ${{ runner.temp }}/sdk-stage-diagnostic/artifacts
+          if-no-files-found: error
+          retention-days: 30
