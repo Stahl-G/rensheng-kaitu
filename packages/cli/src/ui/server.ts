@@ -90,6 +90,7 @@ export interface UiOptions {
   openAi?: () => Promise<{ url?: string }>;
   pickDirectory?: () => Promise<string | null>;
   desktopUpdate?: (action: string) => Promise<unknown>;
+  privacyNotice?: () => Promise<unknown>;
   speech?: (action: string, locale?: string) => Promise<unknown>;
   /** 开图 App 的插件：list、install、remove、open（打开 DSH 窗口里的插件页面）。 */
   plugins?: (action: string, input?: string) => Promise<unknown>;
@@ -614,6 +615,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           );
         }
         if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
+        if (method === "privacyNotice")
+          return json(res, 200, options.privacyNotice ? await options.privacyNotice() : null);
         if (method === "desktopUpdate")
           return json(
             res,

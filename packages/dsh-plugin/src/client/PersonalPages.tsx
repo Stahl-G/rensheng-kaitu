@@ -31,6 +31,7 @@ export interface PersonalServices
     FileImportServices,
     Pick<MediaServices, "loadMediaLocation" | "selectMediaLibrary"> {
   desktopUpdate?: FeatureUpdateRequest;
+  privacyNotice?: () => Promise<unknown>;
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
   pluginOpenLabel?: readonly [string, string];
@@ -1106,6 +1107,16 @@ export function PersonalPages(
               <section className={css.sec}>
                 <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
                 {props.desktopUpdate && <FeatureUpdates request={props.desktopUpdate} />}
+                {props.privacyNotice && data.dshVersion && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    disabled={busy}
+                    onClick={() => void run(async () => props.privacyNotice?.(), "")}
+                  >
+                    {t("隐私", "Privacy")}
+                  </button>
+                )}
                 <div className={`${css.small} ${settingsCss.buildInfo}`}>
                   <span>
                     {t("安装版本", "Installed build")} {data.version ?? t("本地工作台", "local workbench")}
