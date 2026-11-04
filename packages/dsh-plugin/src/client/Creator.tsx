@@ -89,7 +89,7 @@ export function Creator({
         if (action === "review") setReview(value as Review);
         if (action === "install") {
           setReview(null);
-          setReceipt(t("已安装 · 页面待验证", "Installed · Page not verified"));
+          setReceipt(t("已安装，可前往开图打开", "Installed. Open it in Explore."));
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -192,10 +192,7 @@ export function Creator({
             <dl>
               <dt>{t("访问范围", "Access")}</dt>
               <dd>
-                {t(
-                  "开图插件环境，含宿主代码权限",
-                  "Kaitu plugin environment, including Host code privileges",
-                )}
+                {t("可联网，并调用可用的开图前端模块", "Network access and available Kaitu frontend modules")}
               </dd>
             </dl>
             <details>
