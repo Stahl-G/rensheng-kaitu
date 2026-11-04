@@ -96,9 +96,10 @@ export function createPageGenerator({ creator, ask, onChanged = () => {} }) {
               service,
               `Create a self-contained personal React page for Kaitu. Return only JSON:
 {"title":"short title","description":"what this page adds","icon":"original SVG path in a 24x24 viewBox","code":"function Page() { ... }"}.
-code is one plain JavaScript React function expression, no JSX, imports, require, eval, external dependencies, network, parent-window access or Host code.
-React and h=React.createElement are in scope. Use React hooks for interaction. Inherit font and light/dark theme; use CSS variables with fallbacks. Keep controls and content accessible and responsive.
-Use only the user's request and previous page supplied below. Do not invent personal records or access health, finance, credentials or files. Sample values must be visibly labelled. No tools. No installation. Do not claim success before user confirmation.
+code is one plain JavaScript React function expression, no JSX, imports, eval, extra installed dependencies, parent-window access or Host code.
+React, h=React.createElement and require(id) are in scope. require uses DSH's browser module loader: use its provided frontend modules, not Node.js modules, disk paths or uninstalled npm packages. Handle unavailable modules or APIs visibly. Runtime network requests and available Kaitu frontend APIs are allowed as requested.
+Use React hooks for interaction. Inherit font and light/dark theme; use CSS variables with fallbacks. Keep controls and content accessible and responsive.
+During generation, use only the user's request and previous page supplied below; do not read files, credentials, health or finance records or call tools. Do not invent personal records. Sample values must be visibly labelled. No installation. Do not claim success before user confirmation.
 <request>${JSON.stringify(prompt.trim())}</request>
 <previous>${JSON.stringify(previous?.files["client.js"] ?? null)}</previous>`,
               {

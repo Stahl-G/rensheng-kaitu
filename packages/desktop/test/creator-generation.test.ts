@@ -13,7 +13,7 @@ const answer = JSON.stringify({
   title: "合成书架",
   description: "按阅读进度排列合成书目",
   icon: "M4 4h16v16H4z",
-  code: "(() => { globalThis.executed = true; return function Page() { return h('p', null, 'Synthetic'); }; })()",
+  code: "(() => { globalThis.executed = true; globalThis.frontendValue = require('synthetic-frontend').value; return function Page() { return h('p', null, 'Synthetic'); }; })()",
 });
 
 test("生成仅收发文字，关闭回合后才交审，确认前不执行代码，修订与重启保留源码", async () => {
@@ -106,12 +106,16 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
     };
     runInNewContext(review.files["client.js"], sandbox);
     expect((sandbox as { executed?: boolean }).executed).toBeUndefined();
+    expect((sandbox as { frontendValue?: string }).frontendValue).toBeUndefined();
     const register = vi.fn();
     module
-      ?.factory(() => ({ createElement: () => null }))
+      ?.factory((name) =>
+        name === "synthetic-frontend" ? { value: "available" } : { createElement: () => null },
+      )
       .apply({ slots: { inject: (_name: string, fn: () => void) => fn(), register } });
     expect(register.mock.calls[0][0]).toMatchObject({ name: "main", key: review.name });
     expect((sandbox as { executed?: boolean }).executed).toBe(true);
+    expect((sandbox as { frontendValue?: string }).frontendValue).toBe("available");
     close = async () => {};
     generator.start({ prompt: "改成列表", id, revision });
     await generator.settled();
