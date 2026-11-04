@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readPreferences, savePreferences } from "../core/dist/index.js";
 
 // Bump when the notice or outgoing-data scope changes, including for existing installations.
-export const PRIVACY_NOTICE_VERSION = "2026-11-02.3";
+export const PRIVACY_NOTICE_VERSION = "2026-11-04.1";
 const ACTION = "https://kaitu.invalid/privacy";
 const summary = [
   [
@@ -21,10 +21,7 @@ const summary = [
   ],
   [
     ["敏感资料由你决定", "You decide about sensitive data"],
-    [
-      "财务资料的工具访问、云同步和完整 Agent 是否启用，由你选择。",
-      "You choose financial-data tool access, cloud sync and whether to use a full agent.",
-    ],
+    ["云同步和完整 Agent 由你开启。", "You choose whether to turn on cloud sync or use a full agent."],
   ],
 ];
 const items = [
@@ -66,8 +63,8 @@ const items = [
   [
     ["权限与访问范围", "Permissions and access"],
     [
-      "点击「开始使用」只记录你已读过本版说明，不授予健康、照片、位置、共享或额外外发权限；具体功能仍按原有权限和确认流程操作。财务资料的工具访问可按连接设置；完整 Agent 直接读取文件时不受这些工具开关限制。设置中可随时查看完整政策。",
-      "Get started only records that you have read this notice version. It does not grant health, photo, location, sharing or additional data-transfer permissions; feature-specific permissions and confirmations still apply. Financial-data tool access can be set per connection; these tool switches do not restrict a full agent's direct file access. You can review the full policy in Settings at any time.",
+      "各项功能按各自的权限和确认流程操作。财务资料的工具访问可按连接设置；完整 Agent 直接读取文件时不受这些工具开关限制。设置中可随时查看完整政策。",
+      "Each feature follows its own permission and confirmation process. Financial-data tool access can be set per connection; these tool switches do not restrict a full agent's direct file access. You can review the full policy in Settings at any time.",
     ],
   ],
 ];
