@@ -110,7 +110,9 @@ test("生成仅收发文字，关闭回合后才交审，确认前不执行代�
     const register = vi.fn();
     module
       ?.factory((name) =>
-        name === "synthetic-frontend" ? { value: "available" } : { createElement: () => null },
+        name === "synthetic-frontend"
+          ? { value: "available" }
+          : { createElement: () => null, Component: class {} },
       )
       .apply({ slots: { inject: (_name: string, fn: () => void) => fn(), register } });
     expect(register.mock.calls[0][0]).toMatchObject({ name: "main", key: review.name });

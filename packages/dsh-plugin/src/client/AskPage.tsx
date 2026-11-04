@@ -5,6 +5,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
 import css from "./AskPage.module.css";
+import { Creator } from "./Creator.js";
 import { DocumentBody } from "./DocumentBody.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
@@ -45,6 +46,7 @@ interface AttachmentInput {
   name: string;
 }
 interface Settings {
+  creatorAvailable?: boolean;
   /** 本机没有可用的问问引擎时为 false。 */
   available?: boolean;
   configured: boolean;
@@ -268,6 +270,7 @@ export function AskPage({
   onToday,
   onSettings,
   onOrganize,
+  onExplore,
 }: {
   workspace: string;
   active?: boolean;
@@ -281,6 +284,7 @@ export function AskPage({
   onToday?: () => void;
   onSettings?: (section: "ai" | "local-ai") => void;
   onOrganize?: (source: string) => Promise<void>;
+  onExplore?: () => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -1157,6 +1161,14 @@ export function AskPage({
         >
           {t("＋ 新对话", "+ New conversation")}
         </button>
+        {settings?.creatorAvailable && (
+          <Creator
+            active={active}
+            triggerClassName={css.newThread}
+            onExplore={onExplore}
+            onConnect={connectKey}
+          />
+        )}
         {[...groups].map(([label, rows]) => (
           <Fragment key={label}>
             <h2>{label}</h2>

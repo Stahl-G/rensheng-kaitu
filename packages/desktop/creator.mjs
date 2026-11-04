@@ -146,6 +146,7 @@ export function createCreatorService({ directory, plugins }) {
       source,
       name: pkg.name,
       title: pkg.kaitu.explore.title,
+      description: typeof pkg.description === "string" ? pkg.description : "",
       page: pkg.kaitu.explore.page,
       files,
       // 这是普通 DSH bundle。不能把工作区沙箱描述成已安装 Host 代码的权限限制。

@@ -1,0 +1,77 @@
+.dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.dialog[open] {
+  display: grid;
+  gap: 18px;
+}
+.dialog::backdrop {
+  background: var(--scrim);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.actions h2 {
+  flex: 1;
+  margin: 0;
+}
+.dialog .actions button,
+.dialog > button {
+  width: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--control);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+}
+.dialog textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 96px;
+  margin: 8px 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--sunken);
+  color: var(--ink);
+  font: inherit;
+}
+.pages {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+.pages li,
+.review {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
+.pages li > span {
+  margin-left: 10px;
+  color: var(--muted);
+}
+.dialog pre {
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
