@@ -15,29 +15,44 @@ import { pathToFileURL } from "node:url";
 import { initWorkspace } from "@kaitu/core";
 import { zipSync } from "fflate";
 import { expect, it } from "vitest";
-import { HOST_API, rollback, selectPayload, selection, updateRoot } from "../payload-loader.mjs";
+import { DSH_VERSION, HOST_API, rollback, selectPayload, selection, updateRoot } from "../payload-loader.mjs";
 import { createPayloadUpdater, installPayload, verifyRelease } from "../payload-update.mjs";
 import { readUpdateConfig } from "../update-config.mjs";
 
-it("the signed host-2 loader refuses a host-3 map payload before touching native dependencies", async () => {
+it("older signed loaders reject incompatible payloads and the RC5 loader leaves RC3 selections isolated", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-host-compatibility-"));
   try {
-    // Selection logic is unchanged; exercise it with the previous signed host's API identity.
     const source = readFileSync(new URL("../payload-loader.mjs", import.meta.url), "utf8");
-    const legacy = await import(
-      `data:text/javascript;base64,${Buffer.from(source.replace("export const HOST_API = 3;", "export const HOST_API = 2;")).toString("base64")}`
-    );
-    const legacyRoot = legacy.updateRoot(root);
-    const version = "0.1.1-rc.1";
-    mkdirSync(join(legacyRoot, version), { recursive: true });
-    writeFileSync(
-      join(legacyRoot, version, "payload.json"),
-      JSON.stringify({ version, dshVersion: "0.2.1-rc.3", hostApi: HOST_API }),
-    );
-    legacy.activate(root, version, null);
-    expect(() => legacy.selectPayload(root, join(root, "old-host-without-canvas"))).toThrow(/不兼容/);
-    expect(selectPayload(root, join(root, "new-host"))).toBe(join(root, "new-host/kaitu"));
-    expect(selection(root)).toEqual({ current: null, previous: null });
+    for (const host of [2, 3]) {
+      const legacy = await import(
+        `data:text/javascript;base64,${Buffer.from(source.replace("export const HOST_API = 3;", `export const HOST_API = ${host};`).replace(`export const DSH_VERSION = "${DSH_VERSION}";`, 'export const DSH_VERSION = "0.2.1-rc.3";')).toString("base64")}`
+      );
+      const version = "0.1.1-rc.1";
+      const payload = join(legacy.updateRoot(root), version);
+      mkdirSync(payload, { recursive: true });
+      writeFileSync(
+        join(payload, "payload.json"),
+        JSON.stringify({ version, dshVersion: DSH_VERSION, hostApi: HOST_API }),
+      );
+      legacy.activate(root, version, null);
+      const active = readFileSync(join(legacy.updateRoot(root), "active.json"));
+      expect(() => legacy.selectPayload(root, join(root, "old-host"))).toThrow(/不兼容/);
+      expect(selectPayload(root, join(root, "new-host"))).toBe(join(root, "new-host/kaitu"));
+      expect(selection(root)).toEqual({ current: null, previous: null });
+      expect(readFileSync(join(legacy.updateRoot(root), "active.json"))).toEqual(active);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it("packaging rejects an older DSH kernel before creating a payload", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-package-kernel-"));
+  try {
+    const { writePayload } = await import("../package-payload.mjs");
+    const payload = join(root, "payload");
+    await expect(writePayload({ payload, dshVersion: "0.2.1-rc.3" })).rejects.toThrow(/DSH/);
+    expect(existsSync(payload)).toBe(false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -51,7 +66,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   const ws = await initWorkspace(join(root, "workspace"));
   ws.writeText("me/keep.md", "合成资料，升级与回退都要保留。\n");
   mkdirSync(join(payload, "node_modules"), { recursive: true });
-  const base = { version: "0.1.0", dshVersion: "0.2.1-rc.3", hostApi: HOST_API };
+  const base = { version: "0.1.0", dshVersion: DSH_VERSION, hostApi: HOST_API };
   writeFileSync(join(payload, "payload.json"), JSON.stringify(base));
   writeFileSync(join(resources, "app.asar"), "fixed engine");
   const metadata = { ...base, version: "0.1.1-rc.1" };
@@ -104,7 +119,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   expect(() => readUpdateConfig({ version: "0.1.1" })).toThrow();
   const official = readUpdateConfig({ version: "0.1.1", publicKeyFile: keyFile });
   expect(official.feedUrl).toBe(
-    `https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.3-host-${HOST_API}/latest.json`,
+    `https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-${DSH_VERSION}-host-${HOST_API}/latest.json`,
   );
   writeFileSync(
     join(resources, "kaitu-update.json"),

@@ -6,55 +6,72 @@ import { expect, test, vi } from "vitest";
 // @ts-expect-error Desktop adapters are native ESM.
 import { createPluginService } from "../plugins.mjs";
 
-test("目录区分实际版本与可更新版本，卸载状态仍保留重装入口，未知版本不降级", async () => {
+test("真实目录排除不兼容版本，兼容远端候选保留安装、更新和来源语义", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-plugin-catalog-"));
   const archive = join(root, "archive");
   const home = join(root, "home");
   const profile = join(home, "profiles/desktop");
   const packageName = "kaitu-catalog-fixture";
-  const installed = join(profile, "node_modules", packageName);
   const cli = createRequire(new URL("../../cli/package.json", import.meta.url));
   const dsh = createRequire(cli.resolve("@deepseek-ai/dsh/package.json"));
   const market = dirname(dsh.resolve("@deepseek-ai/dsh-plugin-market-index/package.json"));
   mkdirSync(join(archive, "dsh/node_modules/@deepseek-ai"), { recursive: true });
   symlinkSync(market, join(archive, "dsh/node_modules/@deepseek-ai/dsh-plugin-market-index"), "junction");
-  mkdirSync(installed, { recursive: true });
+  mkdirSync(profile, { recursive: true });
   const bundledCatalog = JSON.parse(
     readFileSync(new URL("../../../docs/site/plugins/index.json", import.meta.url), "utf8"),
   );
-  const template = bundledCatalog.plugins.find(
-    (entry: { name: string }) => entry.name === "kaitu-novel-workspace",
-  );
+  const novel = "kaitu-novel-workspace";
+  const template = bundledCatalog.plugins.find((entry: { name: string }) => entry.name === novel);
+  // Only the remote response is synthetic; no released manifest or bundled index is rewritten.
+  const candidate = (version: string, dsh = "0.2.1-rc.5") => ({
+    ...template.versions[0],
+    version,
+    engines: { dsh },
+    source: { ...template.versions[0].source, commit: "a".repeat(40) },
+  });
   const catalog = {
     ...bundledCatalog,
-    plugins: [
-      {
-        ...template,
-        name: packageName,
-        versions: [
-          { ...template.versions[0], version: "2.0.0" },
-          { ...template.versions[0], version: "1.0.0" },
-        ],
-      },
-    ],
+    plugins: [{ ...template, name: packageName, versions: [candidate("2.0.0"), candidate("1.0.0")] }],
   };
   const fetchIndex = vi.fn(async () => new Response(JSON.stringify(catalog)));
-  const writeInstalled = (version: string | null) => {
+  const writeInstalled = (version: string | null, name = packageName) => {
     writeFileSync(
       join(profile, "package.json"),
-      JSON.stringify({ dependencies: version ? { [packageName]: version } : {} }),
+      JSON.stringify({ dependencies: version ? { [name]: version } : {} }),
     );
-    writeFileSync(join(installed, "package.json"), JSON.stringify({ name: packageName, version }));
+    const installed = join(profile, "node_modules", name);
+    mkdirSync(installed, { recursive: true });
+    writeFileSync(join(installed, "package.json"), JSON.stringify({ name, version }));
   };
   try {
     const create = () => createPluginService({ archive, runtime: join(root, "runtime"), home, fetchIndex });
     const service = create();
-    writeInstalled("1.0.0");
+    writeInstalled(null);
     const initial = await service.list();
     expect(fetchIndex).not.toHaveBeenCalled();
+    for (const name of [novel, "kaitu-fortune"])
+      expect(initial.find((entry: { name: string }) => entry.name === name)).toBeUndefined();
     expect(initial.find((entry: { name: string }) => entry.name === "kaitu-auday")).toMatchObject({
       installed: false,
+      version: "",
+      spec: "",
+      updateAvailable: false,
     });
+    // The real RC3 Auday version is known, but its RC5 placeholder has no latest candidate.
+    for (const name of ["kaitu-auday", novel, "kaitu-fortune"]) {
+      const version = bundledCatalog.plugins.find((entry: { name: string }) => entry.name === name)
+        .versions[0].version;
+      writeInstalled(version, name);
+      expect((await service.list()).find((entry: { name: string }) => entry.name === name)).toMatchObject({
+        installed: true,
+        installedVersion: version,
+        version: "",
+        spec: "",
+        updateAvailable: false,
+      });
+    }
+    writeInstalled("1.0.0");
     const [updated] = await Promise.all([service.list(true), service.list(true)]);
     expect(fetchIndex).toHaveBeenCalledTimes(1);
     let item = updated.find((entry: { name: string }) => entry.name === packageName);
@@ -64,9 +81,10 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       version: "2.0.0",
       updateAvailable: true,
     });
+    expect(item.spec).toBe(`git+https://github.com/Stahl-G/dsh-novel-workspace.git#${"a".repeat(40)}`);
     writeInstalled(null);
     item = (await service.list()).find((entry: { name: string }) => entry.name === packageName);
-    expect(item.installed).toBe(false);
+    expect(item).toMatchObject({ installed: false, version: "2.0.0" });
     expect(item.spec).toBeTruthy();
     writeInstalled("9.0.0");
     item = (await service.list()).find((entry: { name: string }) => entry.name === packageName);
@@ -82,80 +100,29 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       item,
     );
     writeInstalled(null);
-    for (const name of ["kaitu-novel-workspace", "kaitu-fortune", "kaitu-auday"]) {
-      const entries = (await create().list()).filter((entry: { name: string }) => entry.name === name);
-      expect(entries).toHaveLength(1);
-      expect(entries[0]).toMatchObject({
-        installed: false,
-      });
-    }
-    const novel = "kaitu-novel-workspace";
-    writeInstalled(null);
     const online = create();
-    const stale = {
-      ...bundledCatalog,
-      plugins: [
-        { ...template, versions: [{ ...template.versions[0], version: "0.3.2" }] },
-        {
-          ...bundledCatalog.plugins.find((entry: { name: string }) => entry.name === "kaitu-fortune"),
-          versions: bundledCatalog.plugins
-            .find((entry: { name: string }) => entry.name === "kaitu-fortune")
-            .versions.slice(1),
-        },
-      ],
-    };
-    fetchIndex.mockResolvedValueOnce(new Response(JSON.stringify(stale)));
-    const refreshed = await online.list(true);
-    for (const name of [novel, "kaitu-fortune", "kaitu-auday"]) {
-      const entries = refreshed.filter((entry: { name: string }) => entry.name === name);
-      expect(entries).toHaveLength(1);
-      expect(entries[0]).toEqual(initial.find((entry: { name: string }) => entry.name === name));
-    }
     const refreshNovel = async (versions: object[]) => {
       fetchIndex.mockResolvedValueOnce(
-        new Response(JSON.stringify({ ...catalog, plugins: [{ ...template, title: "Online", versions }] })),
+        new Response(
+          JSON.stringify({ ...catalog, plugins: [{ ...template, title: "Synthetic candidate", versions }] }),
+        ),
       );
       return (await online.list(true)).find((entry: { name: string }) => entry.name === novel);
     };
-    expect(await refreshNovel(template.versions)).toMatchObject({ title: "Online", version: "0.3.3-rc.1" });
-    expect(
-      await refreshNovel([
-        {
-          ...template.versions[0],
-          source: { ...template.versions[0].source, commit: "a".repeat(40) },
-        },
-      ]),
-    ).toMatchObject({
-      version: "0.3.3-rc.1",
-      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#59b5ed8a911cd6f2a5feccd8ec569a57856bcde2",
-    });
-    const future = (version: string, dsh: string) => ({ ...template.versions[0], version, engines: { dsh } });
-    expect(await refreshNovel([future("0.4.0", ">=0.2.1-rc.4 <0.3.0")])).toMatchObject({
-      version: "0.3.3-rc.1",
-    });
-    const available = [future("9.0.0", ">=0.3.0"), future("0.4.0", ">=0.2.0 <0.3.0"), ...template.versions];
-    expect(await refreshNovel(available)).toMatchObject({ title: "Online", version: "0.4.0" });
-    writeFileSync(join(profile, "package.json"), JSON.stringify({ dependencies: { [novel]: "0.1.2" } }));
-    mkdirSync(join(profile, "node_modules", novel), { recursive: true });
-    writeFileSync(
-      join(profile, "node_modules", novel, "package.json"),
-      JSON.stringify({ name: novel, version: "0.1.2" }),
-    );
-    expect(await refreshNovel([future("0.4.0", "0.2.1-rc.3")])).toMatchObject({
+    expect(await refreshNovel(template.versions)).toBeUndefined();
+    expect(await refreshNovel([candidate("0.4.0", ">=0.2.1-rc.6 <0.3.0")])).toBeUndefined();
+    const available = [candidate("9.0.0", ">=0.3.0"), candidate("0.4.0"), ...template.versions];
+    expect(await refreshNovel(available)).toMatchObject({
+      title: "Synthetic candidate",
       version: "0.4.0",
-      installedVersion: "0.1.2",
-      updateAvailable: true,
+      spec: `git+https://github.com/Stahl-G/dsh-novel-workspace.git#${"a".repeat(40)}`,
     });
-    for (const version of ["0.3.3-rc.1", "0.4.0", "9.0.0"]) {
-      writeFileSync(join(profile, "package.json"), JSON.stringify({ dependencies: { [novel]: version } }));
-      writeFileSync(
-        join(profile, "node_modules", novel, "package.json"),
-        JSON.stringify({ name: novel, version }),
-      );
+    for (const version of ["0.1.2", "0.3.3-rc.1", "0.4.0", "9.0.0"]) {
+      writeInstalled(version, novel);
       expect(await refreshNovel(available)).toMatchObject({
         installedVersion: version,
         version: "0.4.0",
-        updateAvailable: version === "0.3.3-rc.1",
+        updateAvailable: ["0.1.2", "0.3.3-rc.1"].includes(version),
       });
     }
   } finally {

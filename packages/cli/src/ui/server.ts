@@ -67,7 +67,7 @@ import {
   syncStatus,
   workspaceFileStampsAsync,
 } from "@kaitu/core";
-import { dshCommand } from "../dsh.js";
+import { DSH_VERSION, dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
 import { browserAsk } from "./browser-ask.js";
 import { phoneAnswer } from "./phone-answer.js";
@@ -189,7 +189,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         "npx",
         [
           "--yes",
-          "@deepseek-ai/dsh@0.2.1-rc.3",
+          `@deepseek-ai/dsh@${DSH_VERSION}`,
           "web",
           "--patch",
           ws.resolve(".kaitu/cache/dsh/cordis.yml", { internal: true }),

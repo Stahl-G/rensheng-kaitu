@@ -3,7 +3,7 @@ import { createRequire, findPackageJSON } from "node:module";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { bundleCartographerWorker } from "./package-cartographer.mjs";
-import { HOST_API } from "./payload-loader.mjs";
+import { DSH_VERSION, HOST_API } from "./payload-loader.mjs";
 import { adaptSiwcSource } from "./siwc-compat.mjs";
 const directory = dirname(fileURLToPath(import.meta.url));
 const root = resolve(directory, "../..");
@@ -17,6 +17,9 @@ const nodeBanner = [
 ].join("\n");
 
 export async function writePayload({ payload, archive, asar, payloadVersion, dshVersion, target }) {
+  const cli = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8"));
+  if (dshVersion !== DSH_VERSION || cli.dependencies["@deepseek-ai/dsh"] !== DSH_VERSION)
+    throw new Error(`开图功能包须与 DSH ${DSH_VERSION} 内核及 CLI 依赖一致`);
   const requirePlugin = createRequire(join(root, "packages/dsh-plugin/package.json"));
   const { build } = requirePlugin("esbuild");
   mkdirSync(join(payload, "dist"), { recursive: true });
@@ -140,6 +143,12 @@ export async function writePayload({ payload, archive, asar, payloadVersion, dsh
   await build({
     entryPoints: [join(directory, "sdk-web.mjs")],
     outfile: join(payload, "dist/sdk-web.mjs"),
+    // Root search-provider peers also see SIWC's RC3 graph; use the CLI's pinned runtime.
+    alias: {
+      "@deepseek-ai/dsh-llm": createRequire(join(root, "packages/cli/package.json")).resolve(
+        "@deepseek-ai/dsh-llm",
+      ),
+    },
     bundle: true,
     platform: "node",
     format: "esm",
