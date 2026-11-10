@@ -79,7 +79,7 @@ for (const name of pluginImports) {
   dependencies[name] = version;
 }
 for (const name of ["dsh-web-search-exa", "dsh-web-search-perplexity"])
-  dependencies[`@deepseek-ai/${name}`] = "0.2.1-rc.3";
+  dependencies[`@deepseek-ai/${name}`] = cli.dependencies["@deepseek-ai/dsh"];
 const pluginPackage = {
   name: plugin.name,
   version: cli.version,
@@ -101,7 +101,7 @@ writeFileSync(
       license: cli.license,
       type: "module",
       bin: { kaitu: "dist/cli/main.js" },
-      engines: { node: "^22.19.0 || >=24" },
+      engines: { node: cli.engines?.node ?? ">=24.9.0" },
       files: ["dist", "dsh-plugin", "web", "schemas", "templates", "THIRD_PARTY_NOTICES.md"],
       dependencies,
     },

@@ -32,9 +32,15 @@ export function sdkRuntimePatch({
 }) {
   // SDK bundle 不挂产品埋点；关闭其余额外诊断信息与会话遥测。
   const siwc = { insert: [{ id: "chatgpt-siwc", name: join(dirname(hostPlugin), "chatgpt-siwc.mjs") }] };
-  const privacy = ["session-telemetry-otel", "session-log-deepseek", "plugin-package-inventory-deepseek"].map(
-    (id) => ({ id, disabled: true }),
-  );
+  const privacy = [
+    "session-telemetry-otel",
+    "session-log-deepseek",
+    "plugin-package-inventory-deepseek",
+    "schedule",
+    "tool-schedule",
+    "present",
+    "tool-ask-user",
+  ].map((id) => ({ id, disabled: true }));
   // 目录中这几项是资料工具插件；账号与禁用工具的请求不启动它们，也不改已保存的启用设置。
   const workspacePlugins =
     capabilities || textOnly

@@ -85,6 +85,6 @@ test.each([
     version: "0.3.3-rc.1",
     updateAvailable,
     license: "MIT",
-    dshVersion: "0.2.1-rc.3",
+    dshVersion: "0.2.2-rc.1",
   });
 });
