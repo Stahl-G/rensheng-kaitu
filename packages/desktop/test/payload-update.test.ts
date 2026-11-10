@@ -32,7 +32,7 @@ it("the signed host-2 loader refuses a host-3 map payload before touching native
     mkdirSync(join(legacyRoot, version), { recursive: true });
     writeFileSync(
       join(legacyRoot, version, "payload.json"),
-      JSON.stringify({ version, dshVersion: "0.2.1-rc.3", hostApi: HOST_API }),
+      JSON.stringify({ version, dshVersion: "0.2.2-rc.1", hostApi: HOST_API }),
     );
     legacy.activate(root, version, null);
     expect(() => legacy.selectPayload(root, join(root, "old-host-without-canvas"))).toThrow(/不兼容/);
@@ -51,7 +51,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   const ws = await initWorkspace(join(root, "workspace"));
   ws.writeText("me/keep.md", "合成资料，升级与回退都要保留。\n");
   mkdirSync(join(payload, "node_modules"), { recursive: true });
-  const base = { version: "0.1.0", dshVersion: "0.2.1-rc.3", hostApi: HOST_API };
+  const base = { version: "0.1.0", dshVersion: "0.2.2-rc.1", hostApi: HOST_API };
   writeFileSync(join(payload, "payload.json"), JSON.stringify(base));
   writeFileSync(join(resources, "app.asar"), "fixed engine");
   const metadata = { ...base, version: "0.1.1-rc.1" };
@@ -104,7 +104,7 @@ it("真实下载已签名功能包，切换后读取新功能，回退保留内�
   expect(() => readUpdateConfig({ version: "0.1.1" })).toThrow();
   const official = readUpdateConfig({ version: "0.1.1", publicKeyFile: keyFile });
   expect(official.feedUrl).toBe(
-    `https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.1-rc.3-host-${HOST_API}/latest.json`,
+    `https://github.com/Stahl-G/rensheng-kaitu/releases/download/desktop-stable-dsh-0.2.2-rc.1-host-${HOST_API}/latest.json`,
   );
   writeFileSync(
     join(resources, "kaitu-update.json"),
