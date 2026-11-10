@@ -18,6 +18,8 @@ import { type Locale, useLocale, useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 
 export interface MapPageProps extends ExperienceImportControlProps {
+  initialCity?: string;
+  initialCityRequest?: number;
   mapOptions?: { offline: boolean; workerUrl: string };
   subscribe?: (refresh: () => void) => () => void;
   loadExperienceSource: (id: string) => Promise<import("../types.js").ExperienceSource>;
@@ -269,6 +271,8 @@ function ExperienceDetails({
 }
 
 export function MapPage({
+  initialCity,
+  initialCityRequest = 0,
   mapOptions,
   subscribe,
   loadExperienceSource,
@@ -307,6 +311,8 @@ export function MapPage({
   const close = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const sequence = useRef(0);
+  const initialCitySelected = useRef(false);
+  const cityRequest = useRef<{ id: string; request: number }>();
   const refresh = useCallback(async () => {
     const seq = ++sequence.current;
     setError(null);
@@ -414,6 +420,45 @@ export function MapPage({
       );
   const city = cities.find((item) => item.id === selected);
   const selectedId = city?.id;
+  useEffect(() => {
+    if (initialCitySelected.current || initialCity || !data || !cities.length) return;
+    initialCitySelected.current = true;
+    setSelected((anchor && cities.find((item) => item.id === cityId(anchor))?.id) ?? cities[0]?.id ?? null);
+  }, [data, cities, anchor, initialCity]);
+  useEffect(() => {
+    if (
+      !initialCity ||
+      (cityRequest.current?.id === initialCity && cityRequest.current.request === initialCityRequest)
+    )
+      return;
+    cityRequest.current = { id: initialCity, request: initialCityRequest };
+    initialCitySelected.current = true;
+    setSelected(initialCity);
+  }, [initialCity, initialCityRequest]);
+  const recordedCities = useMemo(() => {
+    const places = new Map<string, Experience["place"]>();
+    for (const item of data?.experiences ?? []) {
+      if (item.review || !["observed", "user_reported"].includes(item.fact_status)) continue;
+      const layer = data ? experienceLayer(item, data.asOf) : null;
+      if (layer !== "been" && layer !== "now") continue;
+      places.set(cityId(item.place), item.place);
+    }
+    if (home) places.set(cityId(home), home);
+    return [...places.values()];
+  }, [data, home]);
+  const recordedCountries = new Set(recordedCities.map((place) => place.country).filter(Boolean)).size;
+  const travelCities = new Set(
+    (data?.experiences ?? [])
+      .filter(
+        (item) =>
+          !item.review &&
+          ["observed", "user_reported"].includes(item.fact_status) &&
+          ["travel", "visit"].includes(item.event_type) &&
+          data &&
+          experienceLayer(item, data.asOf) === "been",
+      )
+      .map((item) => cityId(item.place)),
+  ).size;
   useEffect(() => {
     setDetailLimit(30);
     if (!selectedId || !page.current) return;
@@ -556,7 +601,7 @@ export function MapPage({
   return (
     <div ref={page} className={css.page}>
       <header className={css.header}>
-        <h2 className={css.sr}>{t("足迹工具", "Footprint tools")}</h2>
+        <h1>{t("足迹", "Footprints")}</h1>
         {/* 还没有经历时，下方空白处已有同一个入口。 */}
         {!(data && !data.experiences.length && !home) && (
           <button type="button" className={css.primary} onClick={() => ask(t(prompt, promptEn))}>
@@ -575,75 +620,7 @@ export function MapPage({
         <button type="button" className={css.control} onClick={() => setEditingHome(true)}>
           {home ? `⌂ ${t("家乡", "Hometown")}${t("：", ": ")}${home.name}` : t("设置家乡", "Set hometown")}
         </button>
-      </div>
-      <ReadWarnings warnings={data?.warnings} />
-      {data && editingHome && (
-        <HometownEditor
-          initial={home?.name ?? ""}
-          search={hometownCities}
-          save={async (name, id) => {
-            await saveHometown(name, id);
-            await refresh();
-            setEditingHome(false);
-            setNotice(t("家乡已保存", "Hometown saved"));
-          }}
-          cancel={home ? () => setEditingHome(false) : undefined}
-        />
-      )}
-      {error && (
-        <p className={css.notice} role="alert">
-          {error}{" "}
-          <button type="button" className={css.link} onClick={() => void refresh()}>
-            {label("重新读取")}
-          </button>
-        </p>
-      )}
-      {notice && (
-        <output className={css.notice}>
-          {notice}
-          {undo && (
-            <button
-              type="button"
-              className={css.control}
-              disabled={busy}
-              onClick={() => void unhide(undo.id, undo.revision)}
-            >
-              {label("撤销隐藏")}
-            </button>
-          )}
-        </output>
-      )}
-      {!!data?.hidden.length && (
-        <details className={css.review}>
-          <summary>
-            {t(`已隐藏 ${data.hidden.length} 段经历`, `Hidden places · ${data.hidden.length}`)}
-          </summary>
-          {data.hidden.map(({ item, revision }) => (
-            <div key={item.id} className={css.reviewItem}>
-              <strong>{item.title || item.place.name}</strong>
-              <p className={css.source}>
-                {item.place.name} · {dateLabel(item.start, item.time_precision, locale)} ·{" "}
-                {t("来源：", "Source: ")}
-                {item.source}
-              </p>
-              <button
-                type="button"
-                className={css.control}
-                disabled={busy}
-                onClick={() => void unhide(item.id, revision)}
-              >
-                {label("恢复这段经历")}
-              </button>
-            </div>
-          ))}
-        </details>
-      )}
-      {!data ? (
-        <output className={css.empty}>
-          {error ? label("经历读取失败，请重试。") : label("正在读取经历…")}
-        </output>
-      ) : (
-        <>
+        {data && (
           <details className={css.review}>
             <summary>{label("地图工具 · 图层与时间")}</summary>
             <div className={css.toolbar}>
@@ -761,6 +738,76 @@ export function MapPage({
               </p>
             )}
           </details>
+        )}
+      </div>
+      <ReadWarnings warnings={data?.warnings} />
+      {data && editingHome && (
+        <HometownEditor
+          initial={home?.name ?? ""}
+          search={hometownCities}
+          save={async (name, id) => {
+            await saveHometown(name, id);
+            await refresh();
+            setEditingHome(false);
+            setNotice(t("家乡已保存", "Hometown saved"));
+          }}
+          cancel={home ? () => setEditingHome(false) : undefined}
+        />
+      )}
+      {error && (
+        <p className={css.notice} role="alert">
+          {error}{" "}
+          <button type="button" className={css.link} onClick={() => void refresh()}>
+            {label("重新读取")}
+          </button>
+        </p>
+      )}
+      {notice && (
+        <output className={css.notice}>
+          {notice}
+          {undo && (
+            <button
+              type="button"
+              className={css.control}
+              disabled={busy}
+              onClick={() => void unhide(undo.id, undo.revision)}
+            >
+              {label("撤销隐藏")}
+            </button>
+          )}
+        </output>
+      )}
+      {!!data?.hidden.length && (
+        <details className={css.review}>
+          <summary>
+            {t(`已隐藏 ${data.hidden.length} 段经历`, `Hidden places · ${data.hidden.length}`)}
+          </summary>
+          {data.hidden.map(({ item, revision }) => (
+            <div key={item.id} className={css.reviewItem}>
+              <strong>{item.title || item.place.name}</strong>
+              <p className={css.source}>
+                {item.place.name} · {dateLabel(item.start, item.time_precision, locale)} ·{" "}
+                {t("来源：", "Source: ")}
+                {item.source}
+              </p>
+              <button
+                type="button"
+                className={css.control}
+                disabled={busy}
+                onClick={() => void unhide(item.id, revision)}
+              >
+                {label("恢复这段经历")}
+              </button>
+            </div>
+          ))}
+        </details>
+      )}
+      {!data ? (
+        <output className={css.empty}>
+          {error ? label("经历读取失败，请重试。") : label("正在读取经历…")}
+        </output>
+      ) : (
+        <>
           {(year !== "all" || enabled.length !== layers.length) && (
             <div className={css.filterStatus}>
               <span>
@@ -907,118 +954,132 @@ export function MapPage({
                   ))}
                 </details>
               )}
-              <div className={css.listHeading}>
-                <h2>{label("我的城市")}</h2>
-                <span>{listedCities.length}</span>
-              </div>
-              {!compact && details}
-              {!listedCities.length && (
-                <p className={css.empty}>
-                  {t(
-                    "还没有住过的城市。加上家乡，或在筛选中显示旅行城市。",
-                    "No residences yet. Add your hometown or show travel cities in the filters.",
-                  )}
-                </p>
+              <dl className={css.journeyStats}>
+                <div>
+                  <dt>{t("座城市", "cities")}</dt>
+                  <dd>{recordedCities.length}</dd>
+                </div>
+                <div>
+                  <dt>{t("个国家", "countries")}</dt>
+                  <dd>{recordedCountries || "—"}</dd>
+                </div>
+                <div>
+                  <dt>{t("处到访", "visited")}</dt>
+                  <dd>{travelCities}</dd>
+                </div>
+              </dl>
+              {(timeline.length > 0 || home) && (
+                <section className={css.timeline} aria-label={label("经历时间轴")}>
+                  <h2>{label("生活的章节")}</h2>
+                  <div className={css.timelineCards}>
+                    {home && (
+                      <button
+                        type="button"
+                        className={css.chapter}
+                        aria-pressed={selected === homeId}
+                        onClick={() => setSelected(homeId)}
+                      >
+                        <span>{label("人生起点")}</span>
+                        <strong>
+                          ⌂ {home.name} · {t("家乡", "Hometown")}
+                        </strong>
+                        <small>{label("查看家乡依据")}</small>
+                      </button>
+                    )}
+                    {timeline.slice(0, chapterLimit).map(({ city, item }) => (
+                      <button
+                        type="button"
+                        className={css.chapter}
+                        data-status={item.fact_status}
+                        key={item.id}
+                        aria-pressed={selected === city.id}
+                        onClick={() => setSelected(city.id)}
+                      >
+                        <span>{dateLabel(item.start, item.time_precision, locale)}</span>
+                        <strong>
+                          {city.place.name} · {item.title || label(eventTypes[item.event_type])}
+                        </strong>
+                        <small>{label(statuses[item.fact_status])}</small>
+                      </button>
+                    ))}
+                  </div>
+                </section>
               )}
-              {listedCities.map((item) => (
+              {timeline.length > chapterLimit && (
                 <button
                   type="button"
-                  className={css.city}
-                  data-current={anchor ? cityId(anchor) === item.id : false}
-                  key={item.id}
-                  aria-expanded={city?.id === item.id}
-                  aria-controls={city?.id === item.id ? "city-details" : undefined}
-                  onClick={() => setSelected(item.id)}
+                  className={css.link}
+                  onClick={() => setChapterLimit((value) => value + 30)}
                 >
-                  <span>
-                    <strong>
-                      {item.place.name}
-                      {anchor && cityId(anchor) === item.id ? t(" · 现居", " · Current residence") : ""}
-                    </strong>
-                    <span className={css.secondary}>
-                      {item.home
-                        ? label("⌂ 家乡 · 起点")
-                        : t(
-                            `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`,
-                            `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "place" : "places"}`,
-                          )}
-                    </span>
-                  </span>
-                  <span className={css.cityShapes}>
-                    {item.layers.map((id) => (
-                      <span
-                        key={id}
-                        className={css.shape}
-                        data-layer={id}
-                        role="img"
-                        aria-label={label(layers.find((l) => l.id === id)?.name ?? "")}
-                      />
-                    ))}
-                    <span aria-hidden="true">›</span>
-                  </span>
+                  {t(
+                    `更多时间轴经历（${timeline.length - chapterLimit}）`,
+                    `More timeline entries (${timeline.length - chapterLimit})`,
+                  )}
                 </button>
-              ))}
-              <button
-                type="button"
-                className={css.control}
-                onClick={() =>
-                  ask(
-                    t(
-                      "我想加一个城市经历，请先问我城市和发生的时间，区分住过、去过与计划。",
-                      "Help me add a city experience. Ask for the city and dates, and distinguish residence, travel and plans.",
-                    ),
-                  )
-                }
-              >
-                {t("加一个城市", "Add a city")}
-              </button>
+              )}
+
+              {!compact && details}
+              <details className={css.cityDirectory} open={!city}>
+                <summary>
+                  {label("我的城市")} <span>{listedCities.length}</span>
+                </summary>
+                {!listedCities.length && <p className={css.empty}>{t("暂无城市记录", "No city records")}</p>}
+                {listedCities.map((item) => (
+                  <button
+                    type="button"
+                    className={css.city}
+                    data-current={anchor ? cityId(anchor) === item.id : false}
+                    key={item.id}
+                    aria-expanded={city?.id === item.id}
+                    aria-controls={city?.id === item.id ? "city-details" : undefined}
+                    onClick={() => setSelected(item.id)}
+                  >
+                    <span>
+                      <strong>
+                        {item.place.name}
+                        {anchor && cityId(anchor) === item.id ? t(" · 现居", " · Current residence") : ""}
+                      </strong>
+                      <span className={css.secondary}>
+                        {item.home
+                          ? label("⌂ 家乡 · 起点")
+                          : t(
+                              `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`,
+                              `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "place" : "places"}`,
+                            )}
+                      </span>
+                    </span>
+                    <span className={css.cityShapes}>
+                      {item.layers.map((id) => (
+                        <span
+                          key={id}
+                          className={css.shape}
+                          data-layer={id}
+                          role="img"
+                          aria-label={label(layers.find((l) => l.id === id)?.name ?? "")}
+                        />
+                      ))}
+                      <span aria-hidden="true">›</span>
+                    </span>
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={css.control}
+                  onClick={() =>
+                    ask(
+                      t(
+                        "我想加一个城市经历，请先问我城市和发生的时间，区分住过、去过与计划。",
+                        "Help me add a city experience. Ask for the city and dates, and distinguish residence, travel and plans.",
+                      ),
+                    )
+                  }
+                >
+                  {t("加一个城市", "Add a city")}
+                </button>
+              </details>
             </section>
           </div>
 
-          {(timeline.length > 0 || home) && (
-            <section className={css.timeline} aria-label={label("经历时间轴")}>
-              <h2>{label("生活的章节")}</h2>
-              <div className={css.timelineCards}>
-                {home && (
-                  <button
-                    type="button"
-                    className={css.chapter}
-                    aria-pressed={selected === homeId}
-                    onClick={() => setSelected(homeId)}
-                  >
-                    <span>{label("人生起点")}</span>
-                    <strong>
-                      ⌂ {home.name} · {t("家乡", "Hometown")}
-                    </strong>
-                    <small>{label("查看家乡依据")}</small>
-                  </button>
-                )}
-                {timeline.slice(0, chapterLimit).map(({ city, item }) => (
-                  <button
-                    type="button"
-                    className={css.chapter}
-                    key={item.id}
-                    aria-pressed={selected === city.id}
-                    onClick={() => setSelected(city.id)}
-                  >
-                    <span>{dateLabel(item.start, item.time_precision, locale)}</span>
-                    <strong>
-                      {city.place.name} · {item.title || label(eventTypes[item.event_type])}
-                    </strong>
-                    <small>{label(statuses[item.fact_status])}</small>
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-          {timeline.length > chapterLimit && (
-            <button type="button" className={css.link} onClick={() => setChapterLimit((value) => value + 30)}>
-              {t(
-                `更多时间轴经历（${timeline.length - chapterLimit}）`,
-                `More timeline entries (${timeline.length - chapterLimit})`,
-              )}
-            </button>
-          )}
           <div className={css.mapFooter}>
             <button
               type="button"
@@ -1029,7 +1090,6 @@ export function MapPage({
               {showRoutes ? label("隐藏经历连线") : label("显示经历连线")}
             </button>
           </div>
-          <p className={css.mapFootnote}>{label("城市级位置 · 连线表示经历顺序")}</p>
           <details className={css.review}>
             <summary>{t("地图资料去向", "Map data and connections")}</summary>
             <p>
