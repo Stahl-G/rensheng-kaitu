@@ -93,7 +93,7 @@ export function completeHomeNext(
     )
       throw conflict();
     const notes = `${String(task.notes ?? "")
-      .replace(/(?:^|\n)完成结果：\n(?: {4}[^\n]*\n)*完成时间：[^\n]*\n?/g, "")
+      .replace(/(?:^|\n)完成结果：\n(?:\n)?(?: {4}[^\n]*\n)*(?:\n)?完成时间：[^\n]*\n?/g, "")
       .replace(/(?:^|\n)完成(?:结果|时间)：[^\n]*/g, "")
       .trimEnd()}\n完成结果：${result.trim()}\n完成时间：${at}\n`;
     const updated = updateRecord(ws, "task", task.id, { status: "done", notes }, { by: "user" }).record;
@@ -161,16 +161,6 @@ export function undoHomeNext(ws: Workspace, token: string) {
   receipt.undone = true;
   return { undone: true };
 }
-function taskResultText(notes: string): string {
-  const literal = /(?:^|\n)完成结果：\n((?: {4}[^\n]*\n)+)完成时间：/.exec(notes)?.[1];
-  return literal === undefined
-    ? noteLine(notes, "完成结果")
-    : literal
-        .slice(0, -1)
-        .split("\n")
-        .map((line) => line.slice(4))
-        .join("\n");
-}
 /** Only explicit user results with an actual completion timestamp count. Captures, sync, estimates and old task creation dates do not. */
 export function homeResults(
   records: import("./records.js").StoredRecord[],
@@ -193,7 +183,7 @@ export function homeResults(
     JSON.stringify([
       task.id,
       noteLine(String(task.notes ?? ""), "完成时间"),
-      taskResultText(String(task.notes ?? "")).trim(),
+      noteLine(String(task.notes ?? ""), "完成结果").trim(),
     ]);
   const authors = new Map<string, import("./records.js").StoredRecord>();
   for (const revision of taskRevisions ?? []) {
@@ -202,7 +192,7 @@ export function homeResults(
       authors.set(signature(revision), revision);
   }
   for (const task of records) {
-    const text = taskResultText(String(task.notes ?? "")).trim();
+    const text = noteLine(String(task.notes ?? ""), "完成结果").trim();
     const at = noteLine(String(task.notes ?? ""), "完成时间");
     // The last editor is not the completion author. Without revision provenance, do not guess.
     if (task.status === "done" && authors.get(signature(task))?.by === "user" && text && at)
