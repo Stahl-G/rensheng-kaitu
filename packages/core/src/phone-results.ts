@@ -87,6 +87,7 @@ function statusOwner(doc: ReturnType<typeof statusDocument>, id: string) {
   if (!doc.owners) {
     const owners = new Map<string, { position: number; owner?: string }>();
     for (const match of doc.body.matchAll(/^<!-- (\{.*\}) -->$/gm)) {
+      if (!match[1]) continue;
       try {
         const event = JSON.parse(match[1]);
         if (typeof event.id !== "string") continue;
@@ -103,6 +104,7 @@ function statusOwner(doc: ReturnType<typeof statusDocument>, id: string) {
     }
     // Legacy completions have no ownership comment; never undo their newer result with an older receipt.
     for (const match of doc.body.matchAll(/\n事项：([^\n]*)\n/g)) {
+      if (!match[1]) continue;
       try {
         const key = decodeURIComponent(match[1]);
         if (match.index > (owners.get(key)?.position ?? -1)) owners.set(key, { position: match.index });
