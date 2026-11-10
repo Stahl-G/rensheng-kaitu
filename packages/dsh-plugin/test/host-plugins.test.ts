@@ -62,7 +62,8 @@ test("unlisted specs cannot be installed and failed host changes remain failures
 test.each([
   ["0.3.2", false],
   ["9.0.0", false],
-  ["0.3.3-rc.1", false],
+  ["0.3.3-rc.1", true],
+  ["0.3.3-rc.2", false],
   ["0.1.2", true],
 ])("candidate catalog only updates a known older installed version %s", async (version, updateAvailable) => {
   const request = createHostPluginRequest({
@@ -82,9 +83,9 @@ test.each([
   );
   expect(item).toMatchObject({
     installedVersion: version,
-    version: "0.3.3-rc.1",
+    version: "0.3.3-rc.2",
     updateAvailable,
     license: "MIT",
-    dshVersion: "0.2.1-rc.3",
+    dshVersion: "0.2.2-rc.1",
   });
 });

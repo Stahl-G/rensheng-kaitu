@@ -42,10 +42,13 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
   const manifest = (profile) => JSON.parse(readFileSync(join(profileDir(profile), "package.json"), "utf8"));
   const prepareProfiles = async () => {
     const resolve = createRequire(join(modules, "package.json"));
-    const { initProfile, loadProfile, PROFILE_TEMPLATES } = await import(
+    const { initProfile, loadProfile } = await import(
       pathToFileURL(resolve.resolve("@deepseek-ai/dsh-app-boot")).href
     );
     const anchor = resolve.resolve("@deepseek-ai/dsh/package.json");
+    const { PROFILE_TEMPLATES } = await import(
+      pathToFileURL(createRequire(anchor).resolve("@deepseek-ai/dsh-official-bundles")).href
+    );
     for (const profile of PROFILES) {
       initProfile(profileDir(profile), PROFILE_TEMPLATES[profile === "desktop" ? "web" : profile].bundles);
       loadProfile("dsh", profile, anchor, home, { userLayer: false });
@@ -228,7 +231,7 @@ export function createPluginService({ archive, runtime, home, beforeChange, onCh
             installedVersion: versions.get(plugin.name),
             updateAvailable:
               knownVersions.get(plugin.name)?.has(versions.get(plugin.name)) === true &&
-              semver.gt(latest.version, versions.get(plugin.name)),
+              Boolean(latest && semver.gt(latest.version, versions.get(plugin.name))),
           };
         });
       const extra = names

@@ -1,7 +1,7 @@
 import fs, { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
   type Workspace,
   addTask,
@@ -11,6 +11,7 @@ import {
   initWorkspace,
   isTracked,
   listTasks,
+  localStateRoot,
   readOnboardingMatter,
   readRecords,
   saveOnboardingMatter,
@@ -18,20 +19,144 @@ import {
   snapshotNow,
   workspaceBackupStatus,
 } from "@kaitu/core";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it, onTestFailed, vi } from "vitest";
 import { fetchCalendar } from "../../core/src/calendar-fetch.js";
 import type { AskService } from "../src/ui/ask.js";
 import { startUi } from "../src/ui/server.js";
 
 vi.mock("../../core/src/calendar-fetch.js", () => ({ fetchCalendar: vi.fn() }));
 const git = createRequire(new URL("../../core/package.json", import.meta.url))("isomorphic-git");
+const migration = vi.hoisted(() => ({
+  observe: null as null | (<T>(name: string, ws: Workspace, run: () => Promise<T>) => Promise<T>),
+  rename: null as null | ((error: unknown, source: unknown, target: unknown) => void),
+}));
+// Observe Vitest's named fs import, not the default object's unrelated ESM binding.
+vi.mock("node:fs", async (original) => {
+  const fs = await original<typeof import("node:fs")>();
+  return {
+    ...fs,
+    renameSync: (...args: Parameters<typeof fs.renameSync>) => {
+      try {
+        return fs.renameSync(...args);
+      } catch (error) {
+        migration.rename?.(error, ...args);
+        throw error;
+      }
+    },
+  };
+});
 vi.mock("@kaitu/core", async (original) => {
   const core = await original<typeof import("@kaitu/core")>();
-  return { ...core, snapshotNow: vi.fn(core.snapshotNow) };
+  const call = <T>(name: string, ws: Workspace, run: () => Promise<T>) =>
+    migration.observe ? migration.observe(name, ws, run) : run();
+  return {
+    ...core,
+    snapshotNow: vi.fn((...args: Parameters<typeof core.snapshotNow>) =>
+      call("snapshotNow", args[0], () => core.snapshotNow(...args)),
+    ),
+    moveWorkspace: (...args: Parameters<typeof core.moveWorkspace>) =>
+      call("moveWorkspace", args[0], () => core.moveWorkspace(...args)),
+    pauseNoteIndex: (...args: Parameters<typeof core.pauseNoteIndex>) =>
+      call("pauseNoteIndex", args[0], () => core.pauseNoteIndex(...args)),
+  };
 });
 const cleanup: (() => Promise<unknown>)[] = [];
 const beforeClose: (() => void)[] = [];
+function observeMigration(ws: Workspace) {
+  type Trace = {
+    route: string;
+    phase: string;
+    events: unknown[];
+    record(step: string, error?: unknown, source?: unknown, target?: unknown): void;
+  };
+  const reports: Trace[] = [];
+  let active: Trace | undefined;
+  onTestFailed(() => console.error("migration-failure", JSON.stringify(reports)));
+  migration.rename = (error, source, target) => active?.record("rename:error", error, source, target);
+  migration.observe = <T>(name: string, workspace: Workspace, run: () => Promise<T>): Promise<T> => {
+    const request = active;
+    if (!request || workspace !== ws) return run();
+    request.record(`${name}:enter`);
+    const settled = (status: string, error?: unknown) => {
+      request.record(`${name}:${status}`, error);
+      if (["enableSync", "disableSync", "moveWorkspace"].includes(name)) request.phase = "finalize";
+    };
+    try {
+      const result = run();
+      void result.then(
+        () => settled("return"),
+        (error) => settled("error", error),
+      );
+      return result;
+    } catch (error) {
+      settled("throw", error);
+      throw error;
+    }
+  };
+  return {
+    begin(route: string, target: string) {
+      const roots = [
+        ["source", ws.root],
+        ["target", target],
+        ["state", localStateRoot()],
+      ] as const;
+      const role = (value: unknown) => {
+        if (typeof value === "string" && isAbsolute(value)) {
+          for (const [name, root] of roots) {
+            const path = relative(root, value);
+            if (!isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`))
+              return `${name}/${path.split(sep).join("/") || "."}`;
+          }
+        }
+        return "redacted";
+      };
+      const detail = (error: unknown, seen = new Set<object>()): unknown => {
+        if (!error || typeof error !== "object") return { type: typeof error };
+        if (seen.has(error)) return { repeated: true };
+        seen.add(error);
+        const value = error as Record<string, unknown>;
+        const token = (field: unknown) =>
+          typeof field === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(field) ? field : undefined;
+        return {
+          name: token(value.name),
+          code: token(value.code),
+          syscall: token(value.syscall),
+          path: role(value.path),
+          dest: role(value.dest),
+          ...(value.cause === undefined ? {} : { cause: detail(value.cause, seen) }),
+          ...(Array.isArray(value.errors) ? { errors: value.errors.map((item) => detail(item, seen)) } : {}),
+        };
+      };
+      const request: Trace = {
+        route,
+        phase: "prepare",
+        events: [],
+        record(step, error, source, destination) {
+          request.events.push({
+            step,
+            phase: request.phase,
+            root: role(ws.root),
+            ...(error === undefined ? {} : { error: detail(error) }),
+            ...(source === undefined ? {} : { path: role(source), dest: role(destination) }),
+          });
+        },
+      };
+      reports.push(request);
+      active = request;
+      request.record("http:send");
+    },
+    mark(step: string) {
+      if (!active) return;
+      if (step === "prepared") active.phase = "core";
+      if (step === "watchers-restored") active.phase = "finalize";
+      active.record(step);
+      if (step.startsWith("http:")) active = undefined;
+    },
+  };
+}
 afterEach(async () => {
+  migration.observe = null;
+  migration.rename = null;
   const errors: unknown[] = [];
   try {
     // Vitest timeout does not unwind a test suspended on a promise.
@@ -61,11 +186,14 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await initWorkspace(join(root, "source"));
+  const diagnostic = observeMigration(ws);
   const snapshots: Promise<string | null>[] = [];
   let snapshotStarted = gate<void>();
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   vi.mocked(snapshotNow).mockImplementation((...args) => {
-    const result = original.snapshotNow(...args);
+    const result = migration.observe
+      ? migration.observe("snapshotNow", args[0], () => original.snapshotNow(...args))
+      : original.snapshotNow(...args);
     if (args[0] === ws) {
       snapshots.push(result);
       snapshotStarted.resolve();
@@ -80,17 +208,24 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
     versionDelayMs: 20,
     snapshotDelayMs: 20,
     onWorkspaceChanging: async () => {
+      diagnostic.mark("prepared");
       entered.resolve();
       await resume.promise;
     },
+    onWorkspaceChanged: async () => diagnostic.mark("watchers-restored"),
   });
   cleanup.push(ui.close);
-  const post = (method: string, args: unknown[]) =>
-    fetch(`${ui.url}/api/product/${method}`, {
+  const post = (method: string, args: unknown[]) => {
+    if (method === "moveStorage") diagnostic.begin(`/api/product/${method}`, String(args[0]));
+    return fetch(`${ui.url}/api/product/${method}`, {
       method: "POST",
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(args),
+    }).then((response) => {
+      if (method === "moveStorage") diagnostic.mark(`http:${response.status}`);
+      return response;
     });
+  };
   const originals = new Map<string, string>();
   const captures = await Promise.all(
     Array.from({ length: 12 }, async (_, i) => {
