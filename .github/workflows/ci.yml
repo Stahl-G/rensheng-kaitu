@@ -1,31 +1,225 @@
-name: CI
+name: DSH RC5 Windows diagnostic (do not merge)
 
 on:
   pull_request:
-  push:
-    branches: [main]
+    types: [opened]
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
-  check:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+  compare:
+    if: github.head_ref == 'codex/dsh-rc5-windows-compare-1104'
+    name: Windows main then head (one sample each)
+    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout fixed main
+        uses: actions/checkout@v4
+        with:
+          ref: dc470a2cd32c540a2605e0a9642802205840ae5d
+          path: control-main
+          persist-credentials: false
+      - name: Checkout fixed RC5 head
+        uses: actions/checkout@v4
+        with:
+          ref: 39f5770402d5bc3c01d3b43ac72b299d39fbbc3f
+          path: control-head
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm build
-      - run: pnpm --filter @kaitu/dsh-plugin build:testsite
-      - run: pnpm typecheck
-      - run: pnpm test
+          node-version: '24.22.2'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.22.0'
+          package_json_file: control-main/package.json
+          run_install: false
+      - name: Prepare temporary timing harness outside both checkouts
+        shell: pwsh
+        run: |
+          $harness = Join-Path $env:RUNNER_TEMP "dsh-rc5-compare"
+          New-Item -ItemType Directory -Force -Path $harness | Out-Null
+          @'
+          import { createRequire } from "node:module";
+          import { resolve } from "node:path";
+          import { pathToFileURL } from "node:url";
+
+          const root = process.env.KAITU_DIAG_ROOT;
+          const require = createRequire(resolve(root, "package.json"));
+          const ts = require("typescript");
+          const { default: base } = await import(pathToFileURL(resolve(root, "vitest.config.ts")));
+          if (base.test.maxWorkers !== 2 || base.test.testTimeout !== 15000 || base.test.retry) {
+            throw new Error("Expected the original two workers, 15000ms deadline and zero retries");
+          }
+          const targets = new Map([
+            ["/packages/core/test/helpers.ts", ["clonedWorkspace"]],
+            ["/packages/core/src/init.ts", ["initWorkspace"]],
+            ["/packages/core/src/history.ts", ["ensureHistory", "snapshotNow", "pendingWorkspaceFiles", "history"]],
+            ["/packages/core/src/phone-snapshots.ts", ["preparePhoneSnapshots", "publishPhoneSnapshots", "writePhoneSnapshots"]],
+            ["/packages/core/src/inbox.ts", ["processInbox"]],
+          ]);
+          export default {
+            ...base,
+            root,
+            plugins: [...base.plugins, {
+              name: "temporary-rc5-stage-timing",
+              enforce: "pre",
+              transform(code, id) {
+                const file = id.replaceAll("\\", "/");
+                const names = [...targets].find(([suffix]) => file.endsWith(suffix))?.[1];
+                if (!names && !file.endsWith("/packages/core/test/phone-sync.test.ts")) return;
+                const edits = [];
+                const source = ts.createSourceFile(id, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+                for (const node of source.statements) {
+                  if (!ts.isFunctionDeclaration(node) || !node.body || !names?.includes(node.name?.text)) continue;
+                  const start = code.indexOf("{", node.body.pos) + 1;
+                  const end = node.body.end - 1;
+                  const name = JSON.stringify(node.name.text);
+                  edits.push({ start, end, text:
+                    `const diagAt=performance.now(); const diagCall=globalThis.__kaituDiagTrace("call.start",{name:${name}}); try {${code.slice(start,end)}} finally {globalThis.__kaituDiagTrace("call.end",{name:${name},call:diagCall,ms:performance.now()-diagAt});}`,
+                  });
+                }
+                for (const edit of edits.sort((a,b) => b.start-a.start)) code = code.slice(0,edit.start)+edit.text+code.slice(edit.end);
+                if (file.endsWith("/packages/core/test/helpers.ts")) {
+                  code = code.replace('console.error("workspace-clone-stages", { clones, failedAt: performance.now() });',
+                    'globalThis.__kaituDiagTrace("clone.failure", {clones,failedAt:performance.now()});');
+                  code = code.replace("activeClones = undefined;", 'globalThis.__kaituDiagTrace("clone.stages",{clones:activeClones}); activeClones = undefined;');
+                }
+                if (file.endsWith("/packages/core/src/phone-snapshots.ts")) {
+                  code = code.replace("worker = new Worker(entry);", 'globalThis.__kaituDiagTrace("worker.creating"); worker = new Worker(entry); const diagThread=worker.threadId; worker.once("online",()=>globalThis.__kaituDiagTrace("worker.online",{thread:diagThread}));');
+                  code = code.replace("active.postMessage({ root, at: now.toISOString() });", 'globalThis.__kaituDiagTrace("worker.post",{thread:active.threadId}); active.postMessage({ root, at: now.toISOString() });');
+                  code = code.replace("const received = (message: { prepared?: PreparedPhoneSnapshots; error?: string }) => {", 'const received = (message: { prepared?: PreparedPhoneSnapshots; error?: string }) => { globalThis.__kaituDiagTrace("worker.received",{thread:active.threadId,error:!!message.error,prepared:!!message.prepared});');
+                  code = code.replace("timer = setTimeout(() => void run(), 2000);", 'globalThis.__kaituDiagTrace("worker.debounce",{ms:2000}); timer = setTimeout(() => void run(), 2000);');
+                }
+                if (file.endsWith("/packages/core/test/phone-sync.test.ts")) {
+                  code = code.replace(/phase = "([^"]+)";/g, '$& globalThis.__kaituDiagTrace("phone.phase",{phase});');
+                }
+                return { code, map: null };
+              },
+            }],
+            test: {
+              ...base.test,
+              setupFiles: [...base.test.setupFiles, resolve(process.env.KAITU_DIAG_HARNESS, "setup.mjs")],
+              reporters: ["default", "json"],
+              outputFile: { json: process.env.KAITU_DIAG_RESULTS },
+            },
+          };
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "config.mjs")
+          @'
+          import { monitorEventLoopDelay, performance } from "node:perf_hooks";
+          import { resolve } from "node:path";
+          import { pathToFileURL } from "node:url";
+          const { beforeEach, afterEach, onTestFailed } = await import(pathToFileURL(resolve(process.env.KAITU_DIAG_ROOT, "node_modules/vitest/dist/index.js")));
+          let sequence = 0;
+          globalThis.__kaituDiagTrace = (kind, fields = {}) => {
+            const seq = ++sequence;
+            console.error("rc5-diag", JSON.stringify({sample:process.env.KAITU_DIAG_LABEL,pid:process.pid,seq,at:performance.now(),utc:new Date().toISOString(),kind,...fields}));
+            return seq;
+          };
+          let observation;
+          beforeEach(({ task }) => {
+            const lag = monitorEventLoopDelay({ resolution: 20 });
+            lag.enable();
+            observation = { started:performance.now(),cpu:process.cpuUsage(),loop:performance.eventLoopUtilization(),lag };
+            globalThis.__kaituDiagTrace("test.start", { name:task.name });
+            onTestFailed(() => globalThis.__kaituDiagTrace("test.failed",{name:task.name,ms:performance.now()-observation.started}));
+          });
+          afterEach(({ task }) => {
+            observation.lag.disable();
+            globalThis.__kaituDiagTrace("test.end",{name:task.name,ms:performance.now()-observation.started,cpuMicros:process.cpuUsage(observation.cpu),eventLoop:performance.eventLoopUtilization(observation.loop),lagMaxMs:observation.lag.max/1e6,lagMeanMs:observation.lag.mean/1e6});
+          });
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "setup.mjs")
+          @'
+          import { spawn, execFileSync } from "node:child_process";
+          import { createHash } from "node:crypto";
+          import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync, writeSync } from "node:fs";
+          import { join, resolve } from "node:path";
+          const harness = resolve(process.argv[2]);
+          const artifacts = join(harness, "artifacts");
+          mkdirSync(artifacts, {recursive:true});
+          const plan = [
+            {label:"main",sha:"dc470a2cd32c540a2605e0a9642802205840ae5d",tree:"a4fd35cc4673bd7bd180a5ebea56b95e1be2086c"},
+            {label:"head",sha:"39f5770402d5bc3c01d3b43ac72b299d39fbbc3f",tree:"5e8c8c6e0721524695ea6d13d03bfe3e768a5be3"},
+          ];
+          const pattern = "另一台电脑打开同步资料时|手机按已发布能力撤销自动记忆并恢复原条|background phone computation publishes|简历写进同一经历正本|Agent 工具只能提出待办|手机 records 不能伪装采纳";
+          const files = ["packages/core/test/history.test.ts","packages/core/test/phone-memory-capture.test.ts","packages/core/test/phone-sync.test.ts","packages/core/test/resume.test.ts","packages/dsh-plugin/test/task-adoption.test.ts"];
+          const result = {diagnosticOnly:true,order:plan.map(x=>x.label),node:process.version,runner:process.env.RUNNER_NAME,image:process.env.ImageVersion,os:process.env.ImageOS,pattern,maxWorkers:2,testTimeout:15000,samples:[]};
+          const save = () => writeFileSync(join(artifacts,"comparison.json"),JSON.stringify(result,null,2));
+          const hash = file => createHash("sha256").update(readFileSync(file)).digest("hex");
+          const git = (root,...args) => execFileSync("git",["-C",root,...args],{encoding:"utf8"}).trim();
+          save();
+          async function run(sample, root, name, executable, args, env) {
+            const fd = openSync(join(artifacts,`${sample.label}-${name}.log`),"w");
+            const phase = {name,startedAt:new Date().toISOString()};
+            const start = performance.now();
+            sample.phases.push(phase); save();
+            console.log("rc5-phase",JSON.stringify({sample:sample.label,...phase}));
+            await new Promise(resolveDone => {
+              const child = spawn(executable,args,{cwd:root,env,stdio:["ignore","pipe","pipe"],windowsHide:true});
+              for (const stream of [child.stdout,child.stderr]) stream.on("data",b=>{writeSync(fd,b);process.stdout.write(b);});
+              child.once("error",e=>{phase.error=String(e);});
+              child.once("close",(code,signal)=>{phase.exitCode=code;phase.signal=signal;resolveDone();});
+            });
+            closeSync(fd);
+            phase.ms=performance.now()-start;
+            phase.finishedAt=new Date().toISOString(); save();
+            console.log("rc5-phase",JSON.stringify({sample:sample.label,...phase}));
+            return phase.exitCode === 0 && !phase.error;
+          }
+          if (process.version !== "v24.22.2" || process.platform !== "win32") throw new Error("Expected Windows / Node 24.22.2");
+          for (const expected of plan) {
+            const root = resolve(`control-${expected.label}`);
+            const sample = {...expected,phases:[],valid:false}; result.samples.push(sample); save();
+            try {
+              sample.actualSha=git(root,"rev-parse","HEAD"); sample.actualTree=git(root,"rev-parse","HEAD^{tree}");
+              sample.lockBefore=hash(join(root,"pnpm-lock.yaml"));
+              if (sample.actualSha!==expected.sha || sample.actualTree!==expected.tree || git(root,"status","--porcelain")) throw new Error("Unexpected checkout");
+              const env={...process.env,KAITU_DIAG_ROOT:root,KAITU_DIAG_LABEL:sample.label,KAITU_DIAG_HARNESS:harness,KAITU_DIAG_RESULTS:join(artifacts,`${sample.label}-vitest.json`)};
+              sample.pnpm=execFileSync("pwsh",["-NoProfile","-Command","pnpm --version"],{cwd:root,env,encoding:"utf8"}).trim();
+              if (sample.pnpm!=="11.22.0") throw new Error(`Unexpected pnpm ${sample.pnpm}`);
+              let ready=true;
+              for (const [name,command] of [["install","pnpm install --frozen-lockfile"],["build","pnpm build"]]) {
+                if (!(await run(sample,root,name,"pwsh",["-NoLogo","-NoProfile","-Command",command+"\nexit $LASTEXITCODE"],env))) {ready=false;break;}
+              }
+              if (ready) {
+                sample.phoneWorkerSha256=hash(join(root,"packages/core/dist/phone-worker.js"));
+                await run(sample,root,"tests",process.execPath,[join(root,"node_modules/vitest/vitest.mjs"),"run","--config",join(harness,"config.mjs"),...files,"--testNamePattern",pattern],env);
+                const report=JSON.parse(readFileSync(env.KAITU_DIAG_RESULTS,"utf8"));
+                sample.tests={passed:report.numPassedTests,failed:report.numFailedTests,skipped:report.numPendingTests,success:report.success,cases:report.testResults.flatMap(f=>f.assertionResults.filter(t=>["passed","failed"].includes(t.status)).map(t=>({name:t.fullName,status:t.status,ms:t.duration,failureMessages:t.failureMessages})))};
+                sample.valid=sample.tests.passed+sample.tests.failed===7 && sample.tests.cases.length===7;
+              }
+              sample.lockAfter=hash(join(root,"pnpm-lock.yaml")); sample.dirty=git(root,"status","--porcelain");
+              if (sample.lockAfter!==sample.lockBefore || sample.dirty) {sample.valid=false;sample.error="Source or lock changed";}
+            } catch (error) {sample.error=String(error);}
+            save(); console.log("rc5-sample",JSON.stringify(sample));
+          }
+          const clean=result.samples.length===2 && result.samples.every(s=>s.valid && !s.error && s.phases.length===3 && s.phases.every(p=>p.exitCode===0) && s.tests.success && s.tests.failed===0);
+          result.sampleChecksPassed=clean; save();
+          const table=["| Sample | SHA | Valid | Passed | Failed | Skipped | Test ms |","|---|---|---|---:|---:|---:|---:|",...result.samples.map(s=>`| ${s.label} | ${s.sha} | ${s.valid} | ${s.tests?.passed??"—"} | ${s.tests?.failed??"—"} | ${s.tests?.skipped??"—"} | ${s.phases.find(p=>p.name==="tests")?.ms??"—"} |`)];
+          writeFileSync(join(artifacts,"summary.md"),"Diagnostic only: fixed main → head, one sample each, no retries. This does not replace #357's original failing CI.\n\n"+table.join("\n")+"\n");
+          console.log("rc5-comparison",JSON.stringify(result));
+          '@ | Set-Content -Encoding utf8 -Path (Join-Path $harness "driver.mjs")
+      - name: Collect main then head once, preserving all exit codes
+        shell: pwsh
+        run: |
+          $harness = Join-Path $env:RUNNER_TEMP "dsh-rc5-compare"
+          node (Join-Path $harness "driver.mjs") $harness
+          exit $LASTEXITCODE
+      - name: Preserve diagnostic logs and results even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dsh-rc5-windows-main-head-${{ github.run_id }}
+          path: ${{ runner.temp }}/dsh-rc5-compare/artifacts
+          if-no-files-found: error
+          retention-days: 30
+      - name: Report both samples without masking failures
+        if: always()
+        shell: pwsh
+        run: |
+          $artifacts = Join-Path $env:RUNNER_TEMP "dsh-rc5-compare/artifacts"
+          $summary = Join-Path $artifacts "summary.md"
+          if (Test-Path $summary) {
+            Get-Content $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+          $result = Get-Content (Join-Path $artifacts "comparison.json") -Raw | ConvertFrom-Json
+          if (!$result.sampleChecksPassed) { throw "Diagnostic contains failed or invalid samples; inspect both original logs." }
