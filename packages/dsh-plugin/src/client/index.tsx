@@ -221,12 +221,12 @@ export async function apply(ctx: Context) {
                 operationId: string,
               ) => {
                 const r = await ctx.remote.kaitu.completeHomeNext(target, result, operationId);
-                if (!r.ok) throw new Error(r.error.message);
+                if (!r.ok) throw r.error;
                 return r.value;
               },
               undoHomeNext: async (token: string) => {
                 const r = await ctx.remote.kaitu.undoHomeNext(token);
-                if (!r.ok) throw new Error(r.error.message);
+                if (!r.ok) throw r.error;
                 return r.value;
               },
               loadHome: async () => {

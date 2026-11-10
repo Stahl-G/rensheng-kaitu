@@ -1,9 +1,12 @@
+import { RemoteError, remoteErrorOf } from "@deepseek-ai/dsh-typert-protocol";
+import { KaituError } from "@kaitu/core";
 import type { HomeState } from "@kaitu/core";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
 import { CommandPalette } from "../src/client/CommandPalette.js";
 import { TodayBoard, createTodayBoardSession } from "../src/client/TodayBoard.js";
+import { throwHomeCompletionError } from "../src/home-completion-error.js";
 
 afterEach(() => vi.unstubAllGlobals());
 test("Today retains a failed result, prevents double-submit and only shows undo after success", async () => {
@@ -150,7 +153,7 @@ test("command panel filters real records, uses keyboard selection and leaves act
   }
 });
 
-test.each(["CONFLICT", undefined])(
+test.each(["CONFLICT", "kaitu/completion-rejected", undefined])(
   "a rejected completion can release the old target without discarding its draft (%s)",
   async (code) => {
     vi.stubGlobal("window", new EventTarget());
@@ -182,7 +185,13 @@ test.each(["CONFLICT", undefined])(
     const props = {
       data,
       session,
-      complete: vi.fn().mockRejectedValue(Object.assign(new Error("Changed"), { code })),
+      complete: vi
+        .fn()
+        .mockRejectedValue(
+          code === "kaitu/completion-rejected"
+            ? new RemoteError("kaitu/completion-rejected", "Changed", { code: "CONFLICT" })
+            : Object.assign(new Error("Changed"), { code }),
+        ),
       undo: vi.fn(),
       openProject: vi.fn(),
       library: vi.fn(),
@@ -228,3 +237,19 @@ test.each(["CONFLICT", undefined])(
     }
   },
 );
+
+test("completion business rejection survives the supported RemoteError carrier while transport failures stay unknown", () => {
+  let failure: unknown;
+  try {
+    throwHomeCompletionError(new KaituError("Changed", "CONFLICT"));
+  } catch (error) {
+    failure = error;
+  }
+  const encoded = remoteErrorOf(failure);
+  expect(encoded).toMatchObject({ code: "kaitu/completion-rejected", details: { code: "CONFLICT" } });
+  const wire = JSON.parse(JSON.stringify(encoded));
+  const decoded = new RemoteError(wire.code, wire.message, wire.details);
+  expect(decoded).toMatchObject({ code: "kaitu/completion-rejected", details: { code: "CONFLICT" } });
+  const lost = new Error("Reply lost");
+  expect(() => throwHomeCompletionError(lost)).toThrow(lost);
+});

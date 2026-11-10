@@ -168,6 +168,7 @@ import {
   writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
+import { throwHomeCompletionError } from "./home-completion-error.js";
 import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
 import type {
@@ -292,7 +293,7 @@ export class KaituOverviewService extends TypertRemoteService {
       const receipt = completeHomeNext(this.workspace, target, result, operationId);
       this.scheduleVersion("你完成下一步并记下结果");
       return Promise.resolve(receipt);
-    });
+    }).catch(throwHomeCompletionError);
   }
 
   @Remote("undoHomeNext")

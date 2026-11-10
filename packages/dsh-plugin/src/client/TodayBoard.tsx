@@ -143,7 +143,12 @@ export function TodayBoard({
       setReceipt({ value, step: target, text });
       operation.current = undefined;
     } catch (err) {
-      const code = err && typeof err === "object" && "code" in err ? err.code : undefined;
+      const failure = err && typeof err === "object" ? err : {};
+      const remoteCode = "code" in failure ? failure.code : undefined;
+      const details =
+        "details" in failure && failure.details && typeof failure.details === "object" ? failure.details : {};
+      const code =
+        remoteCode === "kaitu/completion-rejected" && "code" in details ? details.code : remoteCode;
       if (["CONFLICT", "BAD_ARGS", "INVALID_DOCUMENT", "INVALID_RECORD"].includes(String(code)))
         operation.current = undefined;
       setError(err instanceof Error ? err.message : String(err));
