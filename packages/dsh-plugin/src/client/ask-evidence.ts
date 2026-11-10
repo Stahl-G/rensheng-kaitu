@@ -11,6 +11,9 @@ export type EvidenceState =
   | "preview"
   | "failed"
   | "stopped"
+  | "skipped"
+  | "undone"
+  | "superseded"
   | "unknown";
 export interface AskEvidenceItem {
   id: number;
@@ -53,6 +56,7 @@ const readNames = new Set([
   "kaitu_search_notes",
 ]);
 const writeNames = new Set([
+  "kaitu_memory_capture",
   "kaitu_add_record",
   "kaitu_add_experience",
   "kaitu_exploration_write",
@@ -136,6 +140,8 @@ export function askEvidence(events: AskEvent[], busy: boolean): AskEvidenceItem[
       (name === "kaitu_exploration_write" && command.operation === "create_direction");
     const target = String(
       record.title ??
+        object(payload.entry).name ??
+        args.name ??
         args.path ??
         args.file_path ??
         args.file ??
@@ -159,9 +165,19 @@ export function askEvidence(events: AskEvent[], busy: boolean): AskEvidenceItem[
             ? "preview"
             : value.ok !== true
               ? "unknown"
-              : proposal
-                ? "proposed"
-                : "saved";
+              : name === "kaitu_memory_capture"
+                ? payload.status === "saved" || payload.status === "duplicate"
+                  ? "saved"
+                  : payload.status === "needs-clarification"
+                    ? "preview"
+                    : payload.status === "skipped" ||
+                        payload.status === "undone" ||
+                        payload.status === "superseded"
+                      ? payload.status
+                      : "unknown"
+                : proposal
+                  ? "proposed"
+                  : "saved";
     return [
       {
         id: event.id,

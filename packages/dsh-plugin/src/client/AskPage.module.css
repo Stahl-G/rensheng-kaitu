@@ -871,13 +871,20 @@ output.progress,
 @container (max-width: 820px) {
   .withEvidence,
   .withEvidence.showThreads {
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     overflow: auto;
+  }
+  .withEvidence .threads,
+  .withEvidence .conversation,
+  .withEvidence .evidencePanel {
+    flex-shrink: 0;
   }
   .withEvidence .conversation {
     min-height: 500px;
   }
   .evidencePanel {
+    min-height: auto;
     border-left: 0;
     border-top: 1px solid var(--kt-control);
     overflow: visible;

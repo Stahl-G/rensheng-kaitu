@@ -2,7 +2,7 @@ import { rmSync } from "node:fs";
 import { expect, test } from "vitest";
 import { parseFrontmatter, stringifyFrontmatter } from "../src/frontmatter.js";
 import { completeHomeNext, homeResults, undoHomeNext } from "../src/home-actions.js";
-import { readRecords, updateRecord } from "../src/records.js";
+import { readRecordRevisions, readRecords, updateRecord } from "../src/records.js";
 import { addTask } from "../src/tasks.js";
 import type { ModuleStatus } from "../src/workbench.js";
 import { freshWorkspace } from "./helpers.js";
@@ -25,7 +25,14 @@ test("completion records a real result once and undo touches only the unchanged 
     expect(completeHomeNext(ws, target, "Published the first draft", op, at)).toEqual(receipt);
     expect(readRecords(ws, "task").find((item) => item.id === task.id)?.rev).toBe(2);
     expect(
-      homeResults(readRecords(ws, "task"), [], ws.timeZone(), "2026-11-10", at.toISOString()),
+      homeResults(
+        readRecords(ws, "task"),
+        [],
+        ws.timeZone(),
+        "2026-11-10",
+        at.toISOString(),
+        readRecordRevisions(ws, "task"),
+      ),
     ).toMatchObject([{ text: "Published the first draft", date: "2026-11-10" }]);
     expect(() =>
       completeHomeNext(ws, target, "Stale result", "22222222-2222-4222-8222-222222222222", at),
@@ -38,12 +45,29 @@ test("completion records a real result once and undo touches only the unchanged 
       rev: 3,
     });
     expect(readRecords(ws, "task").find((item) => item.id === other.id)).toEqual(other);
-    expect(homeResults(readRecords(ws, "task"), [], ws.timeZone(), "2026-11-10", at.toISOString())).toEqual(
-      [],
-    );
+    expect(
+      homeResults(
+        readRecords(ws, "task"),
+        [],
+        ws.timeZone(),
+        "2026-11-10",
+        at.toISOString(),
+        readRecordRevisions(ws, "task"),
+      ),
+    ).toEqual([]);
     const next = { ...target, precondition: { kind: "task" as const, expectedRev: 3 } };
     const latest = completeHomeNext(ws, next, "New result", "33333333-3333-4333-8333-333333333333", at);
     updateRecord(ws, "task", task.id, { title: "Changed elsewhere" }, { by: "agent" });
+    expect(
+      homeResults(
+        readRecords(ws, "task"),
+        [],
+        ws.timeZone(),
+        "2026-11-10",
+        at.toISOString(),
+        readRecordRevisions(ws, "task"),
+      ),
+    ).toMatchObject([{ text: "New result" }]);
     expect(() => undoHomeNext(ws, latest.token)).toThrow("已变化");
     expect(readRecords(ws, "task").find((item) => item.id === task.id)?.title).toBe("Changed elsewhere");
   } finally {
@@ -77,9 +101,7 @@ test("STATUS completion and scoped undo retain original text and unrelated later
     const doc = parseFrontmatter<ModuleStatus>(ws.readText(file));
     expect(doc.data.next?.[0]?.status).toBe("done");
     expect(doc.body).toContain("Keep this text.");
-    expect(homeResults([], [{ file, ...doc }], ws.timeZone(), "2026-11-10")).toMatchObject([
-      { text: "Walked for 20 minutes" },
-    ]);
+    expect(homeResults([], [{ file, ...doc }], ws.timeZone(), "2026-11-10")).toEqual([]);
     ws.writeText(file, stringifyFrontmatter(doc.data, `${doc.body}\nAn unrelated later observation.\n`));
     undoHomeNext(ws, receipt.token);
     const restored = parseFrontmatter<ModuleStatus>(ws.readText(file));
@@ -111,12 +133,40 @@ test("seven-day activity uses actual user result timestamps and workspace dates"
   const rows = [
     row,
     { ...row, id: "agent", by: "agent" },
+    { ...row, id: "no-offset", notes: "完成结果：No offset\n完成时间：2026-11-10T03:00:00\n" },
     { ...row, id: "missing-time", notes: "完成结果：No completion time" },
     { ...row, id: "empty", notes: "完成时间：2026-11-09T18:00:00Z" },
     { ...row, id: "future", notes: "完成结果：Future\n完成时间：2026-11-10T06:00:00Z" },
     { ...row, id: "old", notes: "完成结果：Too old\n完成时间：2026-11-02T03:00:00Z" },
   ];
-  expect(homeResults(rows, [], "Asia/Shanghai", "2026-11-10", "2026-11-10T03:00:00Z")).toMatchObject([
+  expect(homeResults(rows, [], "Asia/Shanghai", "2026-11-10", "2026-11-10T03:00:00Z", rows)).toMatchObject([
     { id: "real", date: "2026-11-10" },
   ]);
+});
+
+test("later user edits cannot turn an Agent completion into a user result", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const task = (await addTask(ws, { title: "Agent completion" })).record;
+    updateRecord(
+      ws,
+      "task",
+      task.id,
+      { status: "done", notes: "完成结果：Agent wrote this\n完成时间：2026-11-10T03:00:00Z\n" },
+      { by: "agent" },
+    );
+    updateRecord(ws, "task", task.id, { title: "User adjusted title" }, { by: "user" });
+    expect(
+      homeResults(
+        readRecords(ws, "task"),
+        [],
+        ws.timeZone(),
+        "2026-11-10",
+        "2026-11-10T04:00:00Z",
+        readRecordRevisions(ws, "task"),
+      ),
+    ).toEqual([]);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
 });

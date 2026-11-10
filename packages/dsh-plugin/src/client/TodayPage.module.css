@@ -881,8 +881,9 @@
 }
 .savepointHome .weatherSlot {
   order: 1;
-  width: auto;
-  max-width: 240px;
+  flex: 0 1 240px;
+  width: 240px;
+  max-width: 100%;
 }
 .savepointHome .homeHeading h1 {
   order: 2;

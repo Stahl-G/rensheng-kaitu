@@ -6,6 +6,7 @@ export function AskEvidence({ items, onToday }: { items: AskEvidenceItem[]; onTo
   const t = useT();
   if (!items.length) return null;
   const labels: Record<string, string> = {
+    kaitu_memory_capture: t("记忆", "Memory"),
     kaitu_status: t("开图现状", "Kaitu status"),
     kaitu_life_map: t("足迹", "Footprints"),
     kaitu_exploration_read: t("方向与尝试", "Directions and experiments"),
@@ -26,6 +27,9 @@ export function AskEvidence({ items, onToday }: { items: AskEvidenceItem[]; onTo
     preview: t("待核对", "To review"),
     failed: t("未完成", "Failed"),
     stopped: t("已中断", "Stopped"),
+    skipped: t("未记录", "Not recorded"),
+    undone: t("已撤销", "Undone"),
+    superseded: t("已被更正", "Superseded"),
     unknown: t("查看结果", "View result"),
   };
   return (

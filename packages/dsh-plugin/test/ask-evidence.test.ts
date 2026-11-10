@@ -89,3 +89,29 @@ test("reused tool-call identities in later turns cannot replace an earlier recei
   expect(items[0]?.detail).toContain("First original");
   expect(items[1]).toMatchObject({ target: "notes/second.md", state: "failed" });
 });
+
+test("automatic memory receipts keep skipped, clarification and superseded outcomes distinct", () => {
+  const statuses = [
+    "saved",
+    "duplicate",
+    "skipped",
+    "needs-clarification",
+    "undone",
+    "superseded",
+    "unrecognized",
+  ];
+  const events = statuses.flatMap((status, index) => [
+    call(index + 1, "kaitu_memory_capture", { name: "Observation" }),
+    result(index + 1, { ok: true, result: { status, entry: { name: "Saved observation" } } }),
+  ]);
+  expect(askEvidence(events, false).map(({ state }) => state)).toEqual([
+    "saved",
+    "saved",
+    "skipped",
+    "preview",
+    "undone",
+    "superseded",
+    "unknown",
+  ]);
+  expect(askEvidence(events, false)[0]).toMatchObject({ target: "Saved observation", lane: "write" });
+});

@@ -60,8 +60,14 @@ test("a repeated city command reopens the dismissed city without default selecti
         ?.props.onClick(),
     );
     expect(selected()).toBe(null);
+    const year = app.root.findAllByType("button").find((item) => item.children.includes("2018"));
+    expect(year).toBeDefined();
+    await act(async () => year?.props.onClick());
+    expect(year?.props["aria-pressed"]).toBe(true);
+    expect(selected()).toBe(null);
     await act(async () => app.update(createElement(MapPage, { ...props, initialCityRequest: 2 })));
     expect(selected()).toBe("2");
+    expect(app.root.findByProps({ id: "city-title" }).children).toContain("Second");
   } finally {
     await act(async () => app?.unmount());
   }

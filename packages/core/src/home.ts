@@ -1,6 +1,7 @@
 import { type HomeResult, homeResults } from "./home-actions.js";
 import { readOverviewPage } from "./overview-page.js";
 import { readProjectsPage } from "./project-page.js";
+import { type StoredRecord, readRecordRevisions } from "./records.js";
 import { localDate } from "./time.js";
 import { type NextItem, type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -17,6 +18,7 @@ export interface HomeSources {
   projects: Projects;
   statuses: readonly LearningStatus[];
   records: WorkbenchData["records"];
+  taskRevisions?: readonly StoredRecord[];
 }
 
 /** I/O boundary: build in the background, cache the result, and invalidate it on workspace changes.
@@ -31,6 +33,7 @@ export async function readHomeSources(ws: Workspace, now = new Date()): Promise<
     projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
     statuses: data.statuses,
     records: data.records,
+    taskRevisions: readRecordRevisions(ws, "task", { onError: () => {} }),
   };
 }
 
@@ -257,7 +260,14 @@ export function readHome(input: HomeSources): HomeData {
   return {
     today: overview.today,
     lastAuthored: null,
-    results: homeResults(records.task ?? [], statuses, overview.timeZone, overview.today, overview.cutoff),
+    results: homeResults(
+      records.task ?? [],
+      statuses,
+      overview.timeZone,
+      overview.today,
+      overview.cutoff,
+      input.taskRevisions,
+    ),
     steps: [
       ...statuses.flatMap((status) =>
         (status.data.next ?? [])

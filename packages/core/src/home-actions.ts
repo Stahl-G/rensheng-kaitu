@@ -163,39 +163,41 @@ export function undoHomeNext(ws: Workspace, token: string) {
 /** Only explicit user results with an actual completion timestamp count. Captures, sync, estimates and old task creation dates do not. */
 export function homeResults(
   records: import("./records.js").StoredRecord[],
-  statuses: readonly { file: string; data: ModuleStatus; body: string }[],
+  _statuses: readonly { file: string; data: ModuleStatus; body: string }[],
   timeZone: string,
   today: string,
   cutoff = new Date().toISOString(),
+  taskRevisions?: readonly import("./records.js").StoredRecord[],
 ): HomeResult[] {
   const results: HomeResult[] = [];
   const add = (item: Omit<HomeResult, "date">) => {
     const stamp = Date.parse(item.at);
-    if (!Number.isFinite(stamp) || stamp > Date.parse(cutoff) || !/[TZ]|[+-]\d{2}:\d{2}$/.test(item.at))
+    if (!Number.isFinite(stamp) || stamp > Date.parse(cutoff) || !/(Z|[+-]\d{2}:\d{2})$/i.test(item.at))
       return;
     const date = localDate(new Date(stamp), timeZone);
     const age = (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${date}T12:00:00Z`)) / 86400000;
     if (age >= 0 && age < 7) results.push({ ...item, date });
   };
+  const signature = (task: import("./records.js").StoredRecord) =>
+    JSON.stringify([
+      task.id,
+      noteLine(String(task.notes ?? ""), "完成时间"),
+      noteLine(String(task.notes ?? ""), "完成结果").trim(),
+    ]);
+  const authors = new Map<string, import("./records.js").StoredRecord>();
+  for (const revision of taskRevisions ?? []) {
+    const first = authors.get(signature(revision));
+    if (revision.status === "done" && !revision.deleted && (!first || (revision.rev ?? 1) < (first.rev ?? 1)))
+      authors.set(signature(revision), revision);
+  }
   for (const task of records) {
     const text = noteLine(String(task.notes ?? ""), "完成结果").trim();
     const at = noteLine(String(task.notes ?? ""), "完成时间");
-    if (task.status === "done" && task.by === "user" && text && at)
+    // The last editor is not the completion author. Without revision provenance, do not guess.
+    if (task.status === "done" && authors.get(signature(task))?.by === "user" && text && at)
       add({ id: task.id, file: "task", title: String(task.title), text, at });
   }
-  for (const status of statuses) {
-    for (const match of status.body.matchAll(
-      /(?:^|\n)### 完成结果 · ([^\n]+)\n事项：([^\n]+)\n你完成了：([^\n]+)\n结果：([^\n]+)\n/g,
-    )) {
-      let id: string;
-      try {
-        id = decodeURIComponent(match[2] ?? "");
-      } catch {
-        continue;
-      }
-      if (status.data.next?.some((item) => item.id === id && item.status === "done"))
-        add({ id, file: status.file, title: match[3] ?? "", text: match[4] ?? "", at: match[1] ?? "" });
-    }
-  }
+  // STATUS completion prose remains readable and undoable, but it has no persistent actor evidence.
+  // It cannot establish a user-authored result for this activity count.
   return results.sort((a, b) => b.at.localeCompare(a.at));
 }

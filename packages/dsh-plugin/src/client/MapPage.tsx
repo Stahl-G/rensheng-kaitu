@@ -433,6 +433,10 @@ export function MapPage({
       return;
     cityRequest.current = { id: initialCity, request: initialCityRequest };
     initialCitySelected.current = true;
+    setYear("all");
+    setFrom("");
+    setTo("");
+    setEnabled(["been", "now", "planned"]);
     setSelected(initialCity);
   }, [initialCity, initialCityRequest]);
   const recordedCities = useMemo(() => {
@@ -599,7 +603,7 @@ export function MapPage({
     </>
   );
   return (
-    <div ref={page} className={css.page}>
+    <div ref={page} data-compact={compact || undefined} className={css.page}>
       <header className={css.header}>
         <h1>{t("足迹", "Footprints")}</h1>
         {/* 还没有经历时，下方空白处已有同一个入口。 */}

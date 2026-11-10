@@ -1145,3 +1145,24 @@
     margin: 0;
   }
 }
+
+/* The measured page width also covers narrow hosts whose outer container is wider. */
+.page[data-compact="true"] .detail {
+  position: fixed;
+  z-index: 51;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 75dvh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 20px 20px max(20px, env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  margin: 0;
+}
+.page[data-compact="true"] .backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  background: rgb(0 0 0 / 35%);
+}

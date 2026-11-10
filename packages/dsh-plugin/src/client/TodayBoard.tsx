@@ -8,6 +8,7 @@ import { todayNumber, todayProjectDate } from "./next-presentation.js";
 type Step = HomeNextTarget & { key: string; parent: string };
 interface TodayDraftState {
   selected: string | undefined;
+  showLatest: boolean;
   drafts: Record<string, string>;
   pending: boolean;
   error: string;
@@ -17,6 +18,7 @@ interface TodayDraftState {
 export function createTodayBoardSession() {
   let state: TodayDraftState = {
     selected: undefined,
+    showLatest: false,
     drafts: {},
     pending: false,
     error: "",
@@ -24,7 +26,9 @@ export function createTodayBoardSession() {
   };
   const listeners = new Set<() => void>();
   return {
-    operation: { current: undefined as { fingerprint: string; id: string } | undefined },
+    operation: {
+      current: undefined as { fingerprint: string; id: string; step: Step; text: string } | undefined,
+    },
     read: () => state,
     subscribe: (listener: () => void) => {
       listeners.add(listener);
@@ -81,7 +85,10 @@ export function TodayBoard({
     );
   const localSession = useRef(session ?? createTodayBoardSession());
   const board = session ?? localSession.current;
-  const { selected, drafts, pending, error, receipt } = useSyncExternalStore(board.subscribe, board.read);
+  const { selected, showLatest, drafts, pending, error, receipt } = useSyncExternalStore(
+    board.subscribe,
+    board.read,
+  );
   const setSelected = (value: string | undefined) => board.set("selected", value);
   const setDrafts = (
     value: Record<string, string> | ((current: Record<string, string>) => Record<string, string>),
@@ -92,9 +99,13 @@ export function TodayBoard({
   const [review, setReview] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const operation = board.operation;
-  const focus = steps.find((step) => step.key === selected) ?? steps[0];
+  const focus =
+    (!showLatest ? operation.current?.step : undefined) ??
+    steps.find((step) => step.key === selected) ??
+    steps[0];
   const shown = receipt?.step ?? focus;
-  const result = focus ? (drafts[focus.key] ?? "") : "";
+  const result =
+    (!showLatest ? operation.current?.text : undefined) ?? (focus ? (drafts[focus.key] ?? "") : "");
   const results = data.data?.results;
   const today = data.data?.today ?? "";
   const days = Array.from({ length: 7 }, (_, index) =>
@@ -118,17 +129,23 @@ export function TodayBoard({
     return () => window.removeEventListener("kaitu:complete-current", focusCurrent);
   }, []);
   const finish = async () => {
-    if (!focus || !complete || board.read().pending || !result.trim()) return;
+    const target = operation.current?.step ?? focus;
+    const text = operation.current?.text ?? result;
+    if (!target || !complete || board.read().pending || !text.trim()) return;
     setPending(true);
     setError("");
-    const fingerprint = JSON.stringify([focus, result.trim()]);
+    const fingerprint = JSON.stringify([target, text.trim()]);
     if (operation.current?.fingerprint !== fingerprint)
-      operation.current = { fingerprint, id: crypto.randomUUID() };
+      operation.current = { fingerprint, id: crypto.randomUUID(), step: target, text };
     try {
-      const value = await complete(focus, result, operation.current.id);
-      setReceipt({ value, step: focus, text: result });
+      const value = await complete(target, text, operation.current.id);
+      board.set("showLatest", false);
+      setReceipt({ value, step: target, text });
       operation.current = undefined;
     } catch (err) {
+      const code = err && typeof err === "object" && "code" in err ? err.code : undefined;
+      if (["CONFLICT", "BAD_ARGS", "INVALID_DOCUMENT", "INVALID_RECORD"].includes(String(code)))
+        operation.current = undefined;
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setPending(false);
@@ -204,6 +221,14 @@ export function TodayBoard({
           ))}
         </section>
       )}
+      {showLatest && operation.current && (
+        <section className={styles.stepList} aria-label={t("上次结果待核实", "Previous result unconfirmed")}>
+          <strong>{operation.current.step.title}</strong>
+          <button type="button" className={css.btn} disabled={pending} onClick={() => void finish()}>
+            {t("核对上次结果", "Check previous result")}
+          </button>
+        </section>
+      )}
       {shown ? (
         <section
           className={styles.actionCard}
@@ -243,7 +268,7 @@ export function TodayBoard({
                     placeholder={t("结果", "Result")}
                     maxLength={2000}
                     value={result}
-                    disabled={pending}
+                    disabled={pending || !!operation.current}
                     onChange={(event) => {
                       const value = event.target.value;
                       if (focus) setDrafts((current) => ({ ...current, [focus.key]: value }));
@@ -251,10 +276,15 @@ export function TodayBoard({
                   />
                   <button
                     className={`${css.btn} ${css["btn-strong"]}`}
-                    disabled={pending || !result.trim()}
+                    disabled={pending || !result.trim() || (showLatest && !!operation.current)}
                     type="submit"
                   >
-                    {pending ? t("正在保存…", "Saving…") : t("完成", "Done")} ↩
+                    {pending
+                      ? t("正在保存…", "Saving…")
+                      : operation.current
+                        ? t("重试", "Retry")
+                        : t("完成", "Done")}{" "}
+                    ↩
                   </button>
                 </form>
               ) : null}
@@ -290,9 +320,22 @@ export function TodayBoard({
         </section>
       )}
       {error && (
-        <p role="alert" className={css.error}>
-          {error}
-        </p>
+        <div role="alert" className={css.error}>
+          <p>{error}</p>
+          {operation.current && !pending && (
+            <button
+              type="button"
+              className={css.link}
+              onClick={() => {
+                board.set("showLatest", true);
+                setSelected(undefined);
+                setError("");
+              }}
+            >
+              {t("查看最新事项", "View latest steps")}
+            </button>
+          )}
+        </div>
       )}
       {(steps.length > 1 || !!data.data?.pending.length) && (
         <section className={styles.stepList} aria-label={t("接下来", "Up next")}>
@@ -308,6 +351,7 @@ export function TodayBoard({
                   aria-label={t(`完成并记结果：${step.title}`, `Complete and record result: ${step.title}`)}
                   onClick={() => {
                     setSelected(step.key);
+                    if (operation.current) board.set("showLatest", true);
                     setReceipt(undefined);
                     requestAnimationFrame(() => field.current?.focus());
                   }}
@@ -317,6 +361,7 @@ export function TodayBoard({
                   className={styles.stepTitle}
                   onClick={() => {
                     setSelected(step.key);
+                    if (operation.current) board.set("showLatest", true);
                     setReceipt(undefined);
                   }}
                 >
