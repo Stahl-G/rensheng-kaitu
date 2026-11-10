@@ -948,3 +948,200 @@
     display: none;
   }
 }
+
+/* The journey stays beside its map; every node opens the original city records. */
+.page {
+  gap: 16px;
+}
+.header h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+.layout {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 24px;
+}
+.mapPane {
+  height: clamp(520px, 72vh, 860px);
+  border-radius: 18px;
+  box-shadow: none;
+}
+.layout .listPane {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.journeyStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin: 0 0 20px;
+}
+.journeyStats > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.journeyStats dt {
+  order: 1;
+  color: var(--kt-secondary);
+  font-size: 13px;
+}
+.journeyStats dd {
+  margin: 0;
+  color: var(--kt-text);
+  font-size: 38px;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.timeline {
+  margin-bottom: 20px;
+  padding: 18px 10px 8px;
+  border: 1px solid var(--kt-control);
+  border-radius: 16px;
+  background: var(--kt-card);
+}
+.timeline h2 {
+  margin: 0 8px 12px;
+  font-size: 12px;
+}
+.timelineCards {
+  gap: 0;
+  padding: 0 4px 10px;
+}
+.chapter {
+  position: relative;
+  flex: 1 0 118px;
+  max-width: 180px;
+  padding: 28px 8px 8px;
+  text-align: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+.chapter::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--kt-map);
+}
+.chapter::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - 6px);
+  top: 7px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--kt-card);
+  border-radius: 50%;
+  background: var(--kt-map);
+}
+.chapter:first-child::before {
+  left: 50%;
+}
+.chapter:last-child::before {
+  right: 50%;
+}
+.chapter[data-status="suggested"]::before,
+.chapter[data-status="planned"]::before,
+.chapter[data-status="inferred"]::before {
+  height: 0;
+  border-top: 3px dotted var(--kt-map);
+  background: none;
+}
+.chapter[aria-pressed="true"] {
+  color: var(--kt-map-ink);
+  background: var(--kt-map-tint);
+  box-shadow: none;
+}
+.chapter[aria-pressed="true"]::after {
+  outline: 2px solid var(--kt-map);
+  outline-offset: 2px;
+}
+.detail {
+  margin-bottom: 20px;
+  padding: 22px;
+  border: 1px solid var(--kt-control);
+  border-radius: 16px;
+  box-shadow: none;
+}
+.detailHeading h2 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+.experience {
+  padding: 18px 0;
+}
+.cityDirectory {
+  padding: 16px 18px;
+  border: 1px solid var(--kt-control);
+  border-radius: 16px;
+  background: var(--kt-card);
+}
+.cityDirectory > summary {
+  padding: 2px 0;
+  color: var(--kt-secondary);
+  cursor: pointer;
+  font-size: 14px;
+}
+.cityDirectory > summary span {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.cityDirectory[open] > summary {
+  margin-bottom: 12px;
+}
+.city {
+  margin: 0;
+  padding: 14px 8px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.city + .city {
+  border-top: 1px solid var(--kt-control);
+}
+.stateCaption {
+  max-width: calc(100% - 130px);
+  background: color-mix(in srgb, var(--kt-card) 92%, transparent);
+}
+.stateCaption h1 {
+  font-size: 21px;
+}
+@container (max-width: 1050px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+    gap: 16px;
+  }
+  .journeyStats {
+    gap: 16px;
+  }
+  .journeyStats dd {
+    font-size: 32px;
+  }
+}
+@container (max-width: 850px) {
+  .layout {
+    display: block;
+  }
+  .layout .listPane {
+    margin-top: 20px;
+  }
+  .mapPane {
+    height: 500px;
+  }
+}
+@container (max-width: 640px) {
+  .detail {
+    position: fixed;
+    padding: 20px 20px max(20px, env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    margin: 0;
+  }
+}

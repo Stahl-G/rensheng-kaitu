@@ -4,11 +4,13 @@ import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
+import { AskEvidence } from "./AskEvidence.js";
 import css from "./AskPage.module.css";
 import { DocumentBody } from "./DocumentBody.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
+import { askEvidence, toolFailed, toolIntent } from "./ask-evidence.js";
 import type { AskAutoSubmit, AskHandoffStatus } from "./ask-handoff.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
@@ -150,7 +152,7 @@ function Tool({
   const target = String(
     args.path ?? args.file_path ?? args.file ?? labels[name] ?? t("开图资料", "Kaitu files"),
   );
-  const reading = name in labels || /read|list|search|status|overview|get/.test(name);
+  const reading = toolIntent(name, args) === "read";
   const running = !result && !finished;
   return (
     <details className={css.tool}>
@@ -158,10 +160,13 @@ function Tool({
         <span className={`${css.dot} ${running ? css.pulse : ""}`} />
         {running
           ? t(`正在${reading ? "读" : "处理"} ${target}`, `${reading ? "Reading" : "Working on"} ${target}`)
-          : message?.isError
+          : toolFailed(result)
             ? t(`未完成 ${target}`, `Couldn’t complete ${target}`)
             : result
-              ? t(`${reading ? "读了" : "完成了"} ${target}`, `${reading ? "Read" : "Completed"} ${target}`)
+              ? t(
+                  `${reading ? "读了" : "已返回结果"} ${target}`,
+                  `${reading ? "Read" : "Returned a result for"} ${target}`,
+                )
               : t(`已中断 ${target}`, `Stopped ${target}`)}
       </summary>
       <pre>
@@ -1141,6 +1146,7 @@ export function AskPage({
     group(true);
     return { resolutions, groups };
   }, [events]);
+  const evidence = useMemo(() => askEvidence(events, busy), [events, busy]);
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
   const waiting =
     busy &&
@@ -1162,7 +1168,7 @@ export function AskPage({
     );
   return (
     <div
-      className={`${css.chat} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
+      className={`${css.chat} ${evidence.length ? css.withEvidence : ""} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
     >
       <nav id="ask-threads" className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
@@ -2044,6 +2050,7 @@ export function AskPage({
             : t("接上 AI 后才能发送", "Connect an AI before sending")}
         </p>
       </section>
+      <AskEvidence items={evidence} onToday={onToday} />
       <dialog
         ref={dialog}
         className={css.dialog}
