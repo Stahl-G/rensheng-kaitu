@@ -280,7 +280,7 @@ export function AskPage({
   onConnections?: () => void;
   onToday?: () => void;
   onSettings?: (section: "ai" | "local-ai") => void;
-  onOrganize?: (source: string) => Promise<void>;
+  onOrganize?: (source: string, draft?: string) => Promise<void>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -303,7 +303,13 @@ export function AskPage({
   useEffect(() => {
     if (!initialPrompt && !initialPromptRequest) return;
     if (initialPromptNewConversation) setSelected(null);
-    setDraft(initialPrompt);
+    setDraft((current) =>
+      initialPromptNewConversation || !current.trim()
+        ? initialPrompt
+        : current.includes(initialPrompt)
+          ? current
+          : `${current}\n\n${initialPrompt}`,
+    );
     const frame = requestAnimationFrame(() => {
       const field = input.current;
       field?.focus();
@@ -421,6 +427,9 @@ export function AskPage({
   const composing = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (active && loaded) input.current?.focus();
+  }, [active, loaded]);
   const activeSession = useRef<string | null>(null);
   const lastStatus = events.filter((event) => event.type === "session.status").at(-1);
   const busy = sending || lastStatus?.data.status === "running";
@@ -768,10 +777,19 @@ export function AskPage({
   const handoffAttempt = useRef<string>();
   const [handoffRetry, setHandoffRetry] = useState(0);
   const [handoffState, setHandoffState] = useState<"sending" | "retry" | "uncertain" | "failed" | null>(null);
-  const organizeSaved = (source: string) => {
-    void onOrganize?.(source)
+  const organizing = useRef(false);
+  const [organizingDraft, setOrganizingDraft] = useState(false);
+  const organizeSaved = (source: string, text?: string) => {
+    if (!onOrganize || organizing.current) return;
+    organizing.current = true;
+    setOrganizingDraft(true);
+    void onOrganize(source, text)
       .then(() => setHandoffState(null))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => {
+        organizing.current = false;
+        setOrganizingDraft(false);
+      });
   };
   const checkHandoff = useCallback(async () => {
     if (!autoSubmit) return;
@@ -1211,11 +1229,12 @@ export function AskPage({
                   ? t("原文已保存", "Original saved")
                   : t("先接上一个 AI。", "Connect an AI first.")}
               </h1>
-              {autoSubmit && onOrganize && (
+              {(autoSubmit || draft.trim()) && onOrganize && (
                 <button
                   type="button"
                   className={css.routePrimary}
-                  onClick={() => organizeSaved(autoSubmit.capturedPath)}
+                  disabled={organizingDraft}
+                  onClick={() => organizeSaved(autoSubmit?.capturedPath ?? "", draft)}
                 >
                   {t("用其他 AI 整理", "Organize with another AI")}
                 </button>
@@ -2021,10 +2040,7 @@ export function AskPage({
           {settings?.configured
             ? localRuntime
               ? t("本机 Agent 按已批准的权限操作", "Local Agent uses the permissions you approve")
-              : t(
-                  "只读写允许的开图资料，不运行命令",
-                  "Reads and writes allowed Kaitu data; cannot run commands",
-                )
+              : t("资料范围：已允许的开图资料", "Data scope: allowed Kaitu files")
             : t("接上 AI 后才能发送", "Connect an AI before sending")}
         </p>
       </section>

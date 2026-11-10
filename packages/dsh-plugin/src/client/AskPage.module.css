@@ -1,12 +1,12 @@
 .chat {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 .threads {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 2px;
   padding: 16px 12px 16px 0;
@@ -511,7 +511,15 @@ output.progress,
   padding: 0 12px 12px;
 }
 .mobileNew {
-  display: none;
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+.showThreads {
+  grid-template-columns: 236px minmax(0, 1fr);
+}
+.showThreads .threads {
+  display: flex;
 }
 @media (max-width: 700px) {
   .chat {

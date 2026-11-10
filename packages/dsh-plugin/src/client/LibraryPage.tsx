@@ -395,47 +395,49 @@ export function LibraryPage({
         )}
         {error && <p role="alert">{error}</p>}
       </section>
-      <h2>{t("整理好的资料", "Organized items")}</h2>
-      <section className={styles.categories} aria-label={t("各类资料", "Library sections")}>
-        {data?.sections
-          .filter((section) => section.id !== "inbox")
-          .map((section) => (
-            <article className={styles.category} key={section.id} style={tones[section.id]}>
-              <button type="button" className={styles.categoryOpen} onClick={() => open(section.id)}>
-                <strong className={styles.title}>
-                  <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
-                  {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
-                </strong>
-                <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
-                  {section.count ?? "—"}
-                </span>
-              </button>
-              {section.count === 0 && hints[section.id] ? (
-                <button type="button" className={css.link} onClick={() => open(section.id)}>
-                  {t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")}
+      <details className={styles.sections} open>
+        <summary>{t("整理好的资料", "Organized items")}</summary>
+        <section className={styles.categories} aria-label={t("各类资料", "Library sections")}>
+          {data?.sections
+            .filter((section) => section.id !== "inbox")
+            .map((section) => (
+              <article className={styles.category} key={section.id} style={tones[section.id]}>
+                <button type="button" className={styles.categoryOpen} onClick={() => open(section.id)}>
+                  <strong className={styles.title}>
+                    <span className={styles.icon}>{icons[section.id] ?? icons.notes}</span>
+                    {t(section.title, LIBRARY_EN[section.id] ?? section.title)}
+                  </strong>
+                  <span className={`${styles.count} ${section.count === 0 ? styles.meta : ""}`}>
+                    {section.count ?? "—"}
+                  </span>
                 </button>
-              ) : section.sources.length > 0 ? (
-                <span className={styles.meta}>
-                  {section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
-                </span>
-              ) : null}
-              {section.latest && <time className={styles.meta}>{section.latest.slice(0, 10)}</time>}
-            </article>
-          ))}
-        {onAdd && (
-          <button
-            type="button"
-            className={`${styles.category} ${styles.add}`}
-            onClick={() => onAdd("category")}
-          >
-            <strong className={styles.title}>
-              <span className={styles.icon}>{icon(<path d="M12 5v14M5 12h14" />)}</span>
-              {t("添加一类", "Add a category")}
-            </strong>
-          </button>
-        )}
-        {!data && <output>{t("正在读取资料…", "Loading…")}</output>}
-      </section>
+                {section.count === 0 && hints[section.id] ? (
+                  <button type="button" className={css.link} onClick={() => open(section.id)}>
+                    {t(hints[section.id]?.[0] ?? "", hints[section.id]?.[1] ?? "")}
+                  </button>
+                ) : section.sources.length > 0 ? (
+                  <span className={styles.meta}>
+                    {section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
+                  </span>
+                ) : null}
+                {section.latest && <time className={styles.meta}>{section.latest.slice(0, 10)}</time>}
+              </article>
+            ))}
+          {onAdd && (
+            <button
+              type="button"
+              className={`${styles.category} ${styles.add}`}
+              onClick={() => onAdd("category")}
+            >
+              <strong className={styles.title}>
+                <span className={styles.icon}>{icon(<path d="M12 5v14M5 12h14" />)}</span>
+                {t("添加一类", "Add a category")}
+              </strong>
+            </button>
+          )}
+          {!data && <output>{t("正在读取资料…", "Loading…")}</output>}
+        </section>
+      </details>
       {!!overview?.versions.length && (
         <section>
           <div className={styles.heading}>

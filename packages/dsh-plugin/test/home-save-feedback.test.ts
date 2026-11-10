@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
 import { freshWorkspace } from "../../core/test/helpers.js";
+import { AskPage } from "../src/client/AskPage.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { LifeHome } from "../src/client/TodayPage.js";
 
@@ -203,6 +204,123 @@ test("home shows actual traces, hides empty traces and keeps genuine pending dec
     expect(app?.root.findAllByProps({ "data-has-side": false })).toHaveLength(1);
   } finally {
     if (app) await act(async () => app?.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("contextual Ask keeps Today and the same conversation mounted across close and expand", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  const sources = await readHomeSources(ws);
+  const requests: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => {
+    const method = url.split("/").at(-1) ?? "";
+    requests.push(method);
+    const values: Record<string, unknown> = {
+      askSettings: {
+        configured: true,
+        provider: "synthetic",
+        providerName: "Synthetic",
+        model: "fixture",
+        protocols: [],
+        providers: [],
+      },
+      askList: [
+        { id: "existing", title: "Existing conversation", created: "2026-11-10", updated: "2026-11-10" },
+      ],
+      overview: { projects: [], allNext: [], notes: [] },
+      automation: { asked: true, tasks: {} },
+    };
+    return { ok: true, json: async () => values[method] ?? {} };
+  });
+  const streams = vi.fn();
+  const closeStream = vi.fn();
+  vi.stubGlobal(
+    "EventSource",
+    class {
+      constructor() {
+        streams();
+      }
+      close = closeStream;
+    },
+  );
+  vi.stubGlobal("addEventListener", vi.fn());
+  vi.stubGlobal("removeEventListener", vi.fn());
+  vi.stubGlobal("requestAnimationFrame", () => 1);
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const renderAsk = vi.fn<NonNullable<OverviewPageProps["renderAsk"]>>(
+    (prompt, _configureRequest, _configureBuiltin, _connections, promptRequest, active) =>
+      createElement(AskPage, {
+        workspace: ws.root,
+        initialPrompt: prompt,
+        initialPromptRequest: promptRequest,
+        active,
+      }),
+  );
+  const captureOnce = vi.fn();
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: async () => sources.overview,
+    loadHome: async () => ({
+      data: readHome(sources),
+      presentation: sources.overview,
+      loading: false,
+      error: null,
+    }),
+    loadCalendar: async () => readCalendar(ws),
+    loadMe: async () => ({}),
+    loadOnboarding: async () => ({ showGuide: false }),
+    loadCalendarPush: async () => ({}),
+    loadProjects: async () => [],
+    loadLibrary: async () => ({ inbox: [] }),
+    renderAsk,
+    captureOnce,
+  } as unknown as OverviewPageProps;
+  let app!: ReturnType<typeof create>;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    await act(async () => app.root.findByType(LifeHome).props.ask("Context from Today"));
+    const panel = () => app.root.findByProps({ role: "complementary" });
+    const composer = () => app.root.findByProps({ "aria-label": "给开图发消息" });
+    expect(panel().props.hidden).toBe(false);
+    expect(app.root.findAllByType(LifeHome)).toHaveLength(1);
+    expect(renderAsk.mock.calls.at(-1)?.[0]).toBe("Context from Today");
+    expect(renderAsk.mock.calls.at(-1)?.[9]).toBeUndefined();
+    expect(captureOnce).not.toHaveBeenCalled();
+    expect(composer().props.value).toBe("Context from Today");
+    await act(async () =>
+      app.root
+        .findAllByType("button")
+        .find((button) => button.children.includes("Existing conversation"))
+        ?.props.onClick(),
+    );
+    await act(async () => composer().props.onChange({ target: { value: "unsent draft" } }));
+    await act(async () => app.root.findByProps({ "aria-label": "关闭问问" }).props.onClick());
+    await act(async () => app.root.findByProps({ "aria-label": "就地问问" }).props.onClick());
+    expect(composer().props.value).toBe("unsent draft");
+    await act(async () =>
+      panel()
+        .findAllByType("button")
+        .find((button) => button.children.includes("展开"))
+        ?.props.onClick(),
+    );
+    expect(app.root.findAllByType(LifeHome)).toHaveLength(0);
+    expect(composer().props.value).toBe("unsent draft");
+    expect(streams).toHaveBeenCalledOnce();
+    expect(closeStream).not.toHaveBeenCalled();
+    const nav = app.root.findByProps({ "aria-label": "主要导航" });
+    await act(async () => nav.findAllByType("button")[0]?.props.onClick());
+    await act(async () => app.root.findByProps({ "aria-label": "就地问问" }).props.onClick());
+    expect(composer().props.value).toBe("unsent draft");
+    expect(streams).toHaveBeenCalledOnce();
+    expect(closeStream).not.toHaveBeenCalled();
+    expect(requests).not.toContain("askCreate");
+    expect(requests).not.toContain("askSend");
+  } finally {
+    if (app) await act(async () => app.unmount());
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

@@ -74,7 +74,9 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
     release,
     [Symbol.dispose]: release,
   };
-  const initializeDraft = vi.fn(() => "applied" as const);
+  const initializeDraft = vi.fn<PluginAskServices["conversation"]["input"]["requestDraftInitialization"]>(
+    () => "applied",
+  );
   const services: PluginAskServices = {
     workspacePath: async () => "/synthetic/kaitu",
     workspaces: { create: vi.fn(async () => ({ workspaceId: "synthetic-workspace" })) },
@@ -118,8 +120,21 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   expect(services.sessions.retain).toHaveBeenCalledTimes(1);
   expect(initializeDraft).toHaveBeenCalledExactlyOnceWith(binding, {
     prompt: "合成预填",
-    whenDraftExists: "keep",
+    whenDraftExists: "append",
   });
+  initializeDraft.mockReturnValue("blocked");
+  await act(async () => root.update(page("Context A", 2)));
+  await act(async () => root.update(page("Context B", 3)));
+  await act(async () => root.update(page("Context B", 3)));
+  expect(initializeDraft).toHaveBeenCalledTimes(3);
+  expect(root.root.findByType("p").children).toEqual(["Context A\n\nContext B"]);
+  initializeDraft.mockReturnValue("applied");
+  await act(async () => root.root.findByType("button").props.onClick());
+  expect(initializeDraft).toHaveBeenLastCalledWith(binding, {
+    prompt: "Context A\n\nContext B",
+    whenDraftExists: "append",
+  });
+  expect(root.root.findAllByType("details")).toHaveLength(0);
   await act(async () => {
     root.unmount();
   });

@@ -187,19 +187,29 @@ test.each(["library", "today"])(
       pasteOnboardingMatter: (file, answer) => track(pasteOnboardingMatter(ws, file, answer)),
       adoptOnboardingMatter: (file, draft, path) => track(adoptOnboardingMatter(ws, file, draft, path)),
       renderAsk: (
-        _prompt,
+        prompt,
         _configureRequest,
         _configureBuiltin,
         _onConnections,
-        _promptRequest,
+        promptRequest,
         active,
         _onToday,
         _onSettings,
         _newConversation,
         autoSubmit,
         onOrganize,
-      ) => createElement(AskPage, { workspace: ws.root, active, autoSubmit, onOrganize }),
+      ) =>
+        createElement(AskPage, {
+          workspace: ws.root,
+          active,
+          autoSubmit,
+          onOrganize,
+          initialPrompt: prompt,
+          initialPromptRequest: promptRequest,
+        }),
     } as OverviewPageProps;
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
     let app!: ReturnType<typeof create>;
     const click = async (label: string) => {
       await act(async () => {
@@ -242,8 +252,9 @@ test.each(["library", "today"])(
             .props.onSubmit({ preventDefault() {} });
           await pending;
         });
-        expect(JSON.stringify(app.toJSON())).not.toContain(source);
+        expect(source).toBe("");
         await click("用其他 AI 整理");
+        expect(source).not.toBe("");
       }
       await click("1 · 复制整理提示词");
       expect(copied).toContain(original);
