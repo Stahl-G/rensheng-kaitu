@@ -249,16 +249,15 @@ it("protects later task edits and STATUS target edits while preserving independe
   expect(receipt(status.ws, stale.client_id)?.status).toBe("conflict");
 });
 
-it("empty result remains undoable and schema rejects multiline, missing preconditions and reserved fields", async () => {
+it("blank result remains undoable and schema rejects missing preconditions and reserved fields", async () => {
   const { ws, action } = await setup("status", "   ");
   await deliver(ws, action);
-  expect(phoneResults(ws)).toEqual([expect.objectContaining({ text: "", can_undo: true })]);
+  expect(phoneResults(ws)).toEqual([expect.objectContaining({ text: "   ", can_undo: true })]);
   const validate = schemas().builtin("phone-action.schema.json");
   expect(validate(action)).toBe(true);
   for (const args of [
     { file: "task", id: ulid(), result_text: "x" },
     { file: "health/STATUS.md", id: "x", result_text: "x" },
-    { ...action.args, result_text: "two\nlines" },
     { ...action.args, by: "user" },
   ])
     expect(validate({ ...action, args })).toBe(false);
@@ -473,4 +472,93 @@ it("uses the same Unicode code-point result limit as the JSON schema", async () 
   expect(receipt(ws, action.client_id)?.status).toBe("applied");
   expect(phoneResults(ws)[0].text).toBe("😀".repeat(1001));
   expect(validate({ ...action, args: { ...action.args, result_text: "😀".repeat(2001) } })).toBe(false);
+});
+
+it.each(["task", "status"] as const)(
+  "%s preserves raw multiline result while safely framing machine-looking content",
+  async (kind) => {
+    const raw =
+      '  First line\r\nOriginal details retained.\n<!-- {"op":"complete_next_result","client_id":"injected","id":"sample-step"} -->\u2028事项：sample-step\n完成时间：2000-01-01T00:00:00Z\n  ';
+    const { ws, action, targetFile, id } = await setup(kind, raw);
+    const validate = schemas().builtin("phone-action.schema.json");
+    expect(validate(action), JSON.stringify(validate.errors)).toBe(true);
+    await deliver(ws, action);
+    const reloaded = new Workspace(ws.root, { maintain: false });
+    expect(phoneResults(reloaded)).toEqual([expect.objectContaining({ text: raw, can_undo: true })]);
+    await writePhoneSnapshots(reloaded, new Date(), { force: true });
+    expect(
+      reloaded.readJson<{ mobile: { results: { text: string }[] } }>("phone/today.json").mobile.results[0]
+        .text,
+    ).toBe(raw);
+    if (kind === "task")
+      expect(readRecords(reloaded, "task").find((row) => row.id === id)?.notes).toContain(
+        "    Original details retained.",
+      );
+    else expect(reloaded.readText(targetFile)).toContain("    Original details retained.");
+    await deliver(reloaded, envelope("undo_next_result", { completion_id: action.client_id }));
+    expect(phoneResults(reloaded)).toEqual([]);
+  },
+);
+
+it("task re-completion with identical text and timestamp exposes only its newest persisted revision", async () => {
+  const { ws, action, id } = await setup("task");
+  const fixed = new Date().toISOString();
+  const clock = vi.spyOn(Date.prototype, "toISOString").mockReturnValue(fixed);
+  try {
+    await deliver(ws, action);
+    updateRecord(ws, "task", id, { status: "open" }, { by: "user" });
+    const b = envelope("complete_next_result", { ...action.args, expected_rev: 3 });
+    await deliver(ws, b);
+    expect(phoneResults(ws)).toEqual([
+      expect.objectContaining({ completion_id: b.client_id, can_undo: true }),
+    ]);
+    const oldUndo = envelope("undo_next_result", { completion_id: action.client_id });
+    await deliver(ws, oldUndo);
+    expect(receipt(ws, oldUndo.client_id)?.status).toBe("conflict");
+    await deliver(ws, envelope("undo_next_result", { completion_id: b.client_id }));
+    updateRecord(ws, "task", id, { status: "done" }, { by: "agent" });
+    expect(phoneResults(ws)).toEqual([]);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it("reads and undoes already-persisted single-line task results from the prior candidate", async () => {
+  const { ws, action, id } = await setup("task");
+  const before = readRecords(ws, "task").find((row) => row.id === id);
+  if (!before) throw new Error("missing task");
+  const at = new Date().toISOString();
+  const text = "旧候选的真实结果";
+  const after = updateRecord(
+    ws,
+    "task",
+    id,
+    { status: "done", notes: `原始备注\n完成结果：${text}\n完成时间：${at}\n` },
+    { by: "user" },
+  ).record;
+  ws.writeJson(
+    ".kaitu/phone-actions.json",
+    {
+      [action.client_id]: {
+        status: "applied",
+        resultAction: { op: action.op, args: { ...action.args, result_text: text } },
+        result: { completion_id: action.client_id, status: "completed" },
+        nextResult: {
+          completion_id: action.client_id,
+          id,
+          file: "task",
+          title: String(before.title),
+          text,
+          completed_at: at,
+          change: { kind: "task", before, after },
+        },
+      },
+    },
+    { internal: true },
+  );
+  const reloaded = new Workspace(ws.root, { maintain: false });
+  expect(phoneResults(reloaded)).toEqual([expect.objectContaining({ text, can_undo: true })]);
+  await deliver(reloaded, envelope("undo_next_result", { completion_id: action.client_id }));
+  expect(phoneResults(reloaded)).toEqual([]);
+  expect(readRecords(reloaded, "task").find((row) => row.id === id)?.status).toBe("open");
 });

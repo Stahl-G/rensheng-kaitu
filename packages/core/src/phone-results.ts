@@ -116,22 +116,28 @@ function statusOwner(doc: ReturnType<typeof statusDocument>, id: string) {
   }
   return doc.owners.get(id)?.owner;
 }
+function literalText(text: string) {
+  return text
+    .split(/\r\n|[\r\n\u2028\u2029]/u)
+    .map((line) => `    ${line}`)
+    .join("\n");
+}
+function resultBlock(text: string, at: string) {
+  return `\n完成结果：\n${literalText(text)}\n完成时间：${at}\n`;
+}
 function notes(text: string, result: string, at: string) {
-  const previous = text.replace(/(?:^|\n)完成(?:结果|时间)：[^\n]*/g, "").trimEnd();
-  return `${previous}\n完成结果：${result}\n完成时间：${at}\n`;
+  const previous = text
+    .replace(/(?:^|\n)完成结果：\n(?: {4}[^\n]*\n)*完成时间：[^\n]*\n?/g, "")
+    .replace(/(?:^|\n)完成(?:结果|时间)：[^\n]*/g, "")
+    .trimEnd();
+  return previous + resultBlock(result, at);
 }
 function prepare(ws: Workspace, action: Action): Completion {
   const { file, id, expected_rev, expected_next, result_text } = action.args;
-  if (
-    !file ||
-    !id ||
-    typeof result_text !== "string" ||
-    Array.from(result_text).length > 2000 ||
-    /[\r\n]/.test(result_text)
-  )
-    throw new KaituError("请用一句话记录结果", "BAD_ARGS");
+  if (!file || !id || typeof result_text !== "string" || Array.from(result_text).length > 2000)
+    throw new KaituError("结果最多2000个字符", "BAD_ARGS");
   const at = new Date().toISOString();
-  const text = result_text.trim();
+  const text = result_text;
   if (file === "task") {
     const before = readRecords(ws, "task").find((item) => item.id === id);
     if (!before || before.status !== "open" || (before.rev ?? 1) !== expected_rev) throw conflict();
@@ -159,7 +165,7 @@ function prepare(ws: Workspace, action: Action): Completion {
   if (!before || before.status !== "todo" || !expected_next || !isDeepStrictEqual(before, expected_next))
     throw conflict();
   const after = { ...before, status: "done" as const };
-  const block = `\n### 完成结果 · ${at}\n操作：${action.client_id}\n事项：${encodeURIComponent(id)}\n你完成了：${before.title.replace(/[\r\n]+/g, " ")}\n结果：${text}\n${eventComment({ op: "complete_next_result", client_id: action.client_id, id })}\n`;
+  const block = `\n### 完成结果 · ${at}\n操作：${action.client_id}\n事项：${encodeURIComponent(id)}\n你完成了：${before.title.replace(/[\r\n]+/g, " ")}\n结果：\n${literalText(text)}\n${eventComment({ op: "complete_next_result", client_id: action.client_id, id })}\n`;
   return {
     completion_id: action.client_id,
     id,
@@ -330,6 +336,7 @@ export function phoneResults(ws: Workspace): PhoneResult[] {
   if (!ws.exists(".kaitu/phone-actions.json")) return [];
   const ledger = ws.readJson<Record<string, PhoneResultLedgerEntry>>(".kaitu/phone-actions.json");
   let tasks: Map<string, StoredRecord> | undefined;
+  let taskOwners: Map<string, { rev: number; owner: string }> | undefined;
   let allowed: Set<string> | undefined;
   const documents = new Map<string, ReturnType<typeof statusDocument>>();
   const results: PhoneResult[] = [];
@@ -339,11 +346,31 @@ export function phoneResults(ws: Workspace): PhoneResult[] {
     let active = false;
     let canUndo = false;
     if (value.change.kind === "task") {
-      tasks ??= new Map(readRecords(ws, "task").map((task) => [task.id, task]));
+      if (!tasks || !taskOwners) {
+        tasks = new Map(readRecords(ws, "task").map((task) => [task.id, task]));
+        const revisions = new Map(
+          readRecordRevisions(ws, "task").map((task) => [`${task.id}:${task.rev ?? 1}`, task]),
+        );
+        taskOwners = new Map();
+        for (const candidate of Object.values(ledger)) {
+          const plan = candidate.nextResult;
+          if (!plan || plan.change.kind !== "task") continue;
+          const after = plan.change.after;
+          if (!isDeepStrictEqual(revisions.get(`${plan.id}:${after.rev ?? 1}`), after)) continue;
+          if ((taskOwners.get(plan.id)?.rev ?? 0) < (after.rev ?? 1))
+            taskOwners.set(plan.id, { rev: after.rev ?? 1, owner: plan.completion_id });
+        }
+      }
       const current = tasks.get(value.id);
+      const literal = resultBlock(value.text, value.completed_at);
+      const legacy = `\n完成结果：${value.text}\n完成时间：${value.completed_at}\n`;
+      const written = String(value.change.after.notes ?? "");
+      const block = written.includes(literal) ? literal : written.includes(legacy) ? legacy : undefined;
       active =
+        taskOwners.get(value.id)?.owner === value.completion_id &&
         current?.status === "done" &&
-        String(current.notes ?? "").includes(`\n完成结果：${value.text}\n完成时间：${value.completed_at}\n`);
+        !!block &&
+        String(current.notes ?? "").includes(block);
       canUndo = isDeepStrictEqual(current, value.change.after);
     } else {
       allowed ??= new Set(statusFiles(ws).map((item) => item.file));

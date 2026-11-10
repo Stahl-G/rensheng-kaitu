@@ -100,7 +100,7 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 仅在 `today.mobile.actions` 显式声明 `complete_next_result` / `undo_next_result` 时投递。旧 `complete_next` 兼容不变；旧消费者没有这两个能力时，手机保留本机结果与待兼容状态，不把完成和普通 capture 拼成原子操作。
 
-- 完成：`op: complete_next_result`，`args: {file,id,result_text,expected_next}`；STATUS 的 expected_next 原样带回规范化的 source_precondition；原字段缺id/status或使用字符串简写时，投影与消费者共用既有 normalizeDocument 规则，写入只替换目标，不顺带改其他事项。task 用 `file: task` 和 `expected_rev`，不能传 by/rev。结果允许空白但不计入有结果天数。非空结果最多2000个Unicode码点、单行；完成时间取电脑首次准备写入时的真实带offset时间，不用旧事项日期或手机回传时间冒充。
+- 完成：`op: complete_next_result`，`args: {file,id,result_text,expected_next}`；STATUS 的 expected_next 原样带回规范化的 source_precondition；原字段缺id/status或使用字符串简写时，投影与消费者共用既有 normalizeDocument 规则，写入只替换目标，不顺带改其他事项。task 用 `file: task` 和 `expected_rev`，不能传 by/rev。结果允许空白但不计入有结果天数。结果最多2000个Unicode码点，完整保留多行raw text；task.notes和STATUS将每一逻辑行以标准Markdown四空格缩进作为字面内容保存，CR/LF及Unicode分隔符都分行缩进，防止结果伪造完成时间、标题或拥有者事件。WAL与snapshot保留原始换行和空白；完成时间取电脑首次准备写入时的真实带offset时间，不用旧事项日期或手机回传时间冒充。
 - 撤销：`op: undo_next_result`，`args: {completion_id}`，completion_id 是首次完成的 client_id。撤销本身有新 client_id；网络失败继续原ID原内容重投，不能另造撤销ID试探。现有账本先持久保存目标 before/after 与结果，再写单个 STATUS 或追加 task 修订，最后持久终态再发回执。重启、写入成功但账本/回执失败后，原操作精确识别 after，不重复追加。未知I/O失败保留准备计划重试，不永久记成conflict。
 - 回执可选 `result: {completion_id,status: completed|undone}`。applied/duplicate 之外不能当完成成功。同client_id换内容返回conflict，不重解释为新操作。完成已撤销后重投首次完成仍返回undone，不能再次完成。
 - `today.mobile.results` 可选数组，每项 `{completion_id,id,file,title,text,completed_at,can_undo}`。仅列账本已确认且当前仍为同一完成内容的项，撤销/重开后移除。改标题可保留原完成结果，但 `can_undo` 会因精确after不匹配变false。非空text才有结果天数；pending、普通capture、AI自动标记与无持久操作证据的旧STATUS正文不算。时间按today.timezone计日。
