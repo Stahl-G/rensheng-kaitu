@@ -99,9 +99,15 @@ export function toolFailed(result: AskEvent | undefined): boolean {
   return message.isError === true || value.ok === false || object(value.result).ok === false;
 }
 export function askEvidence(events: AskEvent[], busy: boolean): AskEvidenceItem[] {
-  const results = new Map<unknown, AskEvent>();
+  const calls = new Map<unknown, AskEvent>();
+  const results = new Map<number, AskEvent>();
   for (const event of events) {
-    if (event.type === "tool/result") results.set(object(event.data.message).toolCallId, event);
+    if (event.type === "user/message") calls.clear();
+    if (event.type === "tool/call") calls.set(event.data.callId, event);
+    if (event.type === "tool/result") {
+      const call = calls.get(object(event.data.message).toolCallId);
+      if (call && !results.has(call.id)) results.set(call.id, event);
+    }
   }
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
   return events.flatMap((event, index): AskEvidenceItem[] => {
@@ -110,7 +116,7 @@ export function askEvidence(events: AskEvent[], busy: boolean): AskEvidenceItem[
     const name = String(event.data.name ?? "");
     const intent = toolIntent(name, args);
     if (!intent) return [];
-    const result = results.get(event.data.callId);
+    const result = results.get(event.id);
     const detail = toolText(object(result?.data.message).content);
     const value = parse(detail);
     const payload = object(value.result ?? value);

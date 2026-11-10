@@ -68,3 +68,24 @@ test("checking a task suggestion routes to Today without adopting or writing", a
     await act(async () => app?.unmount());
   }
 });
+
+test("reused tool-call identities in later turns cannot replace an earlier receipt", () => {
+  const first = call(1, "kaitu_workspace", { operation: "read", path: "notes/first.md" });
+  const second = call(3, "kaitu_workspace", { operation: "read", path: "notes/second.md" });
+  second.data.callId = first.data.callId;
+  const secondResult = result(3, { ok: false, error: "Second read failed" });
+  (secondResult.data.message as { toolCallId: unknown }).toolCallId = first.data.callId;
+  const items = askEvidence(
+    [
+      first,
+      result(1, { ok: true, result: { content: "First original" } }),
+      { id: 2, type: "user/message", data: {} },
+      second,
+      secondResult,
+    ],
+    false,
+  );
+  expect(items[0]).toMatchObject({ target: "notes/first.md", state: "read" });
+  expect(items[0]?.detail).toContain("First original");
+  expect(items[1]).toMatchObject({ target: "notes/second.md", state: "failed" });
+});
