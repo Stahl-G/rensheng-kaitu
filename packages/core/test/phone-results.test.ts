@@ -33,7 +33,12 @@ async function setup(kind: "task" | "status", text = "已经打印两张小样")
     const task = addRecord(
       ws,
       "task",
-      { title: "打印两张小样", status: "open", notes: "原始备注" },
+      {
+        title: "打印两张小样",
+        status: "open",
+        notes: "原始备注",
+        source: "me/goals.json#synthetic-direction",
+      },
       { by: "user" },
     ).record;
     return {
@@ -96,13 +101,17 @@ it.each(["task", "status"] as const)(
     ]);
     expect(Date.parse(results[0].completed_at)).toBeGreaterThanOrEqual(start);
     await writePhoneSnapshots(restored, new Date(), { force: true });
-    const today = restored.readJson<{ mobile: { actions: string[]; results: unknown[] } }>(
-      "phone/today.json",
-    );
+    const today = restored.readJson<{
+      mobile: { actions: string[]; results: unknown[]; tasks: { id: string; source?: string }[] };
+    }>("phone/today.json");
     expect(today.mobile.actions).toEqual(
       expect.arrayContaining(["complete_next_result", "undo_next_result"]),
     );
     expect(today.mobile.results).toEqual(results);
+    if (kind === "task")
+      expect(today.mobile.tasks.find((item) => item.id === id)?.source).toBe(
+        "me/goals.json#synthetic-direction",
+      );
     const validate = schemas().builtin("phone-today.schema.json");
     expect(validate(today), JSON.stringify(validate.errors)).toBe(true);
     await deliver(restored, action);

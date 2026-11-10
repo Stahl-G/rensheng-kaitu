@@ -79,13 +79,14 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
         : ["complete_next", "complete_next_result", "undo_next_result", "capture_memory", "replace_memory"],
       results: phoneResults(ws),
       tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
-        ({ id, rev, title, status, ts, due }) => ({
+        ({ id, rev, title, status, ts, due, source }) => ({
           id,
           rev: rev ?? 1,
           title,
           status,
           ts,
           ...(due ? { due } : {}),
+          ...(typeof source === "string" ? { source } : {}),
         }),
       ),
     },

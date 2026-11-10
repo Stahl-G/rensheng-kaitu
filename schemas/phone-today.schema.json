@@ -56,7 +56,11 @@
               "ts": { "type": "string", "format": "date-time" },
               "title": { "type": "string", "minLength": 1 },
               "status": { "enum": ["proposed", "open", "done", "cancelled"] },
-              "due": { "type": "string" }
+              "due": { "type": "string" },
+              "source": {
+                "type": "string",
+                "description": "已有任务来源原值，例如me/goals.json#id；不按标题猜关联"
+              }
             }
           }
         },
