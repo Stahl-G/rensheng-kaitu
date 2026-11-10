@@ -94,3 +94,16 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
 手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。
+
+
+## 联网完成结果与持久撤销（0.1.4 候选，未合并）
+
+仅在 `today.mobile.actions` 显式声明 `complete_next_result` / `undo_next_result` 时投递。旧 `complete_next` 兼容不变；旧消费者没有这两个能力时，手机保留本机结果与待兼容状态，不把完成和普通 capture 拼成原子操作。
+
+- 完成：`op: complete_next_result`，`args: {file,id,result_text,expected_next}`；STATUS 的 expected_next 原样带回规范化的 source_precondition；原字段缺id/status或使用字符串简写时，投影与消费者共用既有 normalizeDocument 规则，写入只替换目标，不顺带改其他事项。task 用 `file: task` 和 `expected_rev`，不能传 by/rev。结果允许空白但不计入有结果天数。非空结果最多2000个Unicode码点、单行；完成时间取电脑首次准备写入时的真实带offset时间，不用旧事项日期或手机回传时间冒充。
+- 撤销：`op: undo_next_result`，`args: {completion_id}`，completion_id 是首次完成的 client_id。撤销本身有新 client_id；网络失败继续原ID原内容重投，不能另造撤销ID试探。现有账本先持久保存目标 before/after 与结果，再写单个 STATUS 或追加 task 修订，最后持久终态再发回执。重启、写入成功但账本/回执失败后，原操作精确识别 after，不重复追加。未知I/O失败保留准备计划重试，不永久记成conflict。
+- 回执可选 `result: {completion_id,status: completed|undone}`。applied/duplicate 之外不能当完成成功。同client_id换内容返回conflict，不重解释为新操作。完成已撤销后重投首次完成仍返回undone，不能再次完成。
+- `today.mobile.results` 可选数组，每项 `{completion_id,id,file,title,text,completed_at,can_undo}`。仅列账本已确认且当前仍为同一完成内容的项，撤销/重开后移除。改标题可保留原完成结果，但 `can_undo` 会因精确after不匹配变false。非空text才有结果天数；pending、普通capture、AI自动标记与无持久操作证据的旧STATUS正文不算。时间按today.timezone计日。
+- 撤销先比较原完成后的精确条目或task完整修订和结果块，再恢复原状态/正文；后来修改过的目标返回conflict，不覆盖对端。STATUS其他事项/正文的独立改动保留。完成块末尾的标准Markdown JSON comment绑定op/client_id/id，撤销保留同目标的完成拥有者。按正文实际事件顺序确定同一file/id最后完成，不用同毫秒时间或ULID排序；旧完成不能撤销较新完成，较新完成撤销后旧结果不复活。撤销以标准 Markdown HTML comment 中的 JSON（op/client_id/completion_id/id）替换原完成块，随同一次原子写入保留撤销证据；终态账本失包后即使有后续编辑，也可确认原撤销已落盘且不重写后来内容。
+
+该账本属于电脑已有本机状态，不新增手机写正本权限或认证凭据。手机文件仍未签名，client_id、文件名、by和来源标签都不是设备认证或用户手势证明；沿既有Agent权限，只操作普通事项，不借此确认阶段、启用方向或执行外部副作用。结果保留来源关联，不宣称已实现可信手机确认通道。完成/撤销均需等明确回执；真实同步盘/跨语言联调与最终发布另行验收。

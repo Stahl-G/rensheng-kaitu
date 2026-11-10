@@ -23,7 +23,9 @@
         "answer_question",
         "trial_checkin",
         "replace_memory",
-        "capture_memory"
+        "capture_memory",
+        "complete_next_result",
+        "undo_next_result"
       ]
     },
     "args": { "type": "object" }
@@ -373,6 +375,83 @@
               "scope"
             ],
             "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "complete_next_result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["file", "id", "result_text"],
+            "additionalProperties": false,
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "result_text": {
+                "type": "string",
+                "maxLength": 2000,
+                "pattern": "^[^\\r\\n]*$"
+              },
+              "expected_rev": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "expected_next": {
+                "type": "object"
+              }
+            },
+            "if": {
+              "properties": {
+                "file": {
+                  "const": "task"
+                }
+              }
+            },
+            "then": {
+              "required": ["expected_rev"]
+            },
+            "else": {
+              "required": ["expected_next"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "undo_next_result"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["completion_id"],
+            "additionalProperties": false,
+            "properties": {
+              "completion_id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              }
+            }
           }
         }
       }

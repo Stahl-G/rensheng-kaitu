@@ -41,6 +41,20 @@
               }
             }
           },
+          "result": {
+            "type": "object",
+            "required": ["completion_id", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "completion_id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "status": {
+                "enum": ["completed", "undone"]
+              }
+            }
+          },
           "at": { "type": "string", "format": "date-time" }
         }
       }

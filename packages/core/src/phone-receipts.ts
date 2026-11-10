@@ -7,6 +7,7 @@ export interface PhoneReceipt {
   message?: string;
   target?: { id: string; rev: number };
   memory?: { file: string; status: "saved" | "duplicate" | "undone" | "superseded" };
+  result?: { completion_id: string; status: "completed" | "undone" };
   at: string;
 }
 export function phoneReceipts(ws: Workspace): PhoneReceipt[] {

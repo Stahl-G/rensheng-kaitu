@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import {
@@ -14,6 +15,7 @@ import {
   replaceMemory,
 } from "./memory.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
+import { type PhoneResultLedgerEntry, applyPhoneResultAction } from "./phone-results.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
 import { schemas } from "./schema.js";
@@ -37,18 +39,21 @@ interface Action {
     title?: string;
     due?: string | null;
     notes?: string;
+    result_text?: string;
+    completion_id?: string;
     candidate?: MemoryInput | null;
     expected?: MemoryExpectation;
   };
 }
 
 // 待办先记进操作账本再追加；中途失败时重投复用同一条记录，不会重复追加。
-type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> & {
-  task?: StoredRecord;
-  memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
-  capture?: ReturnType<typeof memoryCaptureSchema.parse>;
-  captureResult?: PhoneReceipt["memory"];
-};
+type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> &
+  PhoneResultLedgerEntry & {
+    task?: StoredRecord;
+    memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
+    capture?: ReturnType<typeof memoryCaptureSchema.parse>;
+    captureResult?: PhoneReceipt["memory"];
+  };
 function prepareTask(ws: Workspace, action: Action): StoredRecord {
   const { id, expected_rev, title, due, notes } = action.args;
   const current = readRecords(ws, "task").find((row) => row.id === id);
@@ -90,7 +95,8 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       !seen[r.ref]?.status &&
       !seen[r.ref]?.memory &&
       !seen[r.ref]?.task &&
-      !seen[r.ref]?.capture
+      !seen[r.ref]?.capture &&
+      !seen[r.ref]?.resultAction
     )
       seen[r.ref] =
         r.status === "conflict" || r.status === "rejected"
@@ -126,6 +132,14 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       at: new Date().toISOString(),
     };
     const first = seen[action.client_id];
+    if (action.op === "complete_next_result" || action.op === "undo_next_result" || first?.resultAction) {
+      receipts.push(
+        applyPhoneResultAction(ws, action, seen, () =>
+          ws.writeJson(ledgerFile, seen, { internal: true, mode: 0o600 }),
+        ),
+      );
+      continue;
+    }
     if (
       first?.capture &&
       (action.op !== "capture_memory" || !isDeepStrictEqual(first.capture, action.args))
@@ -206,9 +220,14 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
               if (!statusFiles(ws).some((item) => item.file === target))
                 throw new KaituError("找不到下一步来源", "CONFLICT");
               const data = parseFrontmatter<{ next?: { id: string }[] }>(ws.readText(target)).data;
+              const normalized = normalizeDocument("status.schema.json", data) as typeof data;
               if (
                 !isDeepStrictEqual(
-                  data.next?.find((item) => item.id === id),
+                  Array.isArray(data.next) ? data.next.find((item) => item.id === id) : undefined,
+                  action.args.expected_next,
+                ) &&
+                !isDeepStrictEqual(
+                  normalized.next?.find((item) => item.id === id),
                   action.args.expected_next,
                 )
               )

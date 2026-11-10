@@ -59,6 +59,42 @@
               "due": { "type": "string" }
             }
           }
+        },
+        "results": {
+          "type": "array",
+          "description": "持久完成操作仍生效的结果；空text只表示完成，不能计为真实结果。can_undo为当前精确状态能否撤销，不保证之后仍可撤销。",
+          "items": {
+            "type": "object",
+            "required": ["completion_id", "id", "file", "title", "text", "completed_at", "can_undo"],
+            "additionalProperties": false,
+            "properties": {
+              "completion_id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "title": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "completed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "can_undo": {
+                "type": "boolean"
+              }
+            }
+          }
         }
       }
     },
