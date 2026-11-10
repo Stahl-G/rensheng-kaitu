@@ -1,25 +1,160 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import {
+  type Workspace,
   createHomeCache,
   history,
   localDate,
+  localStateRoot,
   parseFrontmatter,
   readRecords,
   snapshot,
   stringifyFrontmatter,
 } from "@kaitu/core";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, onTestFailed, vi } from "vitest";
 import { appleHealthZip, clonedWorkspace } from "../../core/test/helpers.js";
-import { startUi } from "../src/ui/server.js";
+import { type UiOptions, startUi } from "../src/ui/server.js";
+
+const migration = vi.hoisted(() => ({
+  observe: null as null | (<T>(name: string, ws: Workspace, run: () => Promise<T>) => Promise<T>),
+  rename: null as null | ((error: unknown, source: unknown, target: unknown) => void),
+}));
+// Observe Vitest's named fs import, not the default object's unrelated ESM binding.
+vi.mock("node:fs", async (original) => {
+  const fs = await original<typeof import("node:fs")>();
+  return {
+    ...fs,
+    renameSync: (...args: Parameters<typeof fs.renameSync>) => {
+      try {
+        return fs.renameSync(...args);
+      } catch (error) {
+        migration.rename?.(error, ...args);
+        throw error;
+      }
+    },
+  };
+});
+vi.mock("@kaitu/core", async (original) => {
+  const core = await original<typeof import("@kaitu/core")>();
+  const call = <T>(name: string, ws: Workspace, run: () => Promise<T>) =>
+    migration.observe ? migration.observe(name, ws, run) : run();
+  return {
+    ...core,
+    enableSync: (...args: Parameters<typeof core.enableSync>) =>
+      call("enableSync", args[0], () => core.enableSync(...args)),
+    disableSync: (...args: Parameters<typeof core.disableSync>) =>
+      call("disableSync", args[0], () => core.disableSync(...args)),
+    snapshotNow: (...args: Parameters<typeof core.snapshotNow>) =>
+      call("snapshotNow", args[0], () => core.snapshotNow(...args)),
+    pauseNoteIndex: (...args: Parameters<typeof core.pauseNoteIndex>) =>
+      call("pauseNoteIndex", args[0], () => core.pauseNoteIndex(...args)),
+  };
+});
 
 const cleanup: (() => Promise<void>)[] = [];
+function observeMigration(ws: Workspace) {
+  type Trace = {
+    route: string;
+    phase: string;
+    events: unknown[];
+    record(step: string, error?: unknown, source?: unknown, target?: unknown): void;
+  };
+  const reports: Trace[] = [];
+  let active: Trace | undefined;
+  onTestFailed(() => console.error("migration-failure", JSON.stringify(reports)));
+  migration.rename = (error, source, target) => active?.record("rename:error", error, source, target);
+  migration.observe = <T>(name: string, workspace: Workspace, run: () => Promise<T>): Promise<T> => {
+    const request = active;
+    if (!request || workspace !== ws) return run();
+    request.record(`${name}:enter`);
+    const settled = (status: string, error?: unknown) => {
+      request.record(`${name}:${status}`, error);
+      if (["enableSync", "disableSync", "moveWorkspace"].includes(name)) request.phase = "finalize";
+    };
+    try {
+      const result = run();
+      void result.then(
+        () => settled("return"),
+        (error) => settled("error", error),
+      );
+      return result;
+    } catch (error) {
+      settled("throw", error);
+      throw error;
+    }
+  };
+  return {
+    begin(route: string, target: string) {
+      const roots = [
+        ["source", ws.root],
+        ["target", target],
+        ["state", localStateRoot()],
+      ] as const;
+      const role = (value: unknown) => {
+        if (typeof value === "string" && isAbsolute(value)) {
+          for (const [name, root] of roots) {
+            const path = relative(root, value);
+            if (!isAbsolute(path) && path !== ".." && !path.startsWith(`..${sep}`))
+              return `${name}/${path.split(sep).join("/") || "."}`;
+          }
+        }
+        return "redacted";
+      };
+      const detail = (error: unknown, seen = new Set<object>()): unknown => {
+        if (!error || typeof error !== "object") return { type: typeof error };
+        if (seen.has(error)) return { repeated: true };
+        seen.add(error);
+        const value = error as Record<string, unknown>;
+        const token = (field: unknown) =>
+          typeof field === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(field) ? field : undefined;
+        return {
+          name: token(value.name),
+          code: token(value.code),
+          syscall: token(value.syscall),
+          path: role(value.path),
+          dest: role(value.dest),
+          ...(value.cause === undefined ? {} : { cause: detail(value.cause, seen) }),
+          ...(Array.isArray(value.errors) ? { errors: value.errors.map((item) => detail(item, seen)) } : {}),
+        };
+      };
+      const request: Trace = {
+        route,
+        phase: "prepare",
+        events: [],
+        record(step, error, source, destination) {
+          request.events.push({
+            step,
+            phase: request.phase,
+            root: role(ws.root),
+            ...(error === undefined ? {} : { error: detail(error) }),
+            ...(source === undefined ? {} : { path: role(source), dest: role(destination) }),
+          });
+        },
+      };
+      reports.push(request);
+      active = request;
+      request.record("http:send");
+    },
+    mark(step: string) {
+      if (!active) return;
+      if (step === "prepared") active.phase = "core";
+      if (step === "watchers-restored") active.phase = "finalize";
+      active.record(step);
+      if (step.startsWith("http:")) active = undefined;
+    },
+  };
+}
 afterEach(async () => {
+  migration.observe = null;
+  migration.rename = null;
   for (const fn of cleanup.splice(0).reverse()) await fn();
 });
-async function setup(prepareHome = false) {
+async function setup(
+  prepareHome = false,
+  hooks: Pick<UiOptions, "onWorkspaceChanging" | "onWorkspaceChanged"> = {},
+) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-"));
   cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
   const ws = await clonedWorkspace(undefined, root);
@@ -51,6 +186,7 @@ async function setup(prepareHome = false) {
     snapshotDelayMs: 80,
     refreshDelayMs: 10,
     inboxStableMs: 30,
+    ...hooks,
   });
   cleanup.push(ui.close);
   return { ws, ui };
@@ -220,13 +356,22 @@ it("独立资料接口无需 AI，JSON 空选项可读取财务，原文回读�
 });
 
 it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回到本机", async () => {
-  const { ws, ui } = await setup();
-  const post = (path: string, body: unknown) =>
-    fetch(`${ui.url}${path}`, {
+  const { ws, ui } = await setup(false, {
+    onWorkspaceChanging: async () => diagnostic.mark("prepared"),
+    onWorkspaceChanged: async () => diagnostic.mark("watchers-restored"),
+  });
+  const diagnostic = observeMigration(ws);
+  const post = (path: string, body: unknown, target: string) => {
+    diagnostic.begin(path, target);
+    return fetch(`${ui.url}${path}`, {
       method: "POST",
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(body),
+    }).then((response) => {
+      diagnostic.mark(`http:${response.status}`);
+      return response;
     });
+  };
   for (const [enable, disable, body] of [
     ["/api/sync/enable", "/api/sync/disable", { mode: "drive" }],
     ["/api/drive/enable", "/api/drive/disable", {}],
@@ -238,11 +383,11 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rmSync(folder, { recursive: true, force: true });
       rmSync(back, { recursive: true, force: true });
     });
-    const enabled = await post(enable, { ...body, dir: folder });
+    const enabled = await post(enable, { ...body, dir: folder }, join(folder, "kaitu-ai-memory"));
     const enabledBody = await enabled.json();
     expect(enabled.status, JSON.stringify({ route: enable, response: enabledBody })).toBe(200);
     expect(enabledBody.mode).toBe("drive");
-    const disabled = await post(disable, { to: join(back, "kaitu") });
+    const disabled = await post(disable, { to: join(back, "kaitu") }, join(back, "kaitu"));
     const disabledBody = await disabled.json();
     expect(disabled.status, JSON.stringify({ route: disable, response: disabledBody })).toBe(200);
     expect(disabledBody.mode).toBe("local");
