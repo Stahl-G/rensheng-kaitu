@@ -932,12 +932,14 @@ function InboxReview({
 }
 export function NotesPage({
   initialFile,
+  onAskContext,
   data,
   loadLibraryDocument,
   loadMediaImage,
   ...learning
 }: {
   initialFile?: string;
+  onAskContext?: (context: { title: string; prompt: string } | null) => void;
   data: LibraryData | null;
   topic: string;
   onTopic: (topic: string) => void;
@@ -968,6 +970,16 @@ export function NotesPage({
         : !item.file.startsWith("learning/") && item.kind === (filter === "decision" ? "决定" : "笔记")),
   );
   const current = data?.notes.find((item) => item.file === file);
+  const askPrompt = file
+    ? t(
+        `请先读取开图资料 ${file}，根据这份原文与我继续讨论。区分原文事实、估算和建议；新的下一步保留待采纳。`,
+        `Read my Kaitu document ${file} and continue discussing it with me. Keep source facts, estimates and suggestions distinct, and leave new next steps pending adoption.`,
+      )
+    : "";
+  useEffect(() => {
+    onAskContext?.(file ? { title: current?.title ?? file, prompt: askPrompt } : null);
+    return () => onAskContext?.(null);
+  }, [file, current?.title, askPrompt, onAskContext]);
   const originalBody = body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
   const firstHeading = /^# (.+)\r?\n/.exec(originalBody);
   const documentBody =
@@ -1079,14 +1091,7 @@ export function NotesPage({
               <button
                 type="button"
                 className={styles.askDocument}
-                onClick={() =>
-                  learning.onPrompt(
-                    t(
-                      `请先读取开图资料 ${file}，根据这份原文与我继续讨论。区分原文事实、估算和建议；新的下一步保留待采纳。`,
-                      `Read my Kaitu document ${file} and continue discussing it with me. Keep source facts, estimates and suggestions distinct, and leave new next steps pending adoption.`,
-                    ),
-                  )
-                }
+                onClick={() => learning.onPrompt(askPrompt)}
               >
                 {t("问问", "Ask")}
               </button>

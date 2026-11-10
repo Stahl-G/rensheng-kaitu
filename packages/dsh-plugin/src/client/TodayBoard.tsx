@@ -46,6 +46,26 @@ export function createTodayBoardSession() {
   };
 }
 export type TodayBoardSession = ReturnType<typeof createTodayBoardSession>;
+/** The owner and the visible receipt use the same undo operation across navigation. */
+export async function reverseTodayBoard(
+  board: TodayBoardSession,
+  undo: (token: string) => Promise<{ undone: boolean }>,
+) {
+  const { receipt, pending } = board.read();
+  if (!receipt || pending) return;
+  board.set("pending", true);
+  board.set("error", "");
+  try {
+    await undo(receipt.value.token);
+    board.set("selected", receipt.step.key);
+    board.set("drafts", (current) => ({ ...current, [receipt.step.key]: receipt.text }));
+    board.set("receipt", undefined);
+  } catch (err) {
+    board.set("error", err instanceof Error ? err.message : String(err));
+  } finally {
+    board.set("pending", false);
+  }
+}
 export function TodayBoard({
   data,
   complete,
@@ -156,38 +176,7 @@ export function TodayBoard({
       setPending(false);
     }
   };
-  const reverse = async () => {
-    if (!receipt || !undo || board.read().pending) return;
-    setPending(true);
-    setError("");
-    try {
-      await undo(receipt.value.token);
-      setSelected(receipt.step.key);
-      setDrafts((current) => ({ ...current, [receipt.step.key]: receipt.text }));
-      setReceipt(undefined);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPending(false);
-    }
-  };
-  useEffect(() => {
-    if (!receipt || !undo || typeof window === "undefined") return;
-    const shortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === "z" &&
-        !target?.closest?.("input, textarea, [contenteditable=true]")
-      ) {
-        event.preventDefault();
-        void reverse();
-      }
-    };
-    window.addEventListener("keydown", shortcut);
-    return () => window.removeEventListener("keydown", shortcut);
-  });
+  const reverse = () => undo && reverseTodayBoard(board, undo);
   return (
     <div className={styles.todayBoard}>
       <button

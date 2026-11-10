@@ -16,6 +16,7 @@ test("switching documents retains the list, ignores an old read, and retries the
         : Promise.reject(new Error("Read failed")),
   );
   const prompt = vi.fn();
+  const context = vi.fn();
   const data: LibraryData = {
     inbox: [],
     sections: [],
@@ -36,6 +37,7 @@ test("switching documents retains the list, ignores an old read, and retries the
     onTopic: vi.fn(),
     onSourceConsumed: vi.fn(),
     onPrompt: prompt,
+    onAskContext: context,
     onSaved: vi.fn(),
     draft: emptyLearningDraft,
     onDraft: vi.fn(),
@@ -65,10 +67,15 @@ test("switching documents retains the list, ignores an old read, and retries the
     expect(JSON.stringify(app.toJSON())).toContain("Second document original");
     await act(async () => button("问问")?.props.onClick());
     expect(prompt).toHaveBeenCalledWith(expect.stringContaining("decisions/second.md"));
+    expect(context.mock.calls.at(-1)?.[0]).toEqual({
+      title: "Second",
+      prompt: prompt.mock.calls.at(-1)?.[0],
+    });
     await act(async () => button("笔记")?.props.onClick());
     expect(button("Second")).toBeUndefined();
     expect(JSON.stringify(app.toJSON())).toContain("Second document original");
   } finally {
     await act(async () => app?.unmount());
+    expect(context).toHaveBeenLastCalledWith(null);
   }
 });

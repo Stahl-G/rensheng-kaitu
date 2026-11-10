@@ -1,6 +1,7 @@
 import { rmSync } from "node:fs";
 import {
   adoptOnboardingMatter,
+  completeHomeNext,
   createProject,
   lifeMap,
   readCalendar,
@@ -16,6 +17,7 @@ import {
   readProjectsPage,
   saveOnboardingMatter,
   setProject,
+  undoHomeNext,
   writeExploration,
 } from "@kaitu/core";
 import { createElement, useState } from "react";
@@ -28,6 +30,7 @@ import { ExplorePluginFrame } from "../src/client/ExplorePluginFrame.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { PlansCard } from "../src/client/Plans.js";
 import { ProjectsPage } from "../src/client/ProjectsPage.js";
+import { TodayBoard } from "../src/client/TodayBoard.js";
 import { LifeHome } from "../src/client/TodayPage.js";
 
 vi.mock("../src/client/PaperMap.js", () => ({ PaperMap: () => null }));
@@ -256,6 +259,102 @@ test("plugin handoff returns to the same frame and retains an edited Ask draft",
     await navigate(app, "问问");
     expect(app.root.findByType(Draft).findByType("textarea").props.value).toBe("还没有发送的补充问题");
     expect(mounts).toBe(1);
+  } finally {
+    await act(async () => app.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("global shortcuts follow the selected step and undo its receipt after leaving Today, without taking text undo", async () => {
+  const complete = vi.fn<NonNullable<OverviewPageProps["completeHomeNext"]>>();
+  const undo = vi.fn<NonNullable<OverviewPageProps["undoHomeNext"]>>();
+  const renderAsk = vi.fn(() => null);
+  const { ws, app } = await setup({
+    completeHomeNext: complete,
+    undoHomeNext: undo,
+    captureOnce: vi.fn(),
+    renderAsk,
+  });
+  complete.mockImplementation(async (...args) => completeHomeNext(ws, ...args));
+  undo.mockImplementation(async (token) => undoHomeNext(ws, token));
+  const focus = vi.fn();
+  const scrollIntoView = vi.fn();
+  vi.spyOn(document, "getElementById").mockReturnValue({ focus, scrollIntoView } as unknown as HTMLElement);
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => callback());
+  const key = (value: string, extra: Record<string, unknown> = {}, target?: object) => {
+    const event = new Event("keydown", { cancelable: true });
+    Object.assign(event, { key: value, metaKey: true, ...extra });
+    if (target) Object.defineProperty(event, "target", { value: target });
+    window.dispatchEvent(event);
+    return event;
+  };
+  try {
+    const steps = app.root.findByType(LifeHome).props.home.data.steps;
+    const selected = steps[1];
+    expect(selected).toBeTruthy();
+    await click(app, selected.title);
+    await act(async () => {
+      key("j");
+    });
+    expect(renderAsk.mock.calls.at(-1)?.[0]).toContain(selected.title);
+    expect(renderAsk.mock.calls.at(-1)?.[9]).toBeUndefined();
+    await act(async () => {
+      key("n");
+    });
+    expect(app.root.findAllByProps({ role: "complementary" })).toHaveLength(0);
+    expect(renderAsk.mock.calls.at(-1)?.[5]).toBe(false);
+    await navigate(app, "资料");
+    await act(async () => {
+      key("j");
+    });
+    expect(app.root.findByProps({ role: "complementary" }).props.hidden).toBe(false);
+    await act(async () => app.root.findByProps({ "aria-label": "关闭问问" }).props.onClick());
+    await act(async () => {
+      expect(key("n").defaultPrevented).toBe(true);
+    });
+    expect(app.root.findAllByType(LifeHome)).toHaveLength(1);
+    expect(document.getElementById).toHaveBeenLastCalledWith("today-ask");
+    expect(focus).toHaveBeenCalled();
+    expect(scrollIntoView).toHaveBeenCalled();
+    await act(async () => app.root.findByType(LifeHome).props.setAskText("Unsaved quick note"));
+    await navigate(app, "资料");
+    await act(async () => {
+      key("n");
+    });
+    expect(app.root.findByType(LifeHome).props.askText).toBe("Unsaved quick note");
+    const board = () => app.root.findByType(TodayBoard);
+    await act(async () =>
+      board()
+        .findByType("input")
+        .props.onChange({ target: { value: "Actual result" } }),
+    );
+    await act(async () => board().findByType("form").props.onSubmit({ preventDefault: vi.fn() }));
+    const session = app.root.findByType(LifeHome).props.session;
+    expect(session.read().receipt?.step.id).toBe(selected.id);
+    expect(readHome(await readHomeSources(ws)).steps?.some((step) => step.key === selected.key)).toBe(false);
+    await navigate(app, "资料");
+    expect(app.root.findAllByType(TodayBoard)).toHaveLength(0);
+    for (const target of [
+      { closest: () => ({ tagName: "INPUT" }) },
+      { closest: () => ({ tagName: "TEXTAREA" }) },
+      { isContentEditable: true },
+      { closest: () => ({ contentEditable: "plaintext-only" }) },
+    ]) {
+      expect(key("z", {}, target).defaultPrevented).toBe(false);
+    }
+    for (const extra of [{ shiftKey: true }, { altKey: true }, { isComposing: true }, { repeat: true }])
+      expect(key("z", extra).defaultPrevented).toBe(false);
+    expect(undo).not.toHaveBeenCalled();
+    await act(async () => {
+      expect(key("z").defaultPrevented).toBe(true);
+      key("z");
+    });
+    expect(undo).toHaveBeenCalledOnce();
+    expect(session.read().receipt).toBeUndefined();
+    expect(readHome(await readHomeSources(ws)).steps?.some((step) => step.key === selected.key)).toBe(true);
+    expect(key("z").defaultPrevented).toBe(false);
+    await navigate(app, "今天");
+    expect(board().findByType("input").props.value).toBe("Actual result");
   } finally {
     await act(async () => app.unmount());
     rmSync(ws.root, { recursive: true, force: true });

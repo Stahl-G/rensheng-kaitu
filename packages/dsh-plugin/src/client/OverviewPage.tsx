@@ -34,7 +34,7 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { WarningText } from "./ReadWarnings.js";
 import type { ResumeServices } from "./ResumeImport.js";
-import { createTodayBoardSession } from "./TodayBoard.js";
+import { createTodayBoardSession, reverseTodayBoard } from "./TodayBoard.js";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
@@ -420,6 +420,7 @@ function Overview({
   const [learningSource, setLearningSource] = useState<LearningSource>();
   const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
   const [libraryFile, setLibraryFile] = useState<string>();
+  const [noteContext, setNoteContext] = useState<{ title: string; prompt: string } | null>(null);
   const [libraryGoal, setLibraryGoal] = useState<string>();
   const [projectFocus, setProjectFocus] = useState<string>();
   const [directionFocus, setDirectionFocus] = useState<string>();
@@ -511,16 +512,6 @@ function Overview({
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [commandCity, setCommandCity] = useState<string>();
   const [commandCityRequest, setCommandCityRequest] = useState(0);
-  useEffect(() => {
-    const shortcut = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setCommandsOpen((open) => !open);
-      }
-    };
-    window.addEventListener("keydown", shortcut);
-    return () => window.removeEventListener("keydown", shortcut);
-  }, []);
   const [handoverOpen, setHandoverOpen] = useState(false);
   useEffect(() => {
     if (handoverOpen) {
@@ -1057,10 +1048,38 @@ function Overview({
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
-  const commandCurrent =
-    homeState?.data?.steps?.find((step) => step.key === todaySession.current.board.read().selected) ??
-    homeState?.data?.steps?.[0] ??
-    homeState?.data?.threads.find((thread) => thread.next)?.next;
+  const currentCommandStep = () => {
+    const board = todaySession.current.board;
+    const state = board.read();
+    return (
+      state.receipt?.step ??
+      (!state.showLatest ? board.operation.current?.step : undefined) ??
+      homeState?.data?.steps?.find((step) => step.key === state.selected) ??
+      homeState?.data?.steps?.[0] ??
+      homeState?.data?.threads.find((thread) => thread.next)?.next
+    );
+  };
+  const commandCurrent = currentCommandStep();
+  const askContext = view === "records" && record === "notes" ? noteContext : null;
+  const askTitle =
+    askContext?.title ??
+    (view === "overview"
+      ? commandCurrent?.title
+      : view === "records"
+        ? (data?.plans.goals.find((goal) => goal.id === libraryGoal)?.title ??
+          homeState?.data?.threads.find((thread) => thread.kind === "project" && thread.id === projectFocus)
+            ?.title)
+        : view === "explore"
+          ? homeState?.data?.threads.find((thread) => thread.id === directionFocus)?.title
+          : undefined);
+  const undoHome = props.undoHomeNext
+    ? async (token: string) => {
+        const receipt = await props.undoHomeNext?.(token);
+        if (!receipt) throw new Error(t("撤销结果不明，请刷新", "Undo status uncertain. Refresh"));
+        void refresh();
+        return receipt;
+      }
+    : undefined;
   const commandActions: KaituCommand[] = [
     {
       id: "capture",
@@ -1068,24 +1087,41 @@ function Overview({
       icon: "✎",
       shortcut: "⌘N",
       run: () => {
+        setInlineAsk(false);
         setView("overview");
         setGuide(null);
-        requestAnimationFrame(() => document.getElementById("today-ask")?.focus());
+        if (!props.loadHome) setCaptureOpen(true);
+        requestAnimationFrame(() => {
+          const field = document.getElementById(props.loadHome ? "today-ask" : "capture-text");
+          field?.focus();
+          field?.scrollIntoView({ block: "center" });
+        });
       },
     },
     ...(props.renderAsk
       ? [
           {
             id: "ask",
-            label: commandCurrent
-              ? t(`问问「${commandCurrent.title}」`, `Ask about “${commandCurrent.title}”`)
-              : t("问问", "Ask"),
+            label: askTitle ? t(`问问「${askTitle}」`, `Ask about “${askTitle}”`) : t("问问", "Ask"),
             icon: "○",
             shortcut: "⌘J",
-            run: () =>
-              commandCurrent
-                ? askNext({ title: commandCurrent.title, module: t("今天", "Today") })
-                : openInlineAsk(),
+            run: () => {
+              if (askContext) prompt(askContext.prompt);
+              else {
+                const title = view === "overview" ? currentCommandStep()?.title : askTitle;
+                if (title)
+                  askNext({
+                    title,
+                    module:
+                      view === "overview"
+                        ? t("今天", "Today")
+                        : view === "records"
+                          ? t("资料", "Library")
+                          : t("开图", "Explore"),
+                  });
+                else openInlineAsk();
+              }
+            },
           },
         ]
       : []),
@@ -1108,6 +1144,51 @@ function Overview({
         ]
       : []),
   ];
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey
+      )
+        return;
+      const key = event.key.toLowerCase();
+      if (key === "k") {
+        event.preventDefault();
+        setCommandsOpen((open) => !open);
+        return;
+      }
+      const action = commandActions.find(
+        (item) => item.id === (key === "n" ? "capture" : key === "j" ? "ask" : ""),
+      );
+      if (action) {
+        event.preventDefault();
+        setCommandsOpen(false);
+        action.run();
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      const board = todaySession.current.board;
+      if (
+        key === "z" &&
+        undoHome &&
+        board.read().receipt &&
+        !board.read().pending &&
+        !target?.isContentEditable &&
+        !target?.closest?.("input, textarea, [contenteditable]:not([contenteditable=false]), [role=textbox]")
+      ) {
+        event.preventDefault();
+        void reverseTodayBoard(board, undoHome).then(() => {
+          if (board.read().error) setError(board.read().error);
+        });
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  });
   const loadCommands = async (): Promise<KaituCommand[]> => {
     const values: KaituCommand[] = (homeState?.data?.threads ?? []).map((thread) => ({
       id: thread.key,
@@ -1469,17 +1550,7 @@ function Overview({
                       }
                     : undefined
                 }
-                undo={
-                  props.undoHomeNext
-                    ? async (token) => {
-                        const receipt = await props.undoHomeNext?.(token);
-                        if (!receipt)
-                          throw new Error(t("撤销结果不明，请刷新", "Undo status uncertain. Refresh"));
-                        void refresh();
-                        return receipt;
-                      }
-                    : undefined
-                }
+                undo={undoHome}
                 schedule={
                   data?.blocks.length ? (
                     <section
@@ -1829,6 +1900,7 @@ function Overview({
                 draft={learningDrafts[draftKey] ?? emptyLearningDraft}
                 onDraft={(draft) => updateLearningDraft(draftKey, draft)}
                 initialFile={libraryFile}
+                onAskContext={setNoteContext}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}
                 loadLearning={loadLearning}

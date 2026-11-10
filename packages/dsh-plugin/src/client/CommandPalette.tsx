@@ -68,7 +68,7 @@ export function CommandPalette({
       }}
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing) return;
-        if (event.metaKey || event.ctrlKey) {
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
           const key = event.key.toLowerCase();
           const action = actions.find(
             (item) =>
