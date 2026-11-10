@@ -136,6 +136,14 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   await act(async () => root.update(page("Context B", 3, { ...services })));
   expect(initializeDraft).toHaveBeenCalledTimes(3);
   expect(hostDraft).toBe("合成预填");
+  // Switching DSH main panels unmounts Overview; its prompt props restart empty.
+  await act(async () => root.update(null));
+  await act(async () => root.update(page()));
+  expect(root.root.findAllByType("p").map((item) => item.children.join(""))).toEqual([
+    `${contextA}\n\nContext B`,
+  ]);
+  expect(hostDraft).toBe("合成预填");
+  expect(services.sessions.create).toHaveBeenCalledTimes(1);
   blocked = false;
   await act(async () => root.update(page(contextA, 4)));
   await act(async () => root.update(page(contextA, 4, { ...services })));
@@ -150,6 +158,10 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
     whenDraftExists: "append",
   });
   expect(root.root.findAllByType("details")).toHaveLength(0);
+  await act(async () => root.update(null));
+  await act(async () => root.update(page()));
+  expect(root.root.findAllByType("details")).toHaveLength(0);
+  expect(hostDraft).toBe(`合成预填\n\n${contextA}\n\nContext B`);
   await act(async () => {
     root.unmount();
   });

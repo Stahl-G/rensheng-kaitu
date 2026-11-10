@@ -2,6 +2,7 @@ import type { SessionReference } from "@deepseek-ai/dsh-api-session-controller/c
 import type { PluginAskServices } from "./PluginAsk.js";
 
 export interface PluginAskSession {
+  pendingPrompts: string[];
   open(): Promise<SessionReference>;
   dispose(): void;
 }
@@ -41,6 +42,7 @@ export function createPluginAskSession(services: PluginAskServices): PluginAskSe
     return next;
   };
   return {
+    pendingPrompts: [],
     open() {
       if (disposed) return Promise.reject(new Error("Kaitu plugin session is disposed"));
       opening ??= create().catch((error) => {
