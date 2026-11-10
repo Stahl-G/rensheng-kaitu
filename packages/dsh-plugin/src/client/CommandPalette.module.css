@@ -1,0 +1,86 @@
+.palette {
+  width: min(660px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 64px));
+  margin: 12vh auto auto;
+  padding: 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px #0003;
+  overflow: auto;
+}
+.palette::backdrop {
+  background: #14141455;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.search > span {
+  font-size: 28px;
+  color: var(--muted);
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 20px;
+  color: var(--ink);
+  outline: 0;
+}
+.search button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 8px;
+}
+.results {
+  padding: 6px;
+}
+.results button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.results button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--link) 12%, var(--surface));
+}
+.results button > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.results small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.icon {
+  width: 22px;
+  flex: none;
+  text-align: center;
+  color: var(--link);
+}
+.results p,
+.palette > p {
+  margin: 16px;
+}

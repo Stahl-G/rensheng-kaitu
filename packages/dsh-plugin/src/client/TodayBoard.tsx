@@ -1,0 +1,386 @@
+import type { HomeCompletion, HomeNextTarget, HomeState, HomeThread } from "@kaitu/core";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import css from "./Prototype.module.css";
+import styles from "./TodayPage.module.css";
+import { useLocale, useT } from "./i18n.js";
+import { todayNumber, todayProjectDate } from "./next-presentation.js";
+
+type Step = HomeNextTarget & { key: string; parent: string };
+interface TodayDraftState {
+  selected: string | undefined;
+  drafts: Record<string, string>;
+  pending: boolean;
+  error: string;
+  receipt: { value: HomeCompletion; step: Step; text: string } | undefined;
+}
+/** Kept by the page owner so navigation cannot lose a draft or an in-flight receipt. */
+export function createTodayBoardSession() {
+  let state: TodayDraftState = {
+    selected: undefined,
+    drafts: {},
+    pending: false,
+    error: "",
+    receipt: undefined,
+  };
+  const listeners = new Set<() => void>();
+  return {
+    operation: { current: undefined as { fingerprint: string; id: string } | undefined },
+    read: () => state,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    set: <K extends keyof TodayDraftState>(
+      key: K,
+      value: TodayDraftState[K] | ((current: TodayDraftState[K]) => TodayDraftState[K]),
+    ) => {
+      state = { ...state, [key]: typeof value === "function" ? value(state[key]) : value };
+      for (const listener of listeners) listener();
+    },
+  };
+}
+export type TodayBoardSession = ReturnType<typeof createTodayBoardSession>;
+export function TodayBoard({
+  data,
+  complete,
+  undo,
+  openProject,
+  openGoal,
+  library,
+  begin,
+  ask,
+  canAsk,
+  adopt,
+  dismiss,
+  busy,
+  session,
+}: {
+  data: HomeState;
+  session?: TodayBoardSession;
+  complete?: (target: HomeNextTarget, result: string, operationId: string) => Promise<HomeCompletion>;
+  undo?: (token: string) => Promise<{ undone: boolean }>;
+  openProject: (id: string) => void;
+  openGoal?: (id: string) => void;
+  library: () => void;
+  begin?: () => void;
+  ask: (text: string) => void;
+  canAsk: boolean;
+  adopt: (id: string) => void;
+  dismiss: (id: string) => void;
+  busy: boolean;
+}) {
+  const t = useT();
+  const locale = useLocale();
+  const threads = data.data?.threads ?? [];
+  const steps: Step[] =
+    data.data?.steps ??
+    threads.flatMap((thread) =>
+      thread.next ? [{ ...thread.next, key: thread.key, parent: thread.title }] : [],
+    );
+  const localSession = useRef(session ?? createTodayBoardSession());
+  const board = session ?? localSession.current;
+  const { selected, drafts, pending, error, receipt } = useSyncExternalStore(board.subscribe, board.read);
+  const setSelected = (value: string | undefined) => board.set("selected", value);
+  const setDrafts = (
+    value: Record<string, string> | ((current: Record<string, string>) => Record<string, string>),
+  ) => board.set("drafts", value);
+  const setPending = (value: boolean) => board.set("pending", value);
+  const setError = (value: string) => board.set("error", value);
+  const setReceipt = (value: TodayDraftState["receipt"]) => board.set("receipt", value);
+  const [review, setReview] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const operation = board.operation;
+  const focus = steps.find((step) => step.key === selected) ?? steps[0];
+  const shown = receipt?.step ?? focus;
+  const result = focus ? (drafts[focus.key] ?? "") : "";
+  const results = data.data?.results;
+  const today = data.data?.today ?? "";
+  const days = Array.from({ length: 7 }, (_, index) =>
+    today
+      ? new Date(Date.parse(`${today}T12:00:00Z`) - (6 - index) * 86400000).toISOString().slice(0, 10)
+      : "",
+  );
+  const resultDays = new Set(results?.map((item) => item.date));
+  const openThread = (thread: HomeThread) =>
+    thread.kind === "project"
+      ? openProject(thread.id)
+      : thread.kind === "goal" && openGoal
+        ? openGoal(thread.id)
+        : library();
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const focusCurrent = () => {
+      field.current?.focus();
+    };
+    window.addEventListener("kaitu:complete-current", focusCurrent);
+    return () => window.removeEventListener("kaitu:complete-current", focusCurrent);
+  }, []);
+  const finish = async () => {
+    if (!focus || !complete || board.read().pending || !result.trim()) return;
+    setPending(true);
+    setError("");
+    const fingerprint = JSON.stringify([focus, result.trim()]);
+    if (operation.current?.fingerprint !== fingerprint)
+      operation.current = { fingerprint, id: crypto.randomUUID() };
+    try {
+      const value = await complete(focus, result, operation.current.id);
+      setReceipt({ value, step: focus, text: result });
+      operation.current = undefined;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPending(false);
+    }
+  };
+  const reverse = async () => {
+    if (!receipt || !undo || board.read().pending) return;
+    setPending(true);
+    setError("");
+    try {
+      await undo(receipt.value.token);
+      setSelected(receipt.step.key);
+      setDrafts((current) => ({ ...current, [receipt.step.key]: receipt.text }));
+      setReceipt(undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPending(false);
+    }
+  };
+  useEffect(() => {
+    if (!receipt || !undo || typeof window === "undefined") return;
+    const shortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "z" &&
+        !target?.closest?.("input, textarea, [contenteditable=true]")
+      ) {
+        event.preventDefault();
+        void reverse();
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  });
+  return (
+    <div className={styles.todayBoard}>
+      <button
+        type="button"
+        className={styles.resultWeek}
+        aria-label={t(
+          `近 7 天有结果的天数：${results ? resultDays.size : "未知"}，打开近期回顾`,
+          `Days with results in the past seven days: ${results ? resultDays.size : "unknown"}. Open review`,
+        )}
+        aria-expanded={review}
+        onClick={() => setReview(!review)}
+      >
+        <span>{t("7 天", "7 days")}</span>
+        {days.map((day) => (
+          <i key={day} title={day} data-result={resultDays.has(day)} data-today={day === today} />
+        ))}
+        <b>{results ? resultDays.size : "—"}</b>
+      </button>
+      {review && (
+        <section className={styles.weekReview} aria-label={t("近期回顾", "Recent review")}>
+          <div className={styles.sectionHeading}>
+            <h2>{t("近 7 天的结果", "Results in the past seven days")}</h2>
+            <button type="button" className={css.link} onClick={() => setReview(false)}>
+              {t("收起", "Close")}
+            </button>
+          </div>
+          {!results?.length && (
+            <p>{results ? t("还没有记下结果", "No results recorded yet") : t("正在读取…", "Loading…")}</p>
+          )}
+          {results?.map((item) => (
+            <article key={`${item.file}:${item.id}:${item.at}`}>
+              <time dateTime={item.at}>{todayProjectDate(item.date, today, locale)}</time>
+              <strong>{item.title}</strong>
+              <p>{item.text}</p>
+            </article>
+          ))}
+        </section>
+      )}
+      {shown ? (
+        <section
+          className={styles.actionCard}
+          data-done={!!receipt}
+          aria-label={t("当前事项", "Current step")}
+        >
+          <div className={styles.actionMeta}>
+            <span>{shown.parent}</span>
+            {shown.due && <time dateTime={shown.due}>{shown.due}</time>}
+          </div>
+          <h2>
+            <mark>{shown.title}</mark>
+          </h2>
+          {receipt ? (
+            <div className={styles.completionReceipt} aria-live="polite">
+              <span>{receipt.text}</span>
+              <button type="button" className={css.btn} disabled={pending} onClick={() => void reverse()}>
+                {t("撤销", "Undo")} ⌘Z
+              </button>
+              <button type="button" className={css.link} onClick={() => setReceipt(undefined)}>
+                {t("下一件", "Next")}
+              </button>
+            </div>
+          ) : (
+            <>
+              {complete && shown.file && shown.precondition ? (
+                <form
+                  className={styles.resultForm}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void finish();
+                  }}
+                >
+                  <input
+                    ref={field}
+                    aria-label={t("结果", "Result")}
+                    placeholder={t("结果", "Result")}
+                    maxLength={2000}
+                    value={result}
+                    disabled={pending}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (focus) setDrafts((current) => ({ ...current, [focus.key]: value }));
+                    }}
+                  />
+                  <button
+                    className={`${css.btn} ${css["btn-strong"]}`}
+                    disabled={pending || !result.trim()}
+                    type="submit"
+                  >
+                    {pending ? t("正在保存…", "Saving…") : t("完成", "Done")} ↩
+                  </button>
+                </form>
+              ) : null}
+              {canAsk && (
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() =>
+                    ask(
+                      t(
+                        `帮我推进「${shown.title}」。先读相关资料。`,
+                        `Help me move “${shown.title}” forward. Read related notes first.`,
+                      ),
+                    )
+                  }
+                >
+                  {t("问问", "Ask")}
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      ) : (
+        <section className={styles.actionCard}>
+          <h2>
+            {data.loading
+              ? t("正在读取…", "Loading…")
+              : t("今天想推进什么？", "What would you like to move forward?")}
+          </h2>
+          <button type="button" className={css.btn} onClick={begin ?? library}>
+            {begin ? t("开始", "Get started") : t("打开资料", "Open Library")}
+          </button>
+        </section>
+      )}
+      {error && (
+        <p role="alert" className={css.error}>
+          {error}
+        </p>
+      )}
+      {(steps.length > 1 || !!data.data?.pending.length) && (
+        <section className={styles.stepList} aria-label={t("接下来", "Up next")}>
+          {steps
+            .filter((step) => step.key !== shown?.key)
+            .slice(0, 2)
+            .map((step) => (
+              <div className={styles.stepRow} key={step.key}>
+                <button
+                  type="button"
+                  className={styles.stepCircle}
+                  disabled={pending}
+                  aria-label={t(`完成并记结果：${step.title}`, `Complete and record result: ${step.title}`)}
+                  onClick={() => {
+                    setSelected(step.key);
+                    setReceipt(undefined);
+                    requestAnimationFrame(() => field.current?.focus());
+                  }}
+                />
+                <button
+                  type="button"
+                  className={styles.stepTitle}
+                  onClick={() => {
+                    setSelected(step.key);
+                    setReceipt(undefined);
+                  }}
+                >
+                  {step.title}
+                </button>
+                <span>{step.parent}</span>
+                {step.due && <time data-overdue={step.due < today}>{step.due}</time>}
+              </div>
+            ))}
+          {data.data?.pending.map((item) => (
+            <div className={styles.stepRow} key={item.id}>
+              <span aria-hidden="true">✎</span>
+              <span className={styles.stepTitle}>{item.title}</span>
+              <small>{t("AI 建议", "AI suggestion")}</small>
+              <button type="button" className={css.btn} disabled={busy} onClick={() => adopt(item.id)}>
+                {t("采纳", "Adopt")}
+              </button>
+              <button
+                type="button"
+                className={css.link}
+                disabled={busy}
+                aria-label={t(`不要这条建议：${item.title}`, `Dismiss suggestion: ${item.title}`)}
+                onClick={() => dismiss(item.id)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+      {threads.length > 0 && (
+        <section className={styles.threadLinks} aria-label={t("接着上次", "Continue")}>
+          {threads.slice(0, 3).map((thread) => (
+            <button
+              type="button"
+              key={thread.key}
+              aria-label={t(`打开${thread.title}`, `Open ${thread.title}`)}
+              onClick={() => openThread(thread)}
+            >
+              <strong>{thread.title}</strong>
+              {thread.last && <span>{thread.last.text}</span>}
+              {thread.resultCount !== null && (
+                <small>{t(`${thread.resultCount} 条结果`, `${thread.resultCount} results`)}</small>
+              )}
+            </button>
+          ))}
+        </section>
+      )}
+      {!!data.data?.traces.length && (
+        <section className={styles.traceCards} aria-label={t("最近的痕迹", "Recent traces")}>
+          {data.data.traces.slice(0, 3).map((trace) => (
+            <article key={trace.key}>
+              <strong>
+                {trace.label}
+                {trace.value !== null
+                  ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)} ${trace.unit ?? ""}`
+                  : ""}
+              </strong>
+              <time dateTime={trace.date}>{todayProjectDate(trace.date, today, locale)}</time>
+            </article>
+          ))}
+        </section>
+      )}
+      {data.error && <p role="alert">{data.error}</p>}
+    </div>
+  );
+}
