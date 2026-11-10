@@ -170,3 +170,63 @@ test("later user edits cannot turn an Agent completion into a user result", asyn
     rmSync(ws.root, { recursive: true, force: true });
   }
 });
+
+test("multiline task results retain all lines and completion author evidence", () => {
+  const at = "2026-11-10T03:00:00Z";
+  const text = "First line\nOriginal details retained.\n完成时间：2000-01-01T00:00:00Z";
+  const notes = `Original notes\n完成结果：\n${text
+    .split("\n")
+    .map((line) => `    ${line}`)
+    .join("\n")}\n完成时间：${at}\n`;
+  const completed = {
+    id: "literal",
+    ts: at,
+    by: "user",
+    rev: 2,
+    status: "done",
+    title: "Source task",
+    notes,
+  };
+  const edited = { ...completed, by: "agent", rev: 3, title: "Adjusted title" };
+  expect(homeResults([edited], [], "Asia/Shanghai", "2026-11-10", at, [completed, edited])).toMatchObject([
+    { text, at, date: "2026-11-10" },
+  ]);
+  expect(
+    homeResults([{ ...edited, status: "open" }], [], "Asia/Shanghai", "2026-11-10", at, [completed, edited]),
+  ).toEqual([]);
+  const agent = { ...completed, id: "agent-literal", by: "agent" };
+  expect(
+    homeResults([{ ...agent, by: "user", rev: 3 }], [], "Asia/Shanghai", "2026-11-10", at, [agent]),
+  ).toEqual([]);
+});
+
+test("a new Mac completion replaces a prior literal result and scoped undo restores it", async () => {
+  const ws = await freshWorkspace();
+  try {
+    const task = (await addTask(ws, { title: "Reopened result" })).record;
+    const notes =
+      "Original notes\n完成结果：\n    First line\n    Original details retained.\n完成时间：2026-11-09T03:00:00Z\n";
+    const before = updateRecord(ws, "task", task.id, { notes }, { by: "user" }).record;
+    const target = {
+      id: task.id,
+      file: "task",
+      title: String(task.title),
+      due: null,
+      precondition: { kind: "task" as const, expectedRev: before.rev ?? 1 },
+    };
+    const receipt = completeHomeNext(
+      ws,
+      target,
+      "A new result",
+      "66666666-6666-4666-8666-666666666666",
+      new Date("2026-11-10T03:00:00Z"),
+    );
+    expect(String(readRecords(ws, "task").find((row) => row.id === task.id)?.notes)).not.toContain(
+      "Original details retained.",
+    );
+    undoHomeNext(ws, receipt.token);
+    expect(readRecords(ws, "task").find((row) => row.id === task.id)?.notes).toBe(notes);
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
