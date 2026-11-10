@@ -10,12 +10,14 @@ const [
   { setSandboxMode },
   { setApprovalPolicy },
   { admitEncodedImages, admitEncodedFile },
+  { BlockAssembler },
 ] = await Promise.all([
   load("@deepseek-ai/dsh-sdk-protocol"),
   load("@deepseek-ai/dsh-sdk-jsonrpc-server"),
   load("@deepseek-ai/dsh-sandbox-policy"),
   load("@deepseek-ai/dsh-user-approval"),
   load("@deepseek-ai/dsh-attachment"),
+  load("@deepseek-ai/dsh-llm"),
 ]);
 export const name = "kaitu-sdk-rpc";
 export const inject = [
@@ -32,6 +34,39 @@ export function apply(ctx) {
   const transport = new JsonRpcLineTransport(process.stdin, process.stdout);
   const sdk = new HarnessSdkJsonRpcServer(ctx, transport);
   const opened = new Set();
+  const streams = new Map();
+  // The SDK publishes durable messages; its live Agent frames need a separate bridge.
+  ctx.on("agent/assistant-stream", ({ agent, frame }) => {
+    const sessionId = String(agent.session.id);
+    if (!opened.has(sessionId)) return;
+    if (frame.type === "start") streams.set(sessionId, new BlockAssembler());
+    else if (frame.type === "end") {
+      streams.delete(sessionId);
+      transport.notify("session.event", {
+        sessionId,
+        event: { type: "assistant/delta", seq: frame.revision, data: { text: "" } },
+      });
+    } else {
+      const stream = streams.get(sessionId);
+      if (!stream) return;
+      stream.push(frame.chunk);
+      if (frame.chunk.type !== "text-delta") return;
+      transport.notify("session.event", {
+        sessionId,
+        event: {
+          type: "assistant/delta",
+          seq: frame.revision,
+          data: {
+            text: stream
+              .blocks()
+              .filter((block) => block.type === "text")
+              .map((block) => block.text)
+              .join("\n"),
+          },
+        },
+      });
+    }
+  });
   let initialized = false;
   let shutdown;
   const close = () => {
