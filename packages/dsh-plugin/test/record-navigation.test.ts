@@ -18,12 +18,13 @@ import {
   setProject,
   writeExploration,
 } from "@kaitu/core";
-import { createElement } from "react";
+import { createElement, useState } from "react";
 import { type ReactTestRenderer, act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
 import { clonedWorkspace } from "../../core/test/helpers.js";
 import { DirectionMap } from "../src/client/DirectionMap.js";
 import { DirectionsPage } from "../src/client/DirectionsPage.js";
+import { ExplorePluginFrame } from "../src/client/ExplorePluginFrame.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { PlansCard } from "../src/client/Plans.js";
 import { ProjectsPage } from "../src/client/ProjectsPage.js";
@@ -32,7 +33,7 @@ import { LifeHome } from "../src/client/TodayPage.js";
 vi.mock("../src/client/PaperMap.js", () => ({ PaperMap: () => null }));
 afterEach(() => vi.unstubAllGlobals());
 
-async function setup() {
+async function setup(extra: Partial<OverviewPageProps> = {}) {
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -95,6 +96,7 @@ async function setup() {
     generateDirectionMap: async () => readDirectionMap(ws),
     dismissDirectionLink: async () => readDirectionMap(ws),
     renderAsk: () => null,
+    ...extra,
   } as unknown as OverviewPageProps;
   let app!: ReactTestRenderer;
   await act(async () => {
@@ -204,6 +206,55 @@ test("map record actions open the matching saved goal, project and direction", a
     await click(app, "← 方向");
     await click(app, "合成导航方向");
     expect(app.root.findByType(DirectionsPage).props.initialDirection).toBe(direction.id);
+  } finally {
+    await act(async () => app.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("plugin handoff returns to the same frame and retains an edited Ask draft", async () => {
+  const id = "plugin:synthetic";
+  let mounts = 0;
+  function Draft() {
+    const [text, setText] = useState(() => {
+      mounts++;
+      return "合成对话草稿";
+    });
+    return createElement("textarea", {
+      value: text,
+      onChange: (event: { target: { value: string } }) => setText(event.target.value),
+    });
+  }
+  const { ws, app } = await setup({
+    loadPreferences: async () => ({
+      locale: "zh-CN",
+      followSystem: false,
+      exploreEntries: [id],
+      explorePlugins: [id],
+    }),
+    plugins: async (action) =>
+      action === "explore"
+        ? [{ id, title: ["合成插件", "Synthetic"], description: ["", ""], icon: "◇" }]
+        : "http://127.0.0.1:34567/",
+    renderAsk: () => createElement(Draft),
+  } as Partial<OverviewPageProps>);
+  try {
+    await navigate(app, "开图");
+    await click(app, "合成插件");
+    const frame = app.root.findByType(ExplorePluginFrame);
+    await act(async () => {
+      expect(frame.props.onDraft("合成材料")).toBe(true);
+    });
+    const textarea = app.root.findByType(Draft).findByType("textarea");
+    await act(async () => {
+      textarea.props.onChange({ target: { value: "还没有发送的补充问题" } });
+    });
+    await click(app, "← 返回合成插件");
+    expect(app.root.findByType(ExplorePluginFrame)).toBe(frame);
+    expect(frame.props.active).toBe(true);
+    await navigate(app, "问问");
+    expect(app.root.findByType(Draft).findByType("textarea").props.value).toBe("还没有发送的补充问题");
+    expect(mounts).toBe(1);
   } finally {
     await act(async () => app.unmount());
     rmSync(ws.root, { recursive: true, force: true });

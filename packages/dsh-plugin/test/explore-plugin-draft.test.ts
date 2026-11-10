@@ -64,3 +64,55 @@ test("a delayed plugin draft cannot navigate from another page and can be retrie
     if (root) act(() => root?.unmount());
   }
 });
+
+test("embedded conversation can return to its plugin and resume without reloading", async () => {
+  const listeners = new Set<(event: MessageEvent) => void>();
+  const child = { postMessage: vi.fn() };
+  vi.stubGlobal("window", {
+    addEventListener: (_type: string, fn: (event: MessageEvent) => void) => listeners.add(fn),
+    removeEventListener: (_type: string, fn: (event: MessageEvent) => void) => listeners.delete(fn),
+  });
+  const props = {
+    id: "plugin:synthetic",
+    title: "合成插件",
+    active: true,
+    plugins: vi.fn(async () => "http://127.0.0.1:34567/#kaitu-embed=1"),
+    onRemoved: vi.fn(),
+    onDraft: vi.fn(() => true),
+  };
+  let root!: ReactTestRenderer;
+  await act(async () => {
+    root = create(createElement(ExplorePluginFrame, props), {
+      createNodeMock: (element) => (element.type === "iframe" ? { contentWindow: child } : null),
+    });
+  });
+  const frame = root.root.findByType("iframe");
+  const deliver = (source: object, conversation: boolean) => {
+    for (const listener of [...listeners])
+      listener({
+        origin: "http://127.0.0.1:34567",
+        source,
+        data: { type: "kaitu:explore-navigation", conversation, hasConversation: true },
+      } as MessageEvent);
+  };
+  try {
+    act(() => deliver({}, true));
+    expect(root.root.findAllByType("nav")).toHaveLength(0);
+    act(() => deliver(child, true));
+    act(() => root.root.findByType("button").props.onClick());
+    expect(child.postMessage).toHaveBeenLastCalledWith(
+      { type: "kaitu:explore-return" },
+      "http://127.0.0.1:34567",
+    );
+    act(() => deliver(child, false));
+    act(() => root.root.findByType("button").props.onClick());
+    expect(child.postMessage).toHaveBeenLastCalledWith(
+      { type: "kaitu:explore-conversation" },
+      "http://127.0.0.1:34567",
+    );
+    expect(root.root.findByType("iframe")).toBe(frame);
+    expect(props.plugins).toHaveBeenCalledTimes(1);
+  } finally {
+    act(() => root.unmount());
+  }
+});

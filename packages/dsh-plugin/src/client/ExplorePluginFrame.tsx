@@ -22,6 +22,7 @@ export function ExplorePluginFrame({
   const frame = useRef<HTMLIFrameElement>(null);
   const delivered = useRef(new Set<string>());
   const [url, setUrl] = useState("");
+  const [navigation, setNavigation] = useState({ conversation: false, hasConversation: false });
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -39,6 +40,14 @@ export function ExplorePluginFrame({
   }, [plugins, id]);
   useLayoutEffect(() => {
     if (!url) return;
+    const receiveNavigation = (event: MessageEvent) => {
+      if (event.origin !== new URL(url).origin || event.source !== frame.current?.contentWindow) return;
+      if (event.data?.type === "kaitu:explore-navigation")
+        setNavigation({
+          conversation: event.data.conversation === true,
+          hasConversation: event.data.hasConversation === true,
+        });
+    };
     const removed = (event: MessageEvent) => {
       if (
         event.origin === new URL(url).origin &&
@@ -71,9 +80,11 @@ export function ExplorePluginFrame({
         event.origin,
       );
     };
+    window.addEventListener("message", receiveNavigation);
     window.addEventListener("message", receiveDraft);
     window.addEventListener("message", removed);
     return () => {
+      window.removeEventListener("message", receiveNavigation);
       window.removeEventListener("message", removed);
       window.removeEventListener("message", receiveDraft);
     };
@@ -81,6 +92,24 @@ export function ExplorePluginFrame({
   return (
     <>
       {error ? <p role="alert">{error}</p> : !loaded && <output>{t("正在打开…", "Opening…")}</output>}
+      {navigation.hasConversation && (
+        <nav aria-label={t("插件对话导航", "Plugin conversation navigation")}>
+          <button
+            type="button"
+            className={css.link}
+            onClick={() =>
+              frame.current?.contentWindow?.postMessage(
+                { type: navigation.conversation ? "kaitu:explore-return" : "kaitu:explore-conversation" },
+                new URL(url).origin,
+              )
+            }
+          >
+            {navigation.conversation
+              ? t(`← 返回${title}`, `← Back to ${title}`)
+              : t("继续对话 →", "Continue conversation →")}
+          </button>
+        </nav>
+      )}
       {url && (
         <iframe
           ref={frame}
@@ -88,7 +117,13 @@ export function ExplorePluginFrame({
           title={title}
           src={url}
           sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
-          onLoad={() => setLoaded(true)}
+          onLoad={() => {
+            setLoaded(true);
+            frame.current?.contentWindow?.postMessage(
+              { type: "kaitu:explore-navigation-request" },
+              new URL(url).origin,
+            );
+          }}
         />
       )}
     </>

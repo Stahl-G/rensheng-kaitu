@@ -590,6 +590,8 @@ function Overview({
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [promptNewConversation, setPromptNewConversation] = useState(false);
+  const [askPluginOrigin, setAskPluginOrigin] = useState<string>();
+  const askPlugin = pluginModules.find((entry) => entry.id === askPluginOrigin);
   const handoffPending = useRef(false);
   // Reset after the submitted prompt has been rendered in Ask.
   // biome-ignore lint/correctness/useExhaustiveDependencies: promptRequest signals each handoff.
@@ -777,18 +779,20 @@ function Overview({
     }
   };
   const prompt = (text: string, newConversation = false) => {
+    setAskPluginOrigin(undefined);
     setPromptNewConversation(newConversation);
     setPromptDraft(text);
     setPromptRequest((id) => id + 1);
     if (props.renderAsk) setView("ask");
     else props.onPrompt(text);
   };
-  const handoffAsk = (text: string) => {
+  const handoffAsk = (text: string, pluginId?: string) => {
     if (handoffPending.current || !props.renderAsk) return false;
     const event = new Event("kaitu:before-ask-draft", { cancelable: true });
     if (!window.dispatchEvent(event)) return false;
     handoffPending.current = true;
     prompt(text, true);
+    setAskPluginOrigin(pluginId);
     return true;
   };
   const askNext = (item: { title: string; module: string }) =>
@@ -1679,12 +1683,26 @@ function Overview({
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
                 active={view === "explore" && explore === entry.id}
-                onDraft={handoffAsk}
+                onDraft={(text) => handoffAsk(text, entry.id)}
               />
             </div>
           ))}
         {(view === "ask" || askVisited) && props.renderAsk && (
           <div ref={askPanel} className={css.askPanel} hidden={view !== "ask"}>
+            {askPlugin && (
+              <nav aria-label={t("返回来源页", "Return to source")}>
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => {
+                    setExplore(askPlugin.id);
+                    setView("explore");
+                  }}
+                >
+                  {t(`← 返回${askPlugin.title[0]}`, `← Back to ${askPlugin.title[1]}`)}
+                </button>
+              </nav>
+            )}
             {props.renderAsk(
               promptDraft,
               configureRequest,
