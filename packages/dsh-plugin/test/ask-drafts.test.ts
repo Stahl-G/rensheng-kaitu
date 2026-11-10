@@ -22,8 +22,10 @@ test("keeps separate unsent drafts for the new conversation and an existing conv
     created: new Date().toISOString(),
     updated: new Date().toISOString(),
   };
+  const requests: string[] = [];
   vi.stubGlobal("fetch", async (url: string) => {
     const method = url.split("/").at(-1);
+    requests.push(method ?? "");
     const values: Record<string, unknown> = {
       askSettings: settings,
       askList: [row],
@@ -41,6 +43,8 @@ test("keeps separate unsent drafts for the new conversation and an existing conv
       close() {}
     },
   );
+  vi.stubGlobal("requestAnimationFrame", () => 1);
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
   let app!: ReturnType<typeof create>;
   await act(async () => {
     app = create(createElement(AskPage, { workspace: "synthetic" }));
@@ -62,6 +66,20 @@ test("keeps separate unsent drafts for the new conversation and an existing conv
   expect(input().props.value).toBe("new draft");
   await click("Existing");
   expect(input().props.value).toBe("existing draft");
+  for (const initialPromptRequest of [1, 2]) {
+    await act(async () =>
+      app.update(
+        createElement(AskPage, {
+          workspace: "synthetic",
+          initialPrompt: "Context from Today",
+          initialPromptRequest,
+        }),
+      ),
+    );
+    expect(input().props.value).toBe("existing draft\n\nContext from Today");
+  }
+  expect(requests).not.toContain("askSend");
+  expect(requests).not.toContain("askCreate");
   await act(async () => app.unmount());
 });
 

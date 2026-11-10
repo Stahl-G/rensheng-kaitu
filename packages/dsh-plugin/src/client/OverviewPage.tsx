@@ -106,7 +106,7 @@ export interface OverviewPageProps
     onSettings: (section: "ai" | "local-ai") => void,
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
-    onOrganize?: (source: string) => Promise<void>,
+    onOrganize?: (source: string, draft?: string) => Promise<void>,
   ) => ReactNode;
 }
 const modules = [
@@ -539,7 +539,6 @@ function Overview({
   const homeReady = !props.loadHome || !!homeState?.data || !!homeState?.error;
   const homePresentation = data ?? homeState?.presentation;
   const readWarnings = data?.warnings ?? homeState?.presentation?.warnings ?? [];
-  const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
   const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
   const homeSaving = useRef(false);
   const homeDraftVersion = useRef(0);
@@ -549,7 +548,7 @@ function Overview({
     const timer = setTimeout(() => setHomeSaveState(null), 3000);
     return () => clearTimeout(timer);
   }, [homeSaveState, view]);
-  const saveHome = async (text: string, send: boolean) => {
+  const saveHome = async (text: string) => {
     if (!props.captureOnce || homeSaving.current || !text.trim()) return;
     homeSaving.current = true;
     const draftVersion = homeDraftVersion.current;
@@ -570,14 +569,10 @@ function Overview({
           ),
         );
       operation.path = receipt.path;
-      if (send) {
-        setHomeSubmit({ requestId: operation.id, text: content, references: [], capturedPath: receipt.path });
-        setView("ask");
-      }
       if (homeDraftVersion.current === draftVersion) setHomeAskText("");
       setHomeAskError("");
       homeOperation.current = null;
-      setHomeSaveState(send ? null : "saved");
+      setHomeSaveState("saved");
     } catch (error) {
       setHomeSaveState(null);
       setHomeAskError(error instanceof Error ? error.message : String(error));
@@ -590,6 +585,8 @@ function Overview({
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [promptNewConversation, setPromptNewConversation] = useState(false);
+  const [askPluginOrigin, setAskPluginOrigin] = useState<string>();
+  const askPlugin = pluginModules.find((entry) => entry.id === askPluginOrigin);
   const handoffPending = useRef(false);
   // Reset after the submitted prompt has been rendered in Ask.
   // biome-ignore lint/correctness/useExhaustiveDependencies: promptRequest signals each handoff.
@@ -599,6 +596,32 @@ function Overview({
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
+  const [inlineAsk, setInlineAsk] = useState(false);
+  const askOrigin = useRef<HTMLElement | null>(null);
+  const askLauncher = useRef<HTMLButtonElement>(null);
+  const restoreAskFocus = useRef(false);
+  const openInlineAsk = () => {
+    if (!inlineAsk) askOrigin.current = document.activeElement as HTMLElement | null;
+    setAskVisited(true);
+    setInlineAsk(true);
+  };
+  useEffect(() => {
+    if (inlineAsk) {
+      const field = askPanel.current?.querySelector<HTMLTextAreaElement>("textarea");
+      (field ?? askPanel.current)?.focus();
+    } else if (restoreAskFocus.current) {
+      restoreAskFocus.current = false;
+      (askOrigin.current?.isConnected ? askOrigin.current : askLauncher.current)?.focus();
+    }
+  }, [inlineAsk]);
+  const closeInlineAsk = () => {
+    restoreAskFocus.current = true;
+    setInlineAsk(false);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: navigation dismisses the contextual panel.
+  useEffect(() => {
+    setInlineAsk(false);
+  }, [view]);
   const [configureRequest, setConfigureRequest] = useState(0);
   const [configureBuiltin, setConfigureBuiltin] = useState(false);
   const [theme, setTheme] = useState("light");
@@ -777,18 +800,23 @@ function Overview({
     }
   };
   const prompt = (text: string, newConversation = false) => {
+    setAskPluginOrigin(undefined);
     setPromptNewConversation(newConversation);
     setPromptDraft(text);
     setPromptRequest((id) => id + 1);
-    if (props.renderAsk) setView("ask");
-    else props.onPrompt(text);
+    if (props.renderAsk) {
+      if (view !== "ask") {
+        openInlineAsk();
+      }
+    } else props.onPrompt(text);
   };
-  const handoffAsk = (text: string) => {
+  const handoffAsk = (text: string, pluginId?: string) => {
     if (handoffPending.current || !props.renderAsk) return false;
     const event = new Event("kaitu:before-ask-draft", { cancelable: true });
     if (!window.dispatchEvent(event)) return false;
     handoffPending.current = true;
     prompt(text, true);
+    setAskPluginOrigin(pluginId);
     return true;
   };
   const askNext = (item: { title: string; module: string }) =>
@@ -1302,14 +1330,11 @@ function Overview({
                 save={
                   props.captureOnce
                     ? (text) => {
-                        void saveHome(text, false);
+                        void saveHome(text);
                       }
                     : undefined
                 }
-                ask={(text) => {
-                  if (props.captureOnce) void saveHome(text, true);
-                  else handoffAsk(text);
-                }}
+                ask={(text) => prompt(text)}
                 canAsk={!!props.renderAsk}
                 askError={homeAskError}
                 saveStatus={
@@ -1679,32 +1704,115 @@ function Overview({
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
                 active={view === "explore" && explore === entry.id}
-                onDraft={handoffAsk}
+                onDraft={(text) => handoffAsk(text, entry.id)}
               />
             </div>
           ))}
+        {props.renderAsk && view !== "ask" && !inlineAsk && (
+          <button
+            type="button"
+            className={css.askLauncher}
+            ref={askLauncher}
+            onClick={openInlineAsk}
+            aria-label={t("就地问问", "Ask in context")}
+          >
+            {t("问问", "Ask")}
+          </button>
+        )}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div ref={askPanel} className={css.askPanel} hidden={view !== "ask"}>
+          <div
+            ref={askPanel}
+            tabIndex={-1}
+            className={`${css.askPanel} ${inlineAsk && view !== "ask" ? css.inlineAsk : ""}`}
+            hidden={view !== "ask" && !inlineAsk}
+            role={inlineAsk ? "complementary" : undefined}
+            aria-label={inlineAsk ? t("就地问问", "Ask in context") : undefined}
+            onKeyDown={(event) => {
+              if (
+                inlineAsk &&
+                event.key === "Escape" &&
+                !event.defaultPrevented &&
+                !(event.target as HTMLElement).closest("dialog, [role=menu]")
+              ) {
+                event.preventDefault();
+                closeInlineAsk();
+              }
+            }}
+          >
+            {inlineAsk && view !== "ask" && (
+              <div className={css.inlineAskHeader}>
+                <strong>{t("问问", "Ask")}</strong>
+                <button
+                  type="button"
+                  className={css.btn}
+                  onClick={() => {
+                    setInlineAsk(false);
+                    setView("ask");
+                    askPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+                  }}
+                >
+                  {t("展开", "Expand")}
+                </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  onClick={closeInlineAsk}
+                  aria-label={t("关闭问问", "Close Ask")}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {askPlugin && (
+              <nav aria-label={t("返回来源页", "Return to source")}>
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => {
+                    closeInlineAsk();
+                    setExplore(askPlugin.id);
+                    setView("explore");
+                  }}
+                >
+                  {t(`← 返回${askPlugin.title[0]}`, `← Back to ${askPlugin.title[1]}`)}
+                </button>
+              </nav>
+            )}
             {props.renderAsk(
               promptDraft,
               configureRequest,
               configureBuiltin,
               () => setView("connections"),
               promptRequest,
-              view === "ask",
+              view === "ask" || inlineAsk,
               () => {
                 setGuide(null);
                 setView("overview");
               },
               openAskSettings,
               promptNewConversation,
-              homeSubmit,
-              async (source) => {
-                const matter = await props.readOnboardingMatter(source);
+              undefined,
+              async (source, draft) => {
+                let savedSource = source;
+                if (!savedSource && props.captureOnce) {
+                  const text = draft?.trim() ?? "";
+                  if (homeOperation.current?.text !== text)
+                    homeOperation.current = { text, id: crypto.randomUUID() };
+                  const operation = homeOperation.current;
+                  const receipt = operation.path
+                    ? { status: "saved", path: operation.path }
+                    : await props.captureOnce(text, operation.id);
+                  if (receipt.status !== "saved" || !receipt.path)
+                    throw new Error(t("保存未完成，请重试", "Save incomplete. Retry."));
+                  operation.path = receipt.path;
+                  savedSource = receipt.path;
+                }
+                const matter = savedSource
+                  ? await props.readOnboardingMatter(savedSource)
+                  : await props.saveOnboardingMatter(draft ?? "");
                 openRecord("inbox");
                 setReviewClipboard(true);
                 setReviewMatter(matter);
-                setHomeSubmit(undefined);
               },
             )}
           </div>

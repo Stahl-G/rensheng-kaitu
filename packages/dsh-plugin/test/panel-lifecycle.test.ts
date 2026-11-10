@@ -74,7 +74,15 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
     release,
     [Symbol.dispose]: release,
   };
-  const initializeDraft = vi.fn(() => "applied" as const);
+  let hostDraft = "";
+  let blocked = false;
+  const initializeDraft = vi.fn<PluginAskServices["conversation"]["input"]["requestDraftInitialization"]>(
+    (_binding, { prompt }) => {
+      if (blocked) return "blocked";
+      hostDraft = [hostDraft, prompt].filter(Boolean).join("\n\n");
+      return "applied";
+    },
+  );
   const services: PluginAskServices = {
     workspacePath: async () => "/synthetic/kaitu",
     workspaces: { create: vi.fn(async () => ({ workspaceId: "synthetic-workspace" })) },
@@ -93,9 +101,9 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   };
   const renderSlot: PropsRenderSlots<"kaitu.ask.chat">["renderSlot"] = () =>
     createElement("output", null, "native");
-  const page = (prompt = "", promptRequest = 0) =>
+  const page = (prompt = "", promptRequest = 0, inputServices = services) =>
     createElement(PluginAsk, {
-      services,
+      services: inputServices,
       session,
       SessionProvider,
       renderSlot,
@@ -118,8 +126,30 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   expect(services.sessions.retain).toHaveBeenCalledTimes(1);
   expect(initializeDraft).toHaveBeenCalledExactlyOnceWith(binding, {
     prompt: "合成预填",
-    whenDraftExists: "keep",
+    whenDraftExists: "append",
   });
+  expect(hostDraft).toBe("合成预填");
+  const contextA = "Context A\n\nSecond paragraph";
+  blocked = true;
+  await act(async () => root.update(page(contextA, 2)));
+  await act(async () => root.update(page("Context B", 3)));
+  await act(async () => root.update(page("Context B", 3, { ...services })));
+  expect(initializeDraft).toHaveBeenCalledTimes(3);
+  expect(hostDraft).toBe("合成预填");
+  blocked = false;
+  await act(async () => root.update(page(contextA, 4)));
+  await act(async () => root.update(page(contextA, 4, { ...services })));
+  expect(initializeDraft).toHaveBeenCalledTimes(4);
+  const pendingAfterApplied = root.root.findByType("p").children;
+  expect(hostDraft).toBe(`合成预填\n\n${contextA}`);
+  await act(async () => root.root.findByType("button").props.onClick());
+  expect(hostDraft).toBe(`合成预填\n\n${contextA}\n\nContext B`);
+  expect(pendingAfterApplied).toEqual(["Context B"]);
+  expect(initializeDraft).toHaveBeenLastCalledWith(binding, {
+    prompt: "Context B",
+    whenDraftExists: "append",
+  });
+  expect(root.root.findAllByType("details")).toHaveLength(0);
   await act(async () => {
     root.unmount();
   });
