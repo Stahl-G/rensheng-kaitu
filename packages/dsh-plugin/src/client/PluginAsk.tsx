@@ -68,7 +68,7 @@ export function PluginAsk({
   promptRequest?: number;
 } & PropsRenderSlots<"kaitu.ask.chat">) {
   const t = useT();
-  const [pendingPrompt, setPendingPrompt] = useState("");
+  const [pendingPrompts, setPendingPrompts] = useState<string[]>([]);
   const lastRequest = useRef<{ binding: SessionReference["binding"]; prompt: string; request: number }>();
   const [reference, setReference] = useState<SessionReference | null>(null);
   const [error, setError] = useState("");
@@ -100,11 +100,15 @@ export function PluginAsk({
       prompt,
       whenDraftExists: "append",
     });
-    if (result !== "applied")
-      setPendingPrompt((current) =>
-        current.includes(prompt) ? current : [current, prompt].filter(Boolean).join("\n\n"),
-      );
+    setPendingPrompts((current) =>
+      result === "applied"
+        ? current.filter((item) => item !== prompt)
+        : current.includes(prompt)
+          ? current
+          : [...current, prompt],
+    );
   }, [reference, prompt, promptRequest, services]);
+  const pendingPrompt = pendingPrompts.join("\n\n");
   if (error) return <p role="alert">{error}</p>;
   if (!reference) return null;
   return (
@@ -120,7 +124,8 @@ export function PluginAsk({
                 prompt: pendingPrompt,
                 whenDraftExists: "append",
               });
-              if (result === "applied") setPendingPrompt("");
+              if (result === "applied")
+                setPendingPrompts((current) => current.filter((item) => !pendingPrompts.includes(item)));
             }}
           >
             {t("加入草稿", "Add to draft")}
