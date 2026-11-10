@@ -1,0 +1,11 @@
+{
+  "name": "@kaitu/life-simulation-prototype",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node server.mjs",
+    "test": "node build.mjs && node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=22.19.0" }
+}

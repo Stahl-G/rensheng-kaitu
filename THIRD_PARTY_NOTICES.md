@@ -1,5 +1,9 @@
 # 第三方依赖
 
+## 人生推演独立原型
+
+`prototypes/life-simulation` 复用并改造 VickScarlet/remake 的 condition、vitex 加权抽取及 core 事件推进机制，固定提交 `f04888e202e5dfca0df48c51b8a099dc03cf08b4`。Copyright (c) 2021-2026 神戸小鳥 and 神户小德，MIT。许可全文保存在 [原型 LICENSE](prototypes/life-simulation/src/vendor/remake/LICENSE)，随静态产物分发；改造明细见 [当前规格](prototypes/life-simulation/README.md)。没有复用原游戏事件文案、网络存档、非开源 1in8b 或 AGPL fortune 代码。
+
 按功能查看所有直接依赖、运行环境、构建工具与数据来源：
 [开源项目与致谢](docs/open-source.md)。本文件保留原始许可文本及代码移植说明。
 
