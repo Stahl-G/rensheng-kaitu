@@ -201,7 +201,8 @@ test("home shows actual traces, hides empty traces and keeps genuine pending dec
     expect(content()).toContain(pending[0]?.title);
     await act(async () => update(state([], [])));
     expect(app?.root.findAllByType("aside")).toHaveLength(0);
-    expect(app?.root.findAllByProps({ "data-has-side": false })).toHaveLength(1);
+    expect(app?.root.findAllByProps({ "aria-label": "最近的痕迹" })).toHaveLength(0);
+    expect(content()).not.toContain(pending[0]?.title);
   } finally {
     if (app) await act(async () => app?.unmount());
     rmSync(ws.root, { recursive: true, force: true });
