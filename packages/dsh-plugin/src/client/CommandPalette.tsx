@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import styles from "./CommandPalette.module.css";
 import { useT } from "./i18n.js";
 export interface KaituCommand {
@@ -9,11 +9,15 @@ export interface KaituCommand {
   icon?: string;
   run: () => void;
 }
+export interface CommandLoadResult {
+  items: KaituCommand[];
+  failedSources: string[];
+}
 export function CommandPalette({
   actions,
   load,
   close,
-}: { actions: KaituCommand[]; load: () => Promise<KaituCommand[]>; close: () => void }) {
+}: { actions: KaituCommand[]; load: () => Promise<CommandLoadResult>; close: () => void }) {
   const t = useT();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -21,37 +25,64 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<KaituCommand[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [failedSources, setFailedSources] = useState<string[]>([]);
+  const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState(0);
   const loadRef = useRef(load);
+  loadRef.current = load;
+  const request = useRef(0);
+  const pending = useRef(false);
+  const live = useRef(false);
+  const refresh = useCallback(() => {
+    if (!live.current || pending.current) return;
+    pending.current = true;
+    const current = ++request.current;
+    const load = loadRef.current;
+    setLoading(true);
+    input.current?.focus();
+    void Promise.resolve()
+      .then(load)
+      .then((result) => {
+        if (!live.current || current !== request.current) return;
+        setItems(result.items);
+        setFailedSources(result.failedSources);
+        setFailed(false);
+      })
+      .catch(() => {
+        if (live.current && current === request.current) setFailed(true);
+      })
+      .finally(() => {
+        if (!live.current || current !== request.current) return;
+        pending.current = false;
+        setLoading(false);
+      });
+  }, []);
+  const dismiss = () => {
+    live.current = false;
+    request.current++;
+    close();
+  };
   useEffect(() => {
     const origin = document.activeElement as HTMLElement | null;
     dialog.current?.showModal?.();
     input.current?.focus();
-    let live = true;
-    void loadRef
-      .current()
-      .then((items) => {
-        if (live) setItems(items);
-      })
-      .catch((err) => {
-        if (live) setError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
+    live.current = true;
+    refresh();
     return () => {
-      live = false;
+      live.current = false;
+      pending.current = false;
+      request.current++;
       if (origin?.isConnected) origin.focus();
     };
-  }, []);
+  }, [refresh]);
   const needle = query.trim().toLocaleLowerCase();
   const results = [...actions, ...items]
     .filter((item) => `${item.label} ${item.detail ?? ""}`.toLocaleLowerCase().includes(needle))
     .slice(0, 60);
   const active = Math.min(selected, Math.max(0, results.length - 1));
+  const incomplete = failed || failedSources.length > 0;
   const activate = (item: KaituCommand) => {
-    close();
+    dismiss();
     item.run();
   };
   return (
@@ -61,10 +92,10 @@ export function CommandPalette({
       aria-label={t("搜索或输入动作", "Search or enter an action")}
       onCancel={(event) => {
         event.preventDefault();
-        close();
+        dismiss();
       }}
       onClick={(event) => {
-        if (event.target === dialog.current) close();
+        if (event.target === dialog.current) dismiss();
       }}
       onKeyDown={(event) => {
         if (event.nativeEvent.isComposing) return;
@@ -83,7 +114,7 @@ export function CommandPalette({
         if (event.key === "Escape") {
           event.preventDefault();
           event.stopPropagation();
-          close();
+          dismiss();
         }
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
@@ -91,7 +122,11 @@ export function CommandPalette({
             (active + (event.key === "ArrowDown" ? 1 : -1) + results.length) % Math.max(1, results.length),
           );
         }
-        if (event.key === "Enter" && results[active]) {
+        if (
+          event.key === "Enter" &&
+          !(event.target as HTMLElement | null)?.closest?.("button") &&
+          results[active]
+        ) {
           event.preventDefault();
           activate(results[active]);
         }
@@ -114,10 +149,26 @@ export function CommandPalette({
           }}
           placeholder={t("搜索或输入动作", "Search or enter an action")}
         />
-        <button type="button" onClick={close} aria-label={t("关闭", "Close")}>
+        <button type="button" onClick={dismiss} aria-label={t("关闭", "Close")}>
           esc
         </button>
       </div>
+      {(loading || incomplete) && (
+        <div className={styles.status} role={incomplete ? "alert" : "status"}>
+          <span>
+            {failed
+              ? t("资料读取失败", "Could not load records")
+              : failedSources.length
+                ? `${t("部分资料读取失败：", "Some sources could not be loaded: ")}${failedSources.join(t("、", ", "))}`
+                : t("正在查找…", "Searching…")}
+          </span>
+          {incomplete && (
+            <button type="button" onClick={refresh} disabled={loading}>
+              {loading ? t("重试中…", "Retrying…") : t("重试", "Retry")}
+            </button>
+          )}
+        </div>
+      )}
       <div
         tabIndex={-1}
         className={styles.results}
@@ -125,6 +176,7 @@ export function CommandPalette({
         // biome-ignore lint/a11y/useSemanticElements: Rich action combobox uses virtual focus.
         role="listbox"
         aria-label={t("动作与资料", "Actions and records")}
+        aria-busy={loading}
       >
         {results.slice(0, 60).map((item, index) => (
           <button
@@ -144,9 +196,8 @@ export function CommandPalette({
             <small>{item.shortcut ?? item.detail}</small>
           </button>
         ))}
-        {!results.length && <p>{loading ? t("正在查找…", "Searching…") : t("没有匹配项", "No matches")}</p>}
+        {!results.length && !loading && !incomplete && <p>{t("没有匹配项", "No matches")}</p>}
       </div>
-      {error && <p role="alert">{error}</p>}
     </dialog>
   );
 }

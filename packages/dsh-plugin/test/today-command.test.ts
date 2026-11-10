@@ -4,7 +4,7 @@ import type { HomeState } from "@kaitu/core";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
-import { CommandPalette } from "../src/client/CommandPalette.js";
+import { type CommandLoadResult, CommandPalette } from "../src/client/CommandPalette.js";
 import { TodayBoard, createTodayBoardSession } from "../src/client/TodayBoard.js";
 import { throwHomeCompletionError } from "../src/home-completion-error.js";
 
@@ -130,7 +130,10 @@ test("command panel filters real records, uses keyboard selection and leaves act
     app = create(
       createElement(CommandPalette, {
         actions: [{ id: "capture", label: "记一条", run: capture }],
-        load: async () => [{ id: "note:one", label: "Actual note", detail: "笔记", run: openNote }],
+        load: async () => ({
+          items: [{ id: "note:one", label: "Actual note", detail: "笔记", run: openNote }],
+          failedSources: [],
+        }),
         close,
       }),
     );
@@ -148,6 +151,131 @@ test("command panel filters real records, uses keyboard selection and leaves act
     await act(async () => key("Escape"));
     expect(close).toHaveBeenCalledTimes(2);
     expect(openNote).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => app.unmount());
+  }
+});
+
+test("command load throws and rejections are retryable, retain the query and use the latest loader only once", async () => {
+  vi.stubGlobal("document", { activeElement: null });
+  const capture = vi.fn();
+  const openNote = vi.fn();
+  const close = vi.fn();
+  const load = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw new Error("/synthetic/private/unreadable.md");
+    })
+    .mockRejectedValueOnce(new Error("Synthetic transport failure"));
+  const props = { actions: [{ id: "capture", label: "Capture", run: capture }], load, close };
+  let app!: ReturnType<typeof create>;
+  await act(async () => {
+    app = create(createElement(CommandPalette, props));
+  });
+  try {
+    const retry = () => app.root.findByProps({ role: "alert" }).findByType("button");
+    expect(JSON.stringify(app.toJSON())).not.toContain("/synthetic/private/unreadable.md");
+    await act(async () =>
+      app.root.findByType("dialog").props.onKeyDown({
+        key: "Enter",
+        nativeEvent: {},
+        target: { closest: () => ({}) },
+        preventDefault: vi.fn(),
+      }),
+    );
+    expect(capture).not.toHaveBeenCalled();
+    await act(async () => {
+      const click = retry().props.onClick;
+      click();
+      click();
+    });
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(app.root.findAllByProps({ role: "alert" })).toHaveLength(1);
+    await act(async () => app.root.findByType("input").props.onChange({ target: { value: "Synthetic" } }));
+    let resolve!: (result: CommandLoadResult) => void;
+    const latest = vi.fn(
+      () =>
+        new Promise<CommandLoadResult>((done) => {
+          resolve = done;
+        }),
+    );
+    await act(async () => app.update(createElement(CommandPalette, { ...props, load: latest })));
+    await act(async () => {
+      const click = retry().props.onClick;
+      click();
+      click();
+    });
+    expect(latest).toHaveBeenCalledOnce();
+    expect(retry().props.disabled).toBe(true);
+    expect(app.root.findByType("input").props.value).toBe("Synthetic");
+    await act(async () =>
+      resolve({
+        items: [{ id: "note:synthetic", label: "Synthetic note", run: openNote }],
+        failedSources: [],
+      }),
+    );
+    expect(app.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(app.root.findByType("input").props.value).toBe("Synthetic");
+    await act(async () => app.root.findByProps({ role: "option" }).props.onClick());
+    expect(openNote).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+  } finally {
+    await act(async () => app.unmount());
+  }
+});
+
+test.each(["close", "unmount"])("%s invalidates a pending command load before reopening", async (end) => {
+  vi.stubGlobal("document", { activeElement: null });
+  let stale!: (result: CommandLoadResult) => void;
+  const close = vi.fn();
+  let app!: ReturnType<typeof create>;
+  await act(async () => {
+    app = create(
+      createElement(CommandPalette, {
+        actions: [],
+        load: () =>
+          new Promise<CommandLoadResult>((resolve) => {
+            stale = resolve;
+          }),
+        close,
+      }),
+    );
+  });
+  if (end === "close") {
+    await act(async () => app.root.findByType("dialog").props.onCancel({ preventDefault: vi.fn() }));
+    await act(async () =>
+      stale({ items: [{ id: "stale", label: "Stale", run: vi.fn() }], failedSources: ["Old source"] }),
+    );
+    expect(app.root.findAllByProps({ role: "option" })).toHaveLength(0);
+    expect(app.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(close).toHaveBeenCalledOnce();
+  }
+  await act(async () => app.unmount());
+  let fresh!: (result: CommandLoadResult) => void;
+  await act(async () => {
+    app = create(
+      createElement(CommandPalette, {
+        actions: [],
+        load: () =>
+          new Promise<CommandLoadResult>((resolve) => {
+            fresh = resolve;
+          }),
+        close,
+      }),
+    );
+  });
+  try {
+    await act(async () =>
+      stale({ items: [{ id: "stale", label: "Stale", run: vi.fn() }], failedSources: ["Old source"] }),
+    );
+    expect(app.root.findByProps({ role: "listbox" }).props["aria-busy"]).toBe(true);
+    expect(app.root.findAllByProps({ role: "option" })).toHaveLength(0);
+    expect(app.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    await act(async () =>
+      fresh({ items: [{ id: "fresh", label: "Fresh", run: vi.fn() }], failedSources: [] }),
+    );
+    expect(app.root.findByProps({ role: "option" }).findAllByType("span")[1]?.children).toContain("Fresh");
+    expect(app.root.findByProps({ role: "listbox" }).props["aria-busy"]).toBe(false);
   } finally {
     await act(async () => app.unmount());
   }

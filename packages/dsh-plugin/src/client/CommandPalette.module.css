@@ -1,6 +1,6 @@
 .palette {
   width: min(660px, calc(100vw - 32px));
-  max-height: min(640px, calc(100vh - 64px));
+  max-height: min(640px, 76vh);
   margin: 12vh auto auto;
   padding: 0;
   color: var(--ink);
@@ -8,12 +8,17 @@
   border: 1px solid var(--line);
   border-radius: 16px;
   box-shadow: 0 24px 80px #0003;
-  overflow: auto;
+  overflow: hidden;
+}
+.palette[open] {
+  display: flex;
+  flex-direction: column;
 }
 .palette::backdrop {
   background: #14141455;
 }
 .search {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -47,6 +52,8 @@
 }
 .results {
   padding: 6px;
+  overflow-y: auto;
+  min-height: 0;
 }
 .results button {
   width: 100%;
@@ -80,7 +87,30 @@
   text-align: center;
   color: var(--link);
 }
-.results p,
-.palette > p {
+.results p {
   margin: 16px;
+}
+.status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.status button {
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--link);
+  font: inherit;
+  cursor: pointer;
+}
+.status button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

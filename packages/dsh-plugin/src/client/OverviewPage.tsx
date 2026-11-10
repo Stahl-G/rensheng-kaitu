@@ -5,7 +5,7 @@ import { KaituMark } from "./Brand.js";
 import { CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
-import { CommandPalette, type KaituCommand } from "./CommandPalette.js";
+import { type CommandLoadResult, CommandPalette, type KaituCommand } from "./CommandPalette.js";
 import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
@@ -1189,7 +1189,7 @@ function Overview({
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
   });
-  const loadCommands = async (): Promise<KaituCommand[]> => {
+  const loadCommands = async (): Promise<CommandLoadResult> => {
     const values: KaituCommand[] = (homeState?.data?.threads ?? []).map((thread) => ({
       id: thread.key,
       label: thread.title,
@@ -1205,9 +1205,9 @@ function Overview({
           : openTarget({ kind: thread.kind, id: thread.id }, "overview"),
     }));
     const [map, exploration, notes] = await Promise.allSettled([
-      props.loadLifeMap?.(),
-      props.loadExploration?.(),
-      props.loadLibrary({ section: "notes" }),
+      Promise.resolve().then(() => props.loadLifeMap?.()),
+      Promise.resolve().then(() => props.loadExploration?.()),
+      Promise.resolve().then(() => props.loadLibrary({ section: "notes" })),
     ]);
     if (map.status === "fulfilled" && map.value) {
       const places = new Map(
@@ -1243,7 +1243,14 @@ function Overview({
           detail: item.kind === "决定" ? t("决策", "Decision") : t("笔记", "Note"),
           run: () => openCommandNote(item.file),
         });
-    return values;
+    return {
+      items: values,
+      failedSources: [
+        ...(map.status === "rejected" ? [t("足迹", "Places")] : []),
+        ...(exploration.status === "rejected" ? [t("方向", "Directions")] : []),
+        ...(notes.status === "rejected" ? [t("笔记与决策", "Notes and decisions")] : []),
+      ],
+    };
   };
   function openCommandNote(file: string) {
     openRecord("notes");
@@ -1453,7 +1460,12 @@ function Overview({
         </div>
       </header>
       {commandsOpen && (
-        <CommandPalette actions={commandActions} load={loadCommands} close={() => setCommandsOpen(false)} />
+        <CommandPalette
+          key={workspaceRoot}
+          actions={commandActions}
+          load={loadCommands}
+          close={() => setCommandsOpen(false)}
+        />
       )}
       <main
         className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? `${todayCss.page} ${props.loadHome ? css.todayContent : ""}` : ""}`}
