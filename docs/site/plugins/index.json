@@ -274,6 +274,18 @@
       },
       "versions": [
         {
+          "version": "0.1.4-rc.1",
+          "publishTimestamp": 1794329345,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Stahl-G/dsh-kaitu-auday-skill.git",
+            "commit": "d21216662d47f88fae02efc57695d239604498a5"
+          },
+          "engines": {
+            "dsh": "0.2.2-rc.1"
+          }
+        },
+        {
           "version": "0.1.3",
           "publishTimestamp": 1793003141,
           "source": {

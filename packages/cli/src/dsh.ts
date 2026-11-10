@@ -16,6 +16,7 @@ function entry(
   flow: boolean,
   standalone = false,
   automation = true,
+  protectFiles = standalone,
 ): string {
   if (!existsSync(plugin) || !existsSync(join(dirname(plugin), "client.js")))
     throw new KaituError("插件尚未构建，请在仓库运行 pnpm build", "NOT_BUILT");
@@ -38,11 +39,13 @@ function entry(
         "ui-sidebar-files",
       ]
     : [];
+  const enabled = protectFiles ? ["fs-observation-policy"] : [];
   const config = { workspace, ...(automation ? {} : { automation }), ...(standalone ? { brand: true } : {}) };
   if (flow) {
     return [
       ...disabled.map((id) => ({ id, disabled: true })),
       { id: "tool-skill", disabled: false },
+      ...enabled.map((id) => ({ id, disabled: false })),
       ...(standalone ? [{ id: "ui-settings-models", config: { credentialOnboarding: false } }] : []),
       { insert: [{ id: "kaitu", name: plugin, config }] },
     ]
@@ -53,6 +56,7 @@ function entry(
     ...disabled.flatMap((id) => [`- id: ${id}`, "  disabled: true"]),
     "- id: tool-skill",
     "  disabled: false",
+    ...enabled.flatMap((id) => [`- id: ${id}`, "  disabled: false"]),
     ...(standalone ? ["- id: ui-settings-models", "  config:", "    credentialOnboarding: false"] : []),
     "- insert:",
     "    - id: kaitu",
@@ -102,7 +106,7 @@ export function installDsh(ws: Workspace, automation = true): string {
 
 export function dshCommand(ws: Workspace): string {
   const file = ".kaitu/cache/dsh/cordis.yml";
-  ws.writeText(file, entry(ws.root, defaultPlugin(), false), {
+  ws.writeText(file, entry(ws.root, defaultPlugin(), false, false, true, true), {
     internal: true,
   });
   const patch = ws.resolve(file, { internal: true }).replace(/'/g, "'\\''");

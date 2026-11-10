@@ -56,7 +56,11 @@
     "maplibre-gl": "6.11.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-test-renderer": "18.3.1"
+    "react-test-renderer": "18.3.1",
+    "@deepseek-ai/dsh-schedule": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-storage": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-storage-json": "0.2.2-rc.1"
   },
   "exports": {
     ".": {
@@ -105,5 +109,9 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.1.0"
+  },
+  "engines": {
+    "node": ">=24.9.0",
+    "dsh": "0.2.2-rc.1"
   }
 }

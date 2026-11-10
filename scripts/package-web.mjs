@@ -89,6 +89,7 @@ const pluginPackage = {
     [".", "./client"].map((name) => [name, { default: plugin.exports[name].default }]),
   ),
   dsh: plugin.dsh,
+  engines: plugin.engines,
 };
 writeFileSync(join(output, "dsh-plugin/package.json"), `${JSON.stringify(pluginPackage, null, 2)}\n`);
 writeFileSync(
