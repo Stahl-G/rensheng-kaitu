@@ -52,7 +52,7 @@ DSH 0.2.1-rc.3 插件提供今天、开图、资料、问问四入口。切去�
 插件注册技能 provider、说明、工作流工具和开图页面。补记时间用带时区偏移的 `ts`。
 手动配置参见 [cordis.example.yml](../packages/dsh-plugin/cordis.example.yml)，插件路径必须填 `dist/index.js` 的绝对路径。
 
-当前运行时与 npm 类型固定为 dsh `0.2.1-rc.3`。下文标注 rc.2 的源码核查和实测记录保留为历史依据；不代表 rc.3 的原生验收。
+当前运行时与 npm 类型固定为 dsh `0.2.1-rc.3`。下文标注 rc.2 的源码核查和实测记录保留为历史依据。
 对话工具沿用 `tools.register()` 和 `systemPrompt.section()`；总览通过严格生成的 Remote 和 Slots 接入。
 已有桌面对话写入结果见 [HANDOFF §0.1](HANDOFF.md#01-现在能用什么均已真机实测)。
 
@@ -251,6 +251,6 @@ Kaitu.app profile 与 DSH 插件形态均使用显式工作区入口；DSH 自�
 
 `DSH_HOME` 隔离 DSH profile 和宿主资料，不隔离 Electron 桌面壳。官方 rc.3 桌面入口独立读取 `app.getPath("userData")`，并调用不带路径的 `app.setAppLogsPath()`；仅设置 `HOME`、`DSH_HOME` 或 `DSH_AGENTS_HOME` 不能作为 macOS 桌面壳已完整隔离的依据。
 
-测试入口须在导入宿主主模块之前，使用 Electron 的 `app.setPath()` 显式设置 `home`、`appData`、`userData`、`sessionData` 和 `crashDumps`，并将 `app.setAppLogsPath()` 指向合成目录。随后核对实际 helper 参数及宿主 profile 路径。官方原包没有提供覆盖全部这些路径的环境变量入口；不要直接启动它并把环境变量隔离称为完整隔离。需要纯原包验收时，使用独立测试系统账户或虚拟机；不能用修改过的测试壳结果冒充官方原包验收。
+测试入口须在导入宿主主模块之前，使用 Electron 的 `app.setPath()` 显式设置 `home`、`appData`、`userData`、`sessionData` 和 `crashDumps`，并将 `app.setAppLogsPath()` 指向合成目录。随后核对实际 helper 参数及宿主 profile 路径。官方原包没有提供覆盖全部这些路径的环境变量入口。需要纯原包验收时，使用独立测试系统账户或虚拟机。
 
 Kaitu.app 的测试启动方式见 [桌面隔离验收](desktop.md#隔离验收)，其 bootstrap 会显式设置桌面壳路径。上述隔离要求不需要读取真实 profile、复制凭据、删除真实目录或改变系统安全设置。

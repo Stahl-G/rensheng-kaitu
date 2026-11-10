@@ -33,15 +33,6 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
         installed: false,
       };
     });
-  if (!catalog.some((entry) => entry.name === "kaitu-auday"))
-    catalog.push({
-      name: "kaitu-auday",
-      title: "Auday",
-      description: { zh: "开发中", en: "In development" },
-      version: "",
-      spec: "",
-      installed: false,
-    });
   const changed = async (operation: Promise<ChangeResult>) => {
     const result = await operation;
     if (result.application !== "applied" && result.application !== "restart-required")

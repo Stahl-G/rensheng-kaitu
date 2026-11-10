@@ -28,7 +28,7 @@
   缺省 origin 仍按 Agent 记录处理。id、rev、by 由电脑生成。
 - 自然记忆使用 `.actions.jsonl` 的 `capture_memory`，只在 `today.mobile.actions` 声明该能力时投递。外层 `origin: assistant` 表示手机 AI 写者；`args.origin` 独立表示 user-stated / ai-estimate / ai-suggestion，不获得额外权限。
   `args` 沿用 `memory_capture` 的原始字段，保留来源、观察时间、原话、不确定性、敏感标记、稳定幂等键及纠正的 replaces/expected。临时/引用/假设跳过，未解冲突不写；重试复用首次 client_id 和全部参数。
-  回执新增可选 `memory: { file, status }`，file 为落盘文件名，status 为 saved / duplicate / undone / superseded；既有 `target.id/rev` 不变，旧手机可忽略 memory。只有 applied 且 memory.status=saved 表示新增落盘；undone/superseded 不代表当前事实生效。message 保留文件成功后的索引/版本待重试说明，不能据此宣称版本成功。
+  回执新增可选 `memory: { file, status }`，file 为落盘文件名，status 为 saved / duplicate / undone / superseded；既有 `target.id/rev` 不变，旧手机可忽略 memory。只有 applied 且 memory.status=saved 表示新增落盘。undone 是已撤销，superseded 是已更正。message 只在索引或版本待重试时出现。
   用户撤销或纠正仍可对该 file 使用现有 `replace_memory` 和 expected；缺能力时只保留手机本机结果及待兼容同步状态，不回退到会丢分类字段的旧 `.memory.json`。
 - `.actions.jsonl`：逐行按 phone-action schema 校验，按文件内顺序执行。
   执行 complete_next、complete_task、cancel_task、decide_proposal；声明mobile能力的消费者还支持create_task/update_task。其余预留操作返回 rejected。
