@@ -30,7 +30,7 @@ export function sdkRuntimePatch({
   textOnly = false,
   capabilities = false,
 }) {
-  // SDK bundle 不挂产品埋点；关闭其余额外诊断信息与会话遥测。
+  // 不挂产品埋点，也不让 RC1 新增的宿主任务、展示和提问能力扩大问问的工具范围。
   const siwc = { insert: [{ id: "chatgpt-siwc", name: join(dirname(hostPlugin), "chatgpt-siwc.mjs") }] };
   const privacy = [
     "session-telemetry-otel",
@@ -41,6 +41,8 @@ export function sdkRuntimePatch({
     "present",
     "tool-ask-user",
   ].map((id) => ({ id, disabled: true }));
+  // RC1 默认关闭此策略；保留原宿主的先读和外部修改保护。
+  const defaults = [...privacy, { id: "fs-observation-policy", disabled: false }];
   // 目录中这几项是资料工具插件；账号与禁用工具的请求不启动它们，也不改已保存的启用设置。
   const workspacePlugins =
     capabilities || textOnly
@@ -52,7 +54,7 @@ export function sdkRuntimePatch({
   // 账号服务与资料无关：不加载工作区、资料工具、技能、联网工具或会话 RPC。
   if (capabilities)
     return [
-      ...privacy,
+      ...defaults,
       ...workspacePlugins,
       siwc,
       { id: "sdk-jsonrpc-server", disabled: true },
@@ -77,7 +79,7 @@ export function sdkRuntimePatch({
       ];
   if (mode === "full" && !textOnly)
     return [
-      ...privacy,
+      ...defaults,
       siwc,
       ...web,
       { id: "sdk-jsonrpc-server", disabled: true },
@@ -91,7 +93,7 @@ export function sdkRuntimePatch({
       },
     ];
   return [
-    ...privacy,
+    ...defaults,
     ...workspacePlugins,
     siwc,
     ...web,
