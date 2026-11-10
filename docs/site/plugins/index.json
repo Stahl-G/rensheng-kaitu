@@ -149,7 +149,7 @@
           "source": {
             "type": "git",
             "url": "https://github.com/Stahl-G/dsh-kaitu-fortune.git",
-            "commit": "99543a9f0e4b985b7ca90953f2284f8b51062603"
+            "commit": "4fd321c663796a3daa164d17fa728e1ea56812bd"
           },
           "engines": {
             "dsh": "0.2.1-rc.3"
