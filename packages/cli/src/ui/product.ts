@@ -8,6 +8,7 @@ import {
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
+  type HomeNextTarget,
   type ImportSource,
   KaituError,
   type LearningCheckinInput,
@@ -45,6 +46,7 @@ import {
   changeLifeAtlas,
   changeOnboardingNext,
   commitFinanceImport,
+  completeHomeNext,
   completeNext,
   configureAutomation,
   confirmOnboardingImport,
@@ -146,10 +148,12 @@ import {
   setFinanceAccess,
   setNewsFeedback,
   setWeatherPlace,
+  snapshot,
   stageFinanceUpload,
   startLearning,
   syncProject,
   tryNews,
+  undoHomeNext,
   unhideExperience,
   uploadResume,
   workspaceBackupRequest,
@@ -190,6 +194,8 @@ export const productMutations = new Set([
   "moveStorage",
   "addCalendarSubscription",
   "completeNext",
+  "completeHomeNext",
+  "undoHomeNext",
   "adoptTask",
   "cancelTask",
   "proposeTask",
@@ -495,8 +501,22 @@ export async function productRequest(
     }
     case "capture":
       return captureNote(ws, text(0));
+    case "completeHomeNext": {
+      const receipt = completeHomeNext(ws, args[0] as HomeNextTarget, text(1), text(2));
+      setImmediate(() => void snapshot(ws, "你完成下一步并记下结果").catch(() => {}));
+      return receipt;
+    }
+    case "undoHomeNext": {
+      const receipt = undoHomeNext(ws, text(0));
+      setImmediate(() => void snapshot(ws, "你撤销了下一步的完成").catch(() => {}));
+      return receipt;
+    }
     case "captureOnce":
-      return captureNoteOnce(ws, text(0), text(1));
+      return captureNoteOnce(ws, text(0), text(1), {
+        scheduleVersion: (message) => {
+          setImmediate(() => void snapshot(ws, message).catch(() => {}));
+        },
+      });
     case "captureReceipt":
       return readCaptureReceipt(ws, text(0));
     case "me":

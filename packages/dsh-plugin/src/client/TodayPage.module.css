@@ -853,3 +853,431 @@
     grid-row: 4;
   }
 }
+
+/* Today's action, list and quick capture share the existing paper theme. */
+.savepointHome {
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+  gap: 24px 32px;
+  padding: 26px 32px;
+}
+.savepointHome .homeHeading {
+  grid-column: 1;
+  grid-row: 1;
+  padding-right: 0;
+}
+.savepointHome .dateWeather {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px 16px;
+  min-height: 0;
+}
+.savepointHome .dateWeather > p {
+  order: 0;
+  flex: none;
+  font-size: 15px;
+  margin: 0;
+}
+.savepointHome .weatherSlot {
+  order: 1;
+  width: auto;
+  max-width: 240px;
+}
+.savepointHome .homeHeading h1 {
+  order: 2;
+  flex-basis: 100%;
+  font: 650 38px / 1.2 var(--sans, sans-serif);
+  margin: 6px 0 0;
+}
+.todayBoard {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+.resultWeek {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  align-self: flex-end;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  margin-top: -58px;
+  margin-bottom: 14px;
+  min-height: 28px;
+  font: inherit;
+}
+.resultWeek i {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--muted);
+  background: transparent;
+}
+.resultWeek i[data-result="true"] {
+  background: var(--link);
+  border-color: var(--link);
+}
+.resultWeek i[data-today="true"] {
+  outline: 2px solid var(--accent, #c44f34);
+  outline-offset: 2px;
+}
+.resultWeek b {
+  color: var(--ink);
+  margin-left: 5px;
+}
+.actionCard,
+.stepList,
+.weekReview,
+.scheduleCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.actionCard {
+  padding: 28px;
+}
+.actionMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.actionMeta > span {
+  color: var(--link);
+  font-weight: 600;
+}
+.actionCard h2 {
+  font: 650 clamp(24px, 2.6vw, 34px) / 1.5 var(--sans, sans-serif);
+  margin: 16px 0 22px;
+  overflow-wrap: anywhere;
+}
+.actionCard mark {
+  color: inherit;
+  background: linear-gradient(transparent 65%, #f3d96c80 65%);
+}
+.actionCard[data-done="true"] mark {
+  background: transparent;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.resultForm {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.resultForm input {
+  flex: 1;
+  min-width: 0;
+  border: 1.5px solid var(--link);
+  border-radius: 9px;
+  padding: 12px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+}
+.resultForm input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.resultForm button {
+  flex: none;
+}
+.completionReceipt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.completionReceipt > span {
+  flex: 1;
+  min-width: 100px;
+  overflow-wrap: anywhere;
+}
+.stepList {
+  padding: 0 16px;
+}
+.stepRow {
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+}
+.stepRow:last-child {
+  border: 0;
+}
+.stepCircle {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.stepCircle:hover {
+  border-color: var(--link);
+  background: var(--link-bg);
+}
+.stepTitle {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  overflow-wrap: anywhere;
+}
+button.stepTitle {
+  cursor: pointer;
+}
+.stepRow > span:not(.stepTitle),
+.stepRow small,
+.stepRow time {
+  color: var(--muted);
+  font-size: 12px;
+}
+.stepRow time[data-overdue="true"] {
+  color: var(--error, #b4412e);
+}
+.threadLinks,
+.traceCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.threadLinks > button,
+.traceCards article {
+  min-width: 0;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.threadLinks > button {
+  cursor: pointer;
+  font: inherit;
+}
+.threadLinks > button > span {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.threadLinks small,
+.traceCards time {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: auto;
+}
+.weekReview {
+  padding: 20px;
+}
+.weekReview article {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 14px;
+}
+.weekReview time {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.weekReview p {
+  margin: 8px 0 0;
+}
+.savepointHome .askHome,
+.savepointHome[data-first-visit="true"] .askHome {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 18px;
+  align-self: start;
+}
+.savepointHome .askHome label {
+  font: inherit;
+  color: var(--muted);
+}
+.savepointHome .composer {
+  background: transparent;
+  border: 0;
+}
+.savepointHome .composer textarea {
+  padding: 0;
+  min-height: 106px;
+  font-size: 15px;
+}
+.savepointHome .composerTools {
+  background: transparent;
+  border: 0;
+  padding: 10px 0 0;
+  gap: 8px;
+}
+.savepointHome .voiceTools {
+  order: 0;
+  margin-right: auto;
+}
+.savepointHome .voiceButton {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ink2);
+}
+.savepointHome .composerTools > button[type="button"] {
+  margin-right: 0;
+}
+.todayAside {
+  grid-column: 2;
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.scheduleCard {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.scheduleCard > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.scheduleCard > div:last-child {
+  border: 0;
+  padding-bottom: 0;
+}
+.scheduleCard time {
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 600;
+}
+.scheduleCard span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.commandTrigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  color: var(--muted);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.commandTrigger kbd {
+  font: inherit;
+  font-size: 11px;
+}
+@media (max-width: 960px) {
+  .savepointHome {
+    grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr);
+    gap: 20px;
+    padding: 22px;
+  }
+  .resultWeek {
+    margin-top: 0;
+    margin-bottom: 0;
+    align-self: flex-start;
+  }
+  .threadLinks,
+  .traceCards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .stepRow {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .stepTitle {
+    flex-basis: 65%;
+  }
+  .actionCard {
+    padding: 20px;
+  }
+}
+@media (max-width: 760px) {
+  .savepointHome {
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+  }
+  .savepointHome .homeHeading {
+    order: 0;
+  }
+  .todayBoard {
+    order: 1;
+  }
+  .savepointHome .askHome {
+    order: 2;
+    width: 100%;
+  }
+  .todayAside {
+    order: 3;
+  }
+  .commandTrigger > span:nth-child(2) {
+    display: none;
+  }
+  .resultForm {
+    flex-wrap: wrap;
+  }
+  .resultForm input {
+    flex-basis: 100%;
+  }
+}
+
+.savepointHome {
+  grid-template-rows: auto 1fr;
+}
+.todayBoard {
+  grid-row: 2;
+}
+.todaySide {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.savepointHome .todaySide .askHome {
+  width: 100%;
+}
+.todayAside {
+  display: flex;
+}
+@media (max-width: 760px) {
+  .todaySide {
+    order: 2;
+  }
+}

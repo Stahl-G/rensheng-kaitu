@@ -9,6 +9,7 @@ import type {
   OverviewNext,
 } from "../types.js";
 import css from "./Prototype.module.css";
+import { TodayBoard, type TodayBoardSession } from "./TodayBoard.js";
 import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 import {
@@ -50,7 +51,21 @@ export function LifeHome({
   openProject,
   openGoal,
   begin,
+  complete,
+  undo,
+  schedule,
+  reviewLinks,
+  session,
 }: {
+  session?: TodayBoardSession;
+  complete?: (
+    target: import("@kaitu/core").HomeNextTarget,
+    result: string,
+    operationId: string,
+  ) => Promise<import("@kaitu/core").HomeCompletion>;
+  undo?: (token: string) => Promise<{ undone: boolean }>;
+  schedule?: ReactNode;
+  reviewLinks?: ReactNode;
   save?: (text: string) => void;
   home?: import("@kaitu/core").HomeState | null;
   loadProjects: () => Promise<DoingProject[]>;
@@ -176,13 +191,12 @@ export function LifeHome({
     setFactSource(null);
     requestAnimationFrame(() => sourceTrigger.current?.focus());
   };
-  const [selectedThread, setSelectedThread] = useState(0);
   const [atlasData, setAtlasData] = useState<import("@kaitu/core").LifeAtlasState | null>(null);
   const [atlasImage, setAtlasImage] = useState<string | null>(null);
   const [atlasStatus, setAtlasStatus] = useState<"loading" | "ready" | "error">("loading");
   // biome-ignore lint/correctness/useExhaustiveDependencies: workspace notifications refresh the adopted map preview.
   useEffect(() => {
-    if (!loadAtlas) return;
+    if (!loadAtlas || home) return;
     let active = true;
     let retry: ReturnType<typeof setTimeout> | undefined;
     const load = () => {
@@ -204,7 +218,7 @@ export function LifeHome({
       active = false;
       clearTimeout(retry);
     };
-  }, [loadAtlas, data.cutoff]);
+  }, [loadAtlas, data.cutoff, home]);
   const [todayNotes, setTodayNotes] = useState<{ day: string; cutoff: string; entries: InboxEntry[] } | null>(
     null,
   );
@@ -266,6 +280,7 @@ export function LifeHome({
       <header className={todayCss.homeHeading}>
         <div className={todayCss.dateWeather}>
           <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
+          {home && <h1>{t("今天", "Today")}</h1>}
           {weather && <div className={todayCss.weatherSlot}>{weather}</div>}
         </div>
         {!home && !firstVisit && (
@@ -282,7 +297,7 @@ export function LifeHome({
           <h1>{t("开图还不认识你。先从一件事说起。", "Let's start with one thing about you.")}</h1>
         )}
       </header>
-      {loadAtlas && (
+      {!home && loadAtlas && (
         <div className={todayCss.atlasPreview} data-empty={!atlasImage || undefined}>
           <button type="button" className={css.link} onClick={openAtlas}>
             {t("人生地图", "Life map")}
@@ -299,44 +314,6 @@ export function LifeHome({
                 width={atlasData.resource.width}
                 height={atlasData.resource.height}
               />
-              {home?.data?.threads.map((thread, index) => {
-                const domain = atlasData.domains.find((d) =>
-                  d.facts.some(
-                    (f) => f.source === thread.file && (thread.kind !== "goal" || f.id === thread.id),
-                  ),
-                );
-                const point = domain && atlasData.resource?.regions.provinces[domain.slot];
-                if (!point) return null;
-                return (
-                  // biome-ignore lint/a11y/useValidAnchor: SVG link selects the linked save point below.
-                  <a
-                    key={thread.key}
-                    href="#home-savepoint"
-                    tabIndex={0}
-                    aria-label={thread.title}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setSelectedThread(index);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedThread(index);
-                      }
-                    }}
-                  >
-                    <circle
-                      cx={point.x}
-                      cy={point.y}
-                      r={index === selectedThread ? 22 : 14}
-                      fill={index === selectedThread ? "#d9902f" : "#2b4c7e"}
-                      stroke="#fffdf8"
-                      strokeWidth="4"
-                    />
-                    <title>{thread.title}</title>
-                  </a>
-                );
-              })}
             </svg>
           ) : (
             <small>
@@ -350,134 +327,164 @@ export function LifeHome({
         </div>
       )}
       {home && (
-        <Savepoint
-          selected={selectedThread}
-          select={setSelectedThread}
+        <TodayBoard
+          session={session}
           data={home}
+          complete={complete}
+          undo={undo}
           openProject={openProject}
           openGoal={openGoal}
           begin={firstVisit ? begin : undefined}
           library={library}
+          ask={ask}
+          canAsk={canAsk}
           adopt={adopt}
           dismiss={dismiss}
+          busy={busy}
         />
       )}
-      {canAsk && (
-        <form
-          className={todayCss.askHome}
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (askText.trim()) ask(askText);
-          }}
-        >
-          <label htmlFor="today-ask">{t("此刻，想聊什么？", "What’s on your mind?")}</label>
-          <div className={todayCss.composer}>
-            <textarea
-              id="today-ask"
-              value={askText}
-              onChange={(event) => setAskText(event.target.value)}
-              placeholder={t("此刻想到的…", "Something on your mind…")}
-            />
-            <div className={todayCss.composerTools}>
-              {voice.available && speech && (
-                <div className={todayCss.voiceTools}>
-                  {!["starting", "recording", "stopping"].includes(voice.state) ? (
-                    <button
-                      type="button"
-                      className={todayCss.voiceButton}
-                      onClick={() => {
-                        setVoiceMessage("");
-                        const epoch = ++voiceEpoch.current;
-                        voiceActive.current = true;
-                        void speech("start", locale)
-                          .then((value) => {
-                            if (epoch === voiceEpoch.current) applyVoice(value);
-                          })
-                          .catch(() => {
-                            if (epoch !== voiceEpoch.current) return;
-                            voiceActive.current = false;
-                            setVoiceMessage(t("无法启动语音。", "Could not start speech."));
-                          });
-                      }}
-                    >
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        aria-hidden="true"
+      <div className={home ? todayCss.todaySide : undefined}>
+        {(canAsk || save) && (
+          <form
+            className={todayCss.askHome}
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (askText.trim()) (save ?? ask)(askText);
+            }}
+          >
+            <label htmlFor="today-ask">{t("记一条", "Quick note")}</label>
+            <div className={todayCss.composer}>
+              <textarea
+                id="today-ask"
+                value={askText}
+                onChange={(event) => setAskText(event.target.value)}
+                placeholder={t("此刻想到的…", "Something on your mind…")}
+                onKeyDown={(event) => {
+                  if (
+                    (event.metaKey || event.ctrlKey) &&
+                    event.key === "Enter" &&
+                    !event.nativeEvent.isComposing &&
+                    askText.trim()
+                  ) {
+                    event.preventDefault();
+                    (save ?? ask)(askText);
+                  }
+                }}
+              />
+              <div className={todayCss.composerTools}>
+                {voice.available && speech && (
+                  <div className={todayCss.voiceTools}>
+                    {!["starting", "recording", "stopping"].includes(voice.state) ? (
+                      <button
+                        type="button"
+                        className={todayCss.voiceButton}
+                        onClick={() => {
+                          setVoiceMessage("");
+                          const epoch = ++voiceEpoch.current;
+                          voiceActive.current = true;
+                          void speech("start", locale)
+                            .then((value) => {
+                              if (epoch === voiceEpoch.current) applyVoice(value);
+                            })
+                            .catch(() => {
+                              if (epoch !== voiceEpoch.current) return;
+                              voiceActive.current = false;
+                              setVoiceMessage(t("无法启动语音。", "Could not start speech."));
+                            });
+                        }}
                       >
-                        <rect x="9" y="3" width="6" height="12" rx="3" />
-                        <path d="M6 11v2a6 6 0 0 0 12 0v-2M12 19v3M8 22h8" />
-                      </svg>
-                      <span className={css.sr}>{t("说一段", "Speak")}</span>
-                    </button>
-                  ) : (
-                    <>
-                      <output>
-                        {voice.state === "recording"
-                          ? t("正在听…", "Listening…")
-                          : t("正在处理…", "Working…")}
-                      </output>
-                      {voice.state === "recording" && (
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          aria-hidden="true"
+                        >
+                          <rect x="9" y="3" width="6" height="12" rx="3" />
+                          <path d="M6 11v2a6 6 0 0 0 12 0v-2M12 19v3M8 22h8" />
+                        </svg>
+                        <span className={css.sr}>{t("说一段", "Speak")}</span>
+                      </button>
+                    ) : (
+                      <>
+                        <output>
+                          {voice.state === "recording"
+                            ? t("正在听…", "Listening…")
+                            : t("正在处理…", "Working…")}
+                        </output>
+                        {voice.state === "recording" && (
+                          <button
+                            type="button"
+                            className={css.btn}
+                            onClick={() => {
+                              const epoch = voiceEpoch.current;
+                              void speech("stop").then((value) => {
+                                if (epoch === voiceEpoch.current) applyVoice(value);
+                              });
+                            }}
+                          >
+                            {t("完成", "Done")}
+                          </button>
+                        )}
                         <button
                           type="button"
-                          className={css.btn}
+                          className={css.link}
                           onClick={() => {
-                            const epoch = voiceEpoch.current;
-                            void speech("stop").then((value) => {
-                              if (epoch === voiceEpoch.current) applyVoice(value);
+                            const epoch = ++voiceEpoch.current;
+                            voiceActive.current = false;
+                            void speech("cancel").then((value) => {
+                              if (epoch === voiceEpoch.current) setVoice(value);
                             });
                           }}
                         >
-                          {t("完成", "Done")}
+                          {t("取消", "Cancel")}
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        className={css.link}
-                        onClick={() => {
-                          const epoch = ++voiceEpoch.current;
-                          voiceActive.current = false;
-                          void speech("cancel").then((value) => {
-                            if (epoch === voiceEpoch.current) setVoice(value);
-                          });
-                        }}
-                      >
-                        {t("取消", "Cancel")}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-              {voiceMessage && <output>{voiceMessage}</output>}
-              <output
-                aria-live="polite"
-                aria-atomic="true"
-                className={saveStatus ? todayCss.saveStatus : css.sr}
-              >
-                {saveStatus}
-              </output>
-              {save && (
-                <button
-                  type="button"
-                  className={css.btn}
-                  disabled={!askText.trim()}
-                  onClick={() => save(askText)}
+                      </>
+                    )}
+                  </div>
+                )}
+                {voiceMessage && <output>{voiceMessage}</output>}
+                <output
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className={saveStatus ? todayCss.saveStatus : css.sr}
                 >
-                  {t("记下", "Save")}
-                </button>
-              )}
-              <button className={`${css.btn} ${css["btn-strong"]}`} type="submit" disabled={!askText.trim()}>
-                {t("去问问 →", "Ask →")}
-              </button>
+                  {saveStatus}
+                </output>
+                {save && (
+                  <button
+                    type="button"
+                    className={css.btn}
+                    disabled={!askText.trim()}
+                    onClick={() => save(askText)}
+                  >
+                    {t("记下", "Save")}
+                  </button>
+                )}
+                {canAsk && (
+                  <button
+                    className={css.link}
+                    type="button"
+                    disabled={!askText.trim()}
+                    onClick={() => ask(askText)}
+                  >
+                    {t("问问 →", "Ask →")}
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-          {askError && <p role="alert">{askError}</p>}
-        </form>
-      )}
+            {askError && <p role="alert">{askError}</p>}
+          </form>
+        )}
+        {home && (schedule || reviewLinks) && (
+          <aside className={todayCss.todayAside}>
+            {schedule}
+            {reviewLinks}
+          </aside>
+        )}
+      </div>
       {!home && !firstVisit && facts.length > 0 && (
         <div className={todayCss.mirror}>
           {[...paragraphs.values()].map((metrics) => {
@@ -640,132 +647,6 @@ export function LifeHome({
       )}
       {writing && capture}
     </section>
-  );
-}
-
-function Savepoint({
-  selected,
-  select,
-  data,
-  openProject,
-  openGoal,
-  begin,
-  library,
-  adopt,
-  dismiss,
-}: {
-  selected: number;
-  select: (index: number) => void;
-  data: import("@kaitu/core").HomeState;
-  openProject: (slug: string) => void;
-  openGoal?: (id: string) => void;
-  begin?: () => void;
-  library: () => void;
-  adopt: (id: string) => void;
-  dismiss: (id: string) => void;
-}) {
-  const t = useT();
-  const locale = useLocale();
-
-  const threads = data.data?.threads ?? [];
-  const thread = threads[Math.min(selected, Math.max(0, threads.length - 1))];
-  const traces = data.data?.traces ?? [];
-  const hasSide = traces.length > 0 || !!data.data?.pending.length;
-  return (
-    <div className={todayCss.savepointGrid} data-has-side={hasSide}>
-      <section id="home-savepoint" className={todayCss.continueSection}>
-        <div className={todayCss.sectionHeading}>
-          <h2>{t("接着上次", "Pick up where you left off")}</h2>
-          <button type="button" className={css.link} onClick={library}>
-            {t("查看全部", "View all")}
-          </button>
-        </div>
-        {thread ? (
-          [thread, ...threads.filter((item) => item.key !== thread.key)].slice(0, 2).map((item) => (
-            <article key={item.key} className={todayCss.continueCard} data-selected={item.key === thread.key}>
-              <span className={todayCss.projectSymbol} data-kind={item.kind} aria-hidden="true">
-                {item.kind === "learning" ? "▤" : item.kind === "goal" ? "◎" : "▧"}
-              </span>
-              <button
-                type="button"
-                className={todayCss.projectChoice}
-                onClick={() => select(threads.indexOf(item))}
-              >
-                <h3 title={item.title}>{item.title}</h3>
-                {(item.last || item.next) && (
-                  <p title={item.last?.text ?? item.next?.title}>
-                    {item.last ? t("上次：", "Last: ") : t("下一步：", "Next: ")}
-                    {item.last?.text ?? item.next?.title}
-                  </p>
-                )}
-              </button>
-              <button
-                type="button"
-                className={css.btn}
-                aria-label={t(`打开${item.title}`, `Open ${item.title}`)}
-                onClick={() =>
-                  item.kind === "project"
-                    ? openProject(item.id)
-                    : item.kind === "goal" && openGoal
-                      ? openGoal(item.id)
-                      : library()
-                }
-              >
-                →
-              </button>
-            </article>
-          ))
-        ) : (
-          <div className={todayCss.continueCard}>
-            <p>{data.loading ? t("正在读取…", "Loading…") : t("还没有项目", "No projects yet")}</p>
-            <button type="button" className={css.btn} onClick={begin ?? library}>
-              {begin ? t("开始", "Get started") : t("打开资料", "Open Library")}
-            </button>
-          </div>
-        )}
-        {data.error && <p role="alert">{data.error}</p>}
-      </section>
-      {hasSide && (
-        <aside className={todayCss.savepointSide}>
-          {traces.length > 0 && (
-            <section className={todayCss.savepointCard}>
-              <h3>{t("最近的痕迹", "Recent traces")}</h3>
-              <ol className={todayCss.traceList}>
-                {traces.slice(0, 3).map((trace) => (
-                  <li key={trace.key}>
-                    <span title={trace.label}>
-                      {trace.label}
-                      {trace.value !== null
-                        ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)} ${trace.unit ?? ""}`
-                        : ""}
-                    </span>
-                    <time dateTime={trace.date} title={trace.date}>
-                      {todayProjectDate(trace.date, data.data?.today ?? trace.date, locale)}
-                    </time>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
-          {!!data.data?.pending.length && (
-            <section className={todayCss.savepointCard}>
-              <h3>{t("待确认", "Pending")}</h3>
-              {data.data.pending.slice(0, 2).map((item) => (
-                <div key={item.id}>
-                  <p>{item.title}</p>
-                  <button type="button" className={css.btn} onClick={() => adopt(item.id)}>
-                    {t("采纳", "Adopt")}
-                  </button>
-                  <button type="button" className={css.link} onClick={() => dismiss(item.id)}>
-                    {t("略过", "Dismiss")}
-                  </button>
-                </div>
-              ))}
-            </section>
-          )}
-        </aside>
-      )}
-    </div>
   );
 }
 

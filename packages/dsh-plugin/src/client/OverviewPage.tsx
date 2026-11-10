@@ -5,6 +5,7 @@ import { KaituMark } from "./Brand.js";
 import { CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
+import { CommandPalette, type KaituCommand } from "./CommandPalette.js";
 import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
@@ -33,6 +34,7 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { WarningText } from "./ReadWarnings.js";
 import type { ResumeServices } from "./ResumeImport.js";
+import { createTodayBoardSession } from "./TodayBoard.js";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
@@ -45,6 +47,7 @@ import {
   migrateLifeMapFirst,
 } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
+import { cityKey } from "./life-map-visuals.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
 import type { RecordTarget } from "./progress-map.js";
@@ -84,6 +87,12 @@ export interface OverviewPageProps
   hosted?: boolean;
   navigation?: PanelNavigation;
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
+  completeHomeNext?: (
+    target: import("@kaitu/core").HomeNextTarget,
+    result: string,
+    operationId: string,
+  ) => Promise<import("@kaitu/core").HomeCompletion>;
+  undoHomeNext?: (token: string) => Promise<{ undone: boolean }>;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
   load: () => Promise<OverviewData>;
@@ -288,6 +297,10 @@ function Overview({
   }, [exploreEntries, firstExplore, pluginModules, setExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
+  const todaySession = useRef({ root: workspaceRoot, board: createTodayBoardSession() });
+  if (workspaceRoot && todaySession.current.root && todaySession.current.root !== workspaceRoot)
+    todaySession.current = { root: workspaceRoot, board: createTodayBoardSession() };
+  if (workspaceRoot) todaySession.current.root = workspaceRoot;
   const [exploreFacts, setExploreFacts] = useState<{
     root: string;
     hometown?: boolean;
@@ -495,6 +508,19 @@ function Overview({
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
+  const [commandCity, setCommandCity] = useState<string>();
+  const [commandCityRequest, setCommandCityRequest] = useState(0);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandsOpen((open) => !open);
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, []);
   const [handoverOpen, setHandoverOpen] = useState(false);
   useEffect(() => {
     if (handoverOpen) {
@@ -1031,6 +1057,118 @@ function Overview({
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
+  const commandCurrent =
+    homeState?.data?.steps?.find((step) => step.key === todaySession.current.board.read().selected) ??
+    homeState?.data?.steps?.[0] ??
+    homeState?.data?.threads.find((thread) => thread.next)?.next;
+  const commandActions: KaituCommand[] = [
+    {
+      id: "capture",
+      label: t("记一条", "Quick note"),
+      icon: "✎",
+      shortcut: "⌘N",
+      run: () => {
+        setView("overview");
+        setGuide(null);
+        requestAnimationFrame(() => document.getElementById("today-ask")?.focus());
+      },
+    },
+    ...(props.renderAsk
+      ? [
+          {
+            id: "ask",
+            label: commandCurrent
+              ? t(`问问「${commandCurrent.title}」`, `Ask about “${commandCurrent.title}”`)
+              : t("问问", "Ask"),
+            icon: "○",
+            shortcut: "⌘J",
+            run: () =>
+              commandCurrent
+                ? askNext({ title: commandCurrent.title, module: t("今天", "Today") })
+                : openInlineAsk(),
+          },
+        ]
+      : []),
+    ...(props.completeHomeNext &&
+    !todaySession.current.board.read().receipt &&
+    commandCurrent?.file &&
+    commandCurrent.precondition
+      ? [
+          {
+            id: "complete",
+            label: t(`完成「${commandCurrent.title}」`, `Complete “${commandCurrent.title}”`),
+            icon: "✓",
+            shortcut: "⌘↩",
+            run: () => {
+              setView("overview");
+              setGuide(null);
+              requestAnimationFrame(() => window.dispatchEvent(new Event("kaitu:complete-current")));
+            },
+          },
+        ]
+      : []),
+  ];
+  const loadCommands = async (): Promise<KaituCommand[]> => {
+    const values: KaituCommand[] = (homeState?.data?.threads ?? []).map((thread) => ({
+      id: thread.key,
+      label: thread.title,
+      detail:
+        thread.kind === "project"
+          ? t("项目", "Project")
+          : thread.kind === "goal"
+            ? t("方向", "Goal")
+            : t("笔记", "Note"),
+      run: () =>
+        thread.kind === "learning"
+          ? openCommandNote(thread.file)
+          : openTarget({ kind: thread.kind, id: thread.id }, "overview"),
+    }));
+    const [map, exploration, notes] = await Promise.allSettled([
+      props.loadLifeMap?.(),
+      props.loadExploration?.(),
+      props.loadLibrary({ section: "notes" }),
+    ]);
+    if (map.status === "fulfilled" && map.value) {
+      const places = new Map(
+        map.value.features.map((feature) => [cityKey(feature.properties.place), feature.properties.place]),
+      );
+      for (const [id, place] of places)
+        values.push({
+          id: `city:${id}`,
+          label: place.name,
+          detail: t("足迹", "Places"),
+          icon: "●",
+          run: () => {
+            setCommandCity(id);
+            setCommandCityRequest((request) => request + 1);
+            setExplore("footprints");
+            setView("explore");
+          },
+        });
+    }
+    if (exploration.status === "fulfilled" && exploration.value)
+      for (const item of exploration.value.directions)
+        values.push({
+          id: `direction:${item.id}`,
+          label: item.title,
+          detail: t("方向", "Direction"),
+          run: () => openTarget({ kind: "direction", id: item.id }),
+        });
+    if (notes.status === "fulfilled" && notes.value)
+      for (const item of notes.value.notes ?? [])
+        values.push({
+          id: `note:${item.file}`,
+          label: item.title,
+          detail: item.kind === "决定" ? t("决策", "Decision") : t("笔记", "Note"),
+          run: () => openCommandNote(item.file),
+        });
+    return values;
+  };
+  function openCommandNote(file: string) {
+    openRecord("notes");
+    setLearningTopic(file.startsWith("learning/") ? (file.split("/")[1] ?? "") : "");
+    setLibraryFile(file.startsWith("learning/") ? undefined : file);
+  }
   const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     "life-map":
@@ -1060,7 +1198,12 @@ function Overview({
         }}
       />
     ),
-    footprints: <MapPage {...child} />,
+    footprints: (
+      <MapPage
+        {...child}
+        {...(commandCity ? { initialCity: commandCity, initialCityRequest: commandCityRequest } : {})}
+      />
+    ),
     news: (
       <NewsPage
         {...child}
@@ -1193,6 +1336,16 @@ function Overview({
         <div className={css.tools}>
           <button
             type="button"
+            className={todayCss.commandTrigger}
+            aria-label={t("搜索或输入动作", "Search or enter an action")}
+            onClick={() => setCommandsOpen(true)}
+          >
+            <span aria-hidden="true">⌕</span>
+            <span>{t("搜索", "Search")}</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <button
+            type="button"
             className={css.settingsButton}
             aria-label={t("设置", "Settings")}
             aria-current={view === "settings" ? "page" : undefined}
@@ -1218,6 +1371,9 @@ function Overview({
           </button>
         </div>
       </header>
+      {commandsOpen && (
+        <CommandPalette actions={commandActions} load={loadCommands} close={() => setCommandsOpen(false)} />
+      )}
       <main
         className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? `${todayCss.page} ${props.loadHome ? css.todayContent : ""}` : ""}`}
       >
@@ -1301,6 +1457,81 @@ function Overview({
             <>
               <LifeHome
                 home={homeState}
+                session={todaySession.current.board}
+                complete={
+                  props.completeHomeNext
+                    ? async (target, result, operationId) => {
+                        const receipt = await props.completeHomeNext?.(target, result, operationId);
+                        if (!receipt)
+                          throw new Error(t("保存结果不明，请刷新", "Save status uncertain. Refresh"));
+                        void refresh();
+                        return receipt;
+                      }
+                    : undefined
+                }
+                undo={
+                  props.undoHomeNext
+                    ? async (token) => {
+                        const receipt = await props.undoHomeNext?.(token);
+                        if (!receipt)
+                          throw new Error(t("撤销结果不明，请刷新", "Undo status uncertain. Refresh"));
+                        void refresh();
+                        return receipt;
+                      }
+                    : undefined
+                }
+                schedule={
+                  data?.blocks.length ? (
+                    <section
+                      className={todayCss.scheduleCard}
+                      aria-label={t("今天的日程", "Today’s schedule")}
+                    >
+                      {data.blocks.map((block) => (
+                        <div key={block.id}>
+                          <time>{block.start?.slice(11, 16) || block.start}</time>
+                          <span>{block.title}</span>
+                          {block.status === "pending" && (
+                            <button
+                              type="button"
+                              className={css.btn}
+                              disabled={busy}
+                              onClick={() => void run(() => props.decideProposal(block.id, "confirmed"))}
+                            >
+                              {t("加入日历", "Add to calendar")}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  ) : undefined
+                }
+                reviewLinks={
+                  data && (data.inboxNotes > 0 || data.sync.mapNeedsReview > 0) ? (
+                    <section className={todayCss.scheduleCard}>
+                      {data.inboxNotes > 0 && (
+                        <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
+                          {t(`${data.inboxNotes} 条原文`, `${data.inboxNotes} originals`)} →
+                        </button>
+                      )}
+                      {data.sync.mapNeedsReview > 0 && (
+                        <button
+                          type="button"
+                          className={css.link}
+                          onClick={() => {
+                            setExplore("footprints");
+                            setView("explore");
+                          }}
+                        >
+                          {t(
+                            `足迹待确认 ${data.sync.mapNeedsReview}`,
+                            `${data.sync.mapNeedsReview} places to review`,
+                          )}{" "}
+                          →
+                        </button>
+                      )}
+                    </section>
+                  ) : undefined
+                }
                 data={homePresentation}
                 firstVisit={!!data?.empty && !onboarding?.hasUserData}
                 writing={captureOpen}
