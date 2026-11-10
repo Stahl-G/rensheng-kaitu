@@ -52,12 +52,22 @@ export function upsertGoal(
 }
 
 export function noteLine(notes: string, label: string): string {
-  return (
-    notes
-      .split("\n")
-      .find((line) => line.startsWith(`${label}：`))
-      ?.slice(label.length + 1) ?? ""
-  );
+  const lines = notes.split("\n");
+  const index = lines.findIndex((line) => line.startsWith(`${label}：`));
+  if (index < 0) return "";
+  const inline = lines[index]?.slice(label.length + 1) ?? "";
+  if (label !== "完成结果") return inline;
+  if (inline !== "") return inline.trim() ? inline : "";
+  let cursor = index + 1;
+  // New CommonMark blocks have a blank separator; retain the earlier candidate layout too.
+  if (lines[cursor] === "") cursor++;
+  const body: string[] = [];
+  while (lines[cursor]?.startsWith("    ")) {
+    body.push(lines[cursor]?.slice(4) ?? "");
+    cursor++;
+  }
+  const result = body.join("\n");
+  return result.trim() ? result : "";
 }
 
 /** 下一步属于哪个目标：备注里的目标编号优先，旧记录按目标原文对应。 */

@@ -13,6 +13,7 @@ import {
 } from "../src/index.js";
 import { applyPhoneActions } from "../src/phone-actions.js";
 import { phoneResults } from "../src/phone-results.js";
+import { noteLine, readPlans } from "../src/plans.js";
 import { readRecordRevisions } from "../src/records.js";
 import { ulid } from "../src/ulid.js";
 import { clonedWorkspace } from "./helpers.js";
@@ -570,4 +571,24 @@ it("reads and undoes already-persisted single-line task results from the prior c
   await deliver(reloaded, envelope("undo_next_result", { completion_id: action.client_id }));
   expect(phoneResults(reloaded)).toEqual([]);
   expect(readRecords(reloaded, "task").find((row) => row.id === id)?.status).toBe("open");
+});
+
+it("all shared task readers retain literal results, ignore blank results and preserve unrelated labels", async () => {
+  const { ws, action, id } = await setup("task", "First line\nSecond line");
+  await deliver(ws, action);
+  const tasks = readRecords(ws, "task");
+  const plans = readPlans({
+    goals: [{ id: "synthetic-direction", title: "Synthetic goal", status: "active" }],
+    records: { task: tasks },
+    projects: [],
+  });
+  expect(plans.goals[0]).toMatchObject({ results: 1, lastResult: "First line\nSecond line" });
+  const notes = String(tasks.find((row) => row.id === id)?.notes);
+  expect(noteLine(notes, "完成结果")).toBe("First line\nSecond line");
+  expect(
+    noteLine("完成结果：\n    Old first\n    Old second\n完成时间：2026-11-10T00:00:00Z\n", "完成结果"),
+  ).toBe("Old first\nOld second");
+  expect(noteLine("完成结果：   ", "完成结果")).toBe("");
+  expect(noteLine("完成结果：\n\n    \n       \n\n完成时间：2026-11-10T00:00:00Z\n", "完成结果")).toBe("");
+  expect(noteLine("目标编号：\n    Do not reinterpret this", "目标编号")).toBe("");
 });

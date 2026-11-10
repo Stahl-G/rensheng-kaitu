@@ -123,11 +123,11 @@ function literalText(text: string) {
     .join("\n");
 }
 function resultBlock(text: string, at: string) {
-  return `\n完成结果：\n${literalText(text)}\n完成时间：${at}\n`;
+  return `\n完成结果：\n\n${literalText(text)}\n\n完成时间：${at}\n`;
 }
 function notes(text: string, result: string, at: string) {
   const previous = text
-    .replace(/(?:^|\n)完成结果：\n(?: {4}[^\n]*\n)*完成时间：[^\n]*\n?/g, "")
+    .replace(/(?:^|\n)完成结果：\n(?:\n)?(?: {4}[^\n]*\n)*(?:\n)?完成时间：[^\n]*\n?/g, "")
     .replace(/(?:^|\n)完成(?:结果|时间)：[^\n]*/g, "")
     .trimEnd();
   return previous + resultBlock(result, at);
@@ -165,7 +165,7 @@ function prepare(ws: Workspace, action: Action): Completion {
   if (!before || before.status !== "todo" || !expected_next || !isDeepStrictEqual(before, expected_next))
     throw conflict();
   const after = { ...before, status: "done" as const };
-  const block = `\n### 完成结果 · ${at}\n操作：${action.client_id}\n事项：${encodeURIComponent(id)}\n你完成了：${before.title.replace(/[\r\n]+/g, " ")}\n结果：\n${literalText(text)}\n${eventComment({ op: "complete_next_result", client_id: action.client_id, id })}\n`;
+  const block = `\n### 完成结果 · ${at}\n操作：${action.client_id}\n事项：${encodeURIComponent(id)}\n你完成了：${before.title.replace(/[\r\n]+/g, " ")}\n结果：\n\n${literalText(text)}\n\n${eventComment({ op: "complete_next_result", client_id: action.client_id, id })}\n`;
   return {
     completion_id: action.client_id,
     id,
@@ -363,9 +363,10 @@ export function phoneResults(ws: Workspace): PhoneResult[] {
       }
       const current = tasks.get(value.id);
       const literal = resultBlock(value.text, value.completed_at);
+      const earlyLiteral = `\n完成结果：\n${literalText(value.text)}\n完成时间：${value.completed_at}\n`;
       const legacy = `\n完成结果：${value.text}\n完成时间：${value.completed_at}\n`;
       const written = String(value.change.after.notes ?? "");
-      const block = written.includes(literal) ? literal : written.includes(legacy) ? legacy : undefined;
+      const block = [literal, earlyLiteral, legacy].find((candidate) => written.includes(candidate));
       active =
         taskOwners.get(value.id)?.owner === value.completion_id &&
         current?.status === "done" &&

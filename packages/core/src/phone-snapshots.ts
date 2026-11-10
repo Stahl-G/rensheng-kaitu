@@ -33,7 +33,7 @@ export function phoneReadable(ws: Workspace) {
 }
 export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: string; spec: 1 };
 
-type Published = { resultContract: 2; since: number; generator: string; outputs: ProjectionManifest };
+type Published = { resultContract: 3; since: number; generator: string; outputs: ProjectionManifest };
 type PublishedCache = NonNullable<ReturnType<typeof readProjection<Published>>>;
 const published = new WeakMap<Workspace, PublishedCache>();
 
@@ -49,7 +49,7 @@ export function phoneSnapshotsCurrent(
     const hit = memory ?? readProjection<Published>(input, "phone", now, checks);
     if (
       hit &&
-      hit.value.resultContract === 2 &&
+      hit.value.resultContract === 3 &&
       hit.root === input.root &&
       hit.state === input.state &&
       hit.value.generator === JSON.stringify(generator ?? { kind: "computer" }) &&
@@ -182,7 +182,7 @@ export function publishPhoneSnapshots(
           ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
         );
         const value: Published = {
-          resultContract: 2,
+          resultContract: 3,
           since: now.getTime(),
           generator: JSON.stringify(generator ?? { kind: "computer" }),
           outputs: [...prepared.snapshots.map((item) => item.name), "receipts"].map((name) => {
