@@ -1,10 +1,10 @@
 .app {
-  --bg: #f7f5f0;
-  --surface: #fffdf8;
-  --sunken: #f4f1ea;
-  --control: #f1eee6;
-  --line: #e6e1d6;
-  --line-strong: #d5cfc1;
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --sunken: #eceff2;
+  --control: #e9edf2;
+  --line: #dfe4e8;
+  --line-strong: #c8cfd8;
   --ink: #20221f;
   --ink2: #595e56;
   --muted: #656b60;
@@ -16,10 +16,10 @@
   --primary-hover: #2e4263;
   --strong: #22324a;
   --on-strong: #f7f5f0;
-  --secondary: #fffdf8;
-  --secondary-line: #d5cfc1;
-  --ask: #f1eee6;
-  --ask-line: #e6e1d6;
+  --secondary: #ffffff;
+  --secondary-line: #c8cfd8;
+  --ask: #e9edf2;
+  --ask-line: #dfe4e8;
   --scrim: rgba(32, 34, 31, 0.42);
   --danger: #9b3a2e;
   --ok: #2e5d4a;
@@ -41,7 +41,7 @@
   --me: #9c5b73;
   --me-tint: #f3e8ec;
   --me-ink: #7a3f57;
-  --empty: #f1eee6;
+  --empty: #e9edf2;
   --map-land: #f1eee4;
   --map-sea: #e4eae3;
   --map-grid: #d5d9ce;
@@ -1678,4 +1678,46 @@
 .referenceApp .todayContent {
   padding: 6px 0 20px;
   gap: 16px;
+}
+
+.inlineAsk {
+  position: fixed;
+  inset: 88px 16px 16px auto;
+  z-index: 30;
+  width: min(560px, calc(100vw - 32px));
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px var(--scrim);
+  overflow: hidden;
+  container-type: inline-size;
+}
+.inlineAskHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.inlineAskHeader strong {
+  margin-right: auto;
+}
+@media (max-width: 760px) {
+  .inlineAsk {
+    inset: 128px 8px 8px auto;
+    width: calc(100vw - 16px);
+  }
+}
+
+.askLauncher {
+  position: fixed;
+  right: 24px;
+  bottom: 20px;
+  z-index: 20;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 4px 16px var(--link-line);
 }

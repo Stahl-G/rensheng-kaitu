@@ -250,6 +250,7 @@ test("plugin handoff returns to the same frame and retains an edited Ask draft",
       textarea.props.onChange({ target: { value: "还没有发送的补充问题" } });
     });
     await click(app, "← 返回合成插件");
+    expect(app.root.findByType(Draft).parent?.props.hidden).toBe(true);
     expect(app.root.findByType(ExplorePluginFrame)).toBe(frame);
     expect(frame.props.active).toBe(true);
     await navigate(app, "问问");
