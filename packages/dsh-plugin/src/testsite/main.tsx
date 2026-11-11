@@ -173,6 +173,7 @@ function App() {
             <div className={css.brand}>
               <KaituMark size={26} />
               <span>{t("开图", "Kaitu")}</span>
+              <small>{t("合成预览", "Demo preview")}</small>
             </div>
             <div className={preview.tools}>
               <a className={css.link} href={locale === "en" ? "/en/" : "/"}>

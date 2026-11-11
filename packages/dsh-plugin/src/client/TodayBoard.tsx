@@ -370,6 +370,16 @@ export function TodayBoard({
       {decisions && (
         <TaskSuggestions key={decisions.root} pending={data.data?.pending ?? []} services={decisions} />
       )}
+      {!decisions && !!data.data?.pending.length && (
+        <section className={styles.stepList} aria-label={t("建议", "Suggestions")}>
+          {data.data.pending.map((item) => (
+            <div className={styles.stepRow} key={item.id}>
+              <span className={styles.stepTitle}>{item.title}</span>
+              <small>{t("待处理", "Pending")}</small>
+            </div>
+          ))}
+        </section>
+      )}
       {threads.length > 0 && (
         <section className={styles.threadLinks} aria-label={t("接着上次", "Continue")}>
           {threads.slice(0, 3).map((thread) => (
