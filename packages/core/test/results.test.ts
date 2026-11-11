@@ -3,9 +3,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { normalizeStatus } from "../src/doc-input.js";
 import { parseFrontmatter, stringifyFrontmatter } from "../src/frontmatter.js";
 import {
+  KaituError,
   Workspace,
   addRecord,
+  adoptTask,
   buildPhoneToday,
+  cancelTask,
   readOverviewPage,
   readRecordRevisions,
   readRecords,
@@ -145,9 +148,17 @@ it("shares task and STATUS results, counts local activity dates, preserves compl
   expect(partial.results.find((row) => row.id === first.id)?.by).toBe("unknown");
   expect(partial.resultActivityDays).toBe(1); // STATUS date remains visible; incomplete task provenance is not a user claim.
   expect(schemas().builtin("phone-today.schema.json")(partialPhone)).toBe(true);
+  expect(() => buildPhoneToday(partial, "2026-11-11T01:00:00Z", ws, { strict: true })).toThrow();
+
+  const corruptRestore = request("restore_task_revision", { id: first.id, expected_rev: 3, prior_rev: 1 });
   await expect(
-    applyResultAction(ws, request("restore_task_revision", { id: first.id, expected_rev: 3, prior_rev: 1 })),
+    applyPhoneActions(
+      ws,
+      "corrupt.actions.jsonl",
+      JSON.stringify({ ...corruptRestore, device: "3fa9c1d2", at: new Date().toISOString() }),
+    ),
   ).rejects.toMatchObject({ code: "CORRUPT" });
+  expect(phoneReceipts(ws).some((row) => row.ref === corruptRestore.client_id)).toBe(false);
 });
 
 it("restores stored revisions by CAS, preserves history, and never replays an original completion after undo", async () => {
@@ -317,6 +328,39 @@ it("recovers task writes and lost receipts with the original ID; adopts/cancels 
     status: "duplicate",
     effect: { rev: 2, prior_rev: 1 },
   });
+
+  const uncertain = addRecord(
+    ws,
+    "task",
+    { title: "Unknown append outcome", status: "open" },
+    { by: "user" },
+  );
+  const unknownAction = request("complete_next_result", {
+    file: "task",
+    id: uncertain.record.id,
+    expected_rev: 1,
+    result_text: "Written before failure",
+  });
+  const unknownPayload = JSON.stringify({
+    ...unknownAction,
+    device: "3fa9c1d2",
+    at: new Date().toISOString(),
+  });
+  const append = ws.appendLine.bind(ws);
+  const unavailable = vi.spyOn(ws, "appendLine").mockImplementation((file, line) => {
+    append(file, line);
+    if (file === uncertain.file)
+      throw new KaituError("Synthetic source unavailable after append", "CLOUD_UNAVAILABLE");
+  });
+  await expect(applyPhoneActions(ws, "unknown.actions.jsonl", unknownPayload)).rejects.toMatchObject({
+    code: "CLOUD_UNAVAILABLE",
+  });
+  unavailable.mockRestore();
+  expect(phoneReceipts(ws).some((row) => row.ref === unknownAction.client_id)).toBe(false);
+  expect(readRecordRevisions(ws, "task").filter((row) => row.id === uncertain.record.id)).toHaveLength(2);
+  await applyPhoneActions(new Workspace(ws.root), "unknown.actions.jsonl", unknownPayload);
+  expect(phoneReceipts(ws).find((row) => row.ref === unknownAction.client_id)?.status).toBe("applied");
+  expect(readRecordRevisions(ws, "task").filter((row) => row.id === uncertain.record.id)).toHaveLength(2);
   const proposal = task(ws, "agent");
   await expect(
     applyResultAction(ws, request("adopt_task", { id: proposal.id, expected_rev: 2 })),
@@ -330,6 +374,31 @@ it("recovers task writes and lost receipts with the original ID; adopts/cancels 
   const declined = task(ws, "agent");
   await applyResultAction(ws, request("cancel_task", { id: declined.id, expected_rev: 1 }));
   expect(readRecords(ws, "task").find((row) => row.id === declined.id)?.status).toBe("cancelled");
+
+  for (const operation of ["adopt", "cancel"] as const) {
+    const concurrent = addRecord(
+      ws,
+      "task",
+      { title: `Concurrent ${operation}`, status: "open" },
+      { by: operation === "adopt" ? "agent" : "user" },
+    );
+    const check = ws.assertDownloaded.bind(ws);
+    const interleave = vi.spyOn(ws, "assertDownloaded").mockImplementationOnce((path) => {
+      check(path);
+      ws.appendLine(
+        concurrent.file,
+        JSON.stringify({ ...concurrent.record, rev: 2, by: "user", status: "done" }),
+      );
+    });
+    await expect(
+      operation === "adopt" ? adoptTask(ws, concurrent.record.id, 1) : cancelTask(ws, concurrent.record.id),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    interleave.mockRestore();
+    expect(readRecords(ws, "task").find((row) => row.id === concurrent.record.id)).toMatchObject({
+      status: "done",
+      rev: 2,
+    });
+  }
   const conflicted = addRecord(ws, "task", { title: "First writer", status: "open" }, { by: "user" });
   updateRecord(ws, "task", conflicted.record.id, { title: "Revision two" }, { by: "user" });
   ws.appendLine(conflicted.file, JSON.stringify({ ...conflicted.record, title: "Other first revision" }));

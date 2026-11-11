@@ -42,7 +42,12 @@ function nutrition(ws: Workspace, data: Overview) {
   };
 }
 
-export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspace) {
+export function buildPhoneToday(
+  data: Overview,
+  generatedAt: string,
+  ws: Workspace,
+  options: { strict?: boolean } = {},
+) {
   const food = nutrition(ws, data);
   const hasTasks = listRecordTypes(ws).some((ref) => ref.type === "task");
   const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
@@ -84,17 +89,18 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
             "replace_memory",
           ]
         : ["complete_next_result", "restore_next", "complete_next", "capture_memory", "replace_memory"],
-      tasks: (hasTasks ? listTasks(ws, { status: "all", onError: () => {} }) : []).map(
-        ({ id, rev, title, status, ts, due, source }) => ({
-          id,
-          rev: rev ?? 1,
-          title,
-          status,
-          ts,
-          ...(due ? { due } : {}),
-          ...(source ? { source } : {}),
-        }),
-      ),
+      tasks: (hasTasks
+        ? listTasks(ws, { status: "all", onError: options.strict ? undefined : () => {} })
+        : []
+      ).map(({ id, rev, title, status, ts, due, source }) => ({
+        id,
+        rev: rev ?? 1,
+        title,
+        status,
+        ts,
+        ...(due ? { due } : {}),
+        ...(source ? { source } : {}),
+      })),
     },
     next: data.next.slice(0, 3).map(({ id, title, file, module, section, proposed }) => ({
       id,

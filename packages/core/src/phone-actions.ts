@@ -150,7 +150,12 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
         receipt.effect = result.effect;
         if ("rev" in result.effect) receipt.target = { id: result.effect.id, rev: result.effect.rev };
       } catch (error) {
-        if (!(error instanceof KaituError)) throw error;
+        // I/O/read failures can happen after the append. Keep the original request unconfirmed.
+        if (
+          !(error instanceof KaituError) ||
+          !["CONFLICT", "BAD_ARGS", "INVALID_RECORD", "INVALID_DOCUMENT"].includes(error.code)
+        )
+          throw error;
         receipt.status = error.code === "BAD_ARGS" ? "rejected" : "conflict";
         receipt.message = error.message;
       }

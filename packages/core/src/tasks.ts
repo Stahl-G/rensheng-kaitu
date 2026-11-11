@@ -91,7 +91,13 @@ export async function adoptTask(ws: Workspace, id: string, expected_rev?: number
     throw new KaituError("待办已更新，请刷新 / Task changed; refresh", "CONFLICT");
   if (task.status === "open" && expected_rev === undefined) return { record: task, version: null };
   if (task.status !== "proposed") throw new KaituError("待办已处理，请刷新", "CONFLICT");
-  const result = updateRecord(ws, "task", id, { status: "open" }, { by: "user" });
+  const result = updateRecord(
+    ws,
+    "task",
+    id,
+    { status: "open" },
+    { by: "user", expected_revision: expected_rev ?? task.rev ?? 1 },
+  );
   return { ...result, version: await snapshot(ws, `你采纳了待办：${task.title}`) };
 }
 
@@ -99,7 +105,13 @@ async function setTaskStatus(ws: Workspace, id: string, status: TaskStatus, opti
   const task = listTasks(ws, { status: "all" }).find((task) => task.id === id);
   if (!task || (task.status !== "open" && !(status === "cancelled" && task.status === "proposed")))
     throw new KaituError("待办已处理，请刷新 / Task already handled; refresh", "CONFLICT");
-  const result = updateRecord(ws, "task", id, { status }, { ...options, by: options.by ?? "user" });
+  const result = updateRecord(
+    ws,
+    "task",
+    id,
+    { status },
+    { ...options, by: options.by ?? "user", expected_revision: options.expected_revision ?? task.rev ?? 1 },
+  );
   const action = status === "done" ? "完成" : "取消";
   const version = await snapshot(ws, `${options.actor ?? "你"}${action}了待办：${result.record.title}`);
   return { ...result, version };

@@ -109,12 +109,14 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 - `restore_task_revision`：args `{id,expected_rev,prior_rev}`，仅在当前修订匹配时，把已有旧修订的内容追加为 rev+1，不重写历史。
 - `restore_next`：args `{file,id,expected_next,prior_next}`，只在当前目标条目完整等于 expected_next 时恢复 prior_next；其他条目、未知字段和正文保留。独立修改目标条目返回 conflict。
 
-成功/重复回执含 `effect`。task 为 `{file:"task",id,rev,prior_rev}`，STATUS 为 `{file,id,expected_next,prior_next}`。短时撤销提示把 effect 转成上面的恢复动作，分配新的 client_id。该回执不是永久撤销列表，mobile.results 不提供历史撤销。I/O 结果未知保留本机持久请求与写前计划，重启重投原 ID；已写修订不再追加，已撤销操作不重放。STATUS 的前提是数据精确值，未知写入尚未沿原 ID 核清，外部工具就恢复为相同旧值的 ABA 无法从两个业务字段识别，不声称有来源所有权。
+成功/重复回执含 `effect`。task 为 `{file:"task",id,rev,prior_rev}`，STATUS 为 `{file,id,expected_next,prior_next}`。短时撤销提示把 effect 转成上面的恢复动作，分配新的 client_id。该回执不是永久撤销列表，mobile.results 不提供历史撤销。CLOUD_UNAVAILABLE、CORRUPT 等读取/存储故障不产生终态 conflict 回执；原文件与原 ID 保持未确认，修复后重试。I/O 结果未知保留本机持久请求与写前计划，重启重投原 ID；已写修订不再追加，已撤销操作不重放。STATUS 的前提是数据精确值，未知写入尚未沿原 ID 核清，外部工具就恢复为相同旧值的 ABA 无法从两个业务字段识别，不声称有来源所有权。
 
 例：`{"client_id":"01K00000000000000000000001","at":"2026-11-11T08:00:00Z","device":"3fa9c1d2","op":"complete_next_result","args":{"file":"task","id":"01K00000000000000000000002","expected_rev":1,"result_text":"完成初稿"}}`。
 回执 effect `{file:"task",id:"01K00000000000000000000002",rev:2,prior_rev:1}` 对应恢复 args `{id:"01K00000000000000000000002",expected_rev:2,prior_rev:1}`。
 
 任务继续用 notes 中的「完成结果：」「完成时间：」，来源链接与旧多行内容保留。STATUS 的 next 条目只增加可选 `result` 与 `completed`；completed 取名参考 [RFC 5545 §3.8.2.1 COMPLETED](https://www.rfc-editor.org/rfc/rfc5545#section-3.8.2.1)，存带时区的 ISO 8601；结果没有对应的专用 iCalendar 属性，采用普通 result。正文不增加机器块或 HTML 注释。
+
+只读总览按既有 warning 机制保留损坏任务文件里的可读行；历史不完整时不推断任务完成来源。发布 phone/today.json 仍严格核对源数据，损坏时保留上一份完整快照，不把部分数据覆盖成已同步。
 
 core 的 collectResults / resultActivityDays 同时给桌面 overview.results/resultActivityDays 和 phone.today.mobile.results/activity_days 提供数据，不依赖手机操作账本。只列当前有效非空完成结果，恢复为未完成后移出列表但历史仍在。按工作区本地时区，含今天的七个自然日去重；同日两条结果是两行、一天。task 追溯本次完成的修订来源，后续改标题/到期日不丢结果或把 Agent 完成升级成用户完成；任务旧结果缺有效带时区完成时间时保留原 notes 原文，不进入有日期的结果集合或七天日期。STATUS 显式 result+completed 计入日期，但没有作者字段，无法区分 AI 写入的显式结果，不能宣称排除了全部 AI 结果。
 
