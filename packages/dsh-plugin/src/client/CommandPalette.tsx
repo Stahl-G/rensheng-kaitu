@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import styles from "./CommandPalette.module.css";
 import { useT } from "./i18n.js";
 export interface KaituCommand {
@@ -21,6 +21,7 @@ export function CommandPalette({
   const t = useT();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const activeOption = useRef<HTMLButtonElement>(null);
   const id = useId();
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<KaituCommand[]>([]);
@@ -80,6 +81,16 @@ export function CommandPalette({
     .filter((item) => `${item.label} ${item.detail ?? ""}`.toLocaleLowerCase().includes(needle))
     .slice(0, 60);
   const active = Math.min(selected, Math.max(0, results.length - 1));
+  useLayoutEffect(() => {
+    const option = activeOption.current;
+    const list = option?.parentElement;
+    if (!option || !list) return;
+    const bounds = option.getBoundingClientRect();
+    const top = list.getBoundingClientRect().top + list.clientTop;
+    const bottom = top + list.clientHeight;
+    if (bounds.top < top) list.scrollTop -= top - bounds.top;
+    else if (bounds.bottom > bottom) list.scrollTop += bounds.bottom - bottom;
+  });
   const incomplete = failed || failedSources.length > 0;
   const activate = (item: KaituCommand) => {
     dismiss();
@@ -181,6 +192,7 @@ export function CommandPalette({
         {results.slice(0, 60).map((item, index) => (
           <button
             key={item.id}
+            ref={index === active ? activeOption : null}
             id={`${id}-${index}`}
             type="button"
             // biome-ignore lint/a11y/useSemanticElements: Native command buttons inside virtual-focus listbox.

@@ -156,6 +156,123 @@ test("command panel filters real records, uses keyboard selection and leaves act
   }
 });
 
+test("command keyboard navigation keeps the active result visible without moving input focus", async () => {
+  const document = { activeElement: null as unknown };
+  vi.stubGlobal("document", document);
+  const input = {
+    focus: () => {
+      document.activeElement = input;
+    },
+  };
+  const items = Array.from({ length: 35 }, (_, index) => ({
+    id: `note:${index}`,
+    label: `Record ${String(index).padStart(2, "0")}`,
+    run: vi.fn(),
+  }));
+  let finish!: (result: CommandLoadResult) => void;
+  const load = vi
+    .fn()
+    .mockResolvedValueOnce({ items, failedSources: ["Notes"] })
+    .mockImplementationOnce(
+      () =>
+        new Promise<CommandLoadResult>((resolve) => {
+          finish = resolve;
+        }),
+    )
+    .mockResolvedValueOnce({ items: items.slice(0, 3), failedSources: [] });
+  let app!: ReturnType<typeof create>;
+  const options = () => app?.root.findAllByProps({ role: "option" }) ?? [];
+  let scrollTop = 0;
+  const list = {
+    clientTop: 0,
+    clientHeight: 240,
+    getBoundingClientRect: () => ({ top: 100 }),
+    get scrollTop() {
+      return scrollTop;
+    },
+    set scrollTop(value: number) {
+      scrollTop = Math.max(0, Math.min(value, options().length * 40 - list.clientHeight));
+    },
+  };
+  const measured = vi.fn();
+  const props = { actions: [], load, close: vi.fn() };
+  const key = async (key: string) =>
+    act(async () =>
+      app?.root.findByType("dialog").props.onKeyDown({
+        key,
+        target: input,
+        nativeEvent: {},
+        preventDefault: vi.fn(),
+      }),
+    );
+  const query = async (value: string) =>
+    act(async () => app?.root.findByType("input").props.onChange({ target: { value } }));
+  const visible = (label: string) => {
+    const selected = options().find((option) => option.props["aria-selected"]);
+    expect(selected?.findAllByType("span")[1]?.children).toEqual([label]);
+    expect(app?.root.findByType("input").props["aria-activedescendant"]).toBe(selected?.props.id);
+    const top = 100 + options().findIndex((option) => option === selected) * 40 - list.scrollTop;
+    expect(top).toBeGreaterThanOrEqual(100);
+    expect(top + 40).toBeLessThanOrEqual(100 + list.clientHeight);
+    expect(measured).toHaveBeenLastCalledWith(label);
+    expect(document.activeElement).toBe(input);
+  };
+  try {
+    await act(async () => {
+      app = create(createElement(CommandPalette, props), {
+        createNodeMock: (element) => {
+          if (element.type === "input") return input;
+          if (element.props.role !== "option") return null;
+          const label = element.props.children[1].props.children;
+          const node = {
+            parentElement: list,
+            focus: () => {
+              document.activeElement = node;
+            },
+            getBoundingClientRect: () => {
+              measured(label);
+              const index = options().findIndex((option) => option.props.id === element.props.id);
+              const top = 100 + Math.max(0, index) * 40 - list.scrollTop;
+              return { top, bottom: top + 40 };
+            },
+          };
+          return node;
+        },
+      });
+    });
+    for (let index = 0; index < 15; index++) await key("ArrowDown");
+    visible("Record 15");
+    expect(list.scrollTop).toBe(400);
+    await key("ArrowUp");
+    visible("Record 14");
+    await query("Record 34");
+    visible("Record 34");
+    expect(list.scrollTop).toBe(0);
+    await query("");
+    await key("ArrowUp");
+    visible("Record 34");
+    await key("ArrowDown");
+    visible("Record 00");
+    await query("Record");
+    for (let index = 0; index < 15; index++) await key("ArrowDown");
+    await act(async () => app?.root.findByProps({ role: "alert" }).findByType("button").props.onClick());
+    list.scrollTop = 0;
+    await act(async () => finish({ items: items.toReversed(), failedSources: ["Notes"] }));
+    visible("Record 19");
+    expect(app.root.findByType("input").props.value).toBe("Record");
+    await act(async () => app?.root.findByProps({ role: "alert" }).findByType("button").props.onClick());
+    visible("Record 02");
+    expect(app.root.findAllByProps({ role: "alert" })).toHaveLength(0);
+    await query("Missing");
+    await key("ArrowDown");
+    await key("ArrowUp");
+    expect(options()).toHaveLength(0);
+    expect(document.activeElement).toBe(input);
+  } finally {
+    await act(async () => app?.unmount());
+  }
+});
+
 test("command load throws and rejections are retryable, retain the query and use the latest loader only once", async () => {
   vi.stubGlobal("document", { activeElement: null });
   const capture = vi.fn();
