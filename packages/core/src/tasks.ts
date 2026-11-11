@@ -36,12 +36,12 @@ function dueDay(due: string, timeZone: string): string {
 
 export function listTasks(
   ws: Workspace,
-  options: { status?: TaskStatus | "all"; dueBefore?: string } = {},
+  options: { status?: TaskStatus | "all"; dueBefore?: string; onError?: (error: KaituError) => void } = {},
 ): Task[] {
   const status = options.status ?? "open";
   const bound = options.dueBefore;
   const zone = ws.timeZone();
-  return (readRecords(ws, "task") as Task[]).filter((task) => {
+  return (readRecords(ws, "task", { onError: options.onError }) as Task[]).filter((task) => {
     if (status !== "all" && task.status !== status) return false;
     if (!bound) return true;
     if (!task.due) return false;

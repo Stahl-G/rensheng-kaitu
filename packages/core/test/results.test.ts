@@ -131,6 +131,23 @@ it("shares task and STATUS results, counts local activity dates, preserves compl
   const phone = buildPhoneToday(overview, "2026-11-11T01:00:00Z", ws);
   expect(phone.mobile.results.some((row) => row.id === undated.id)).toBe(false);
   expect(schemas().builtin("phone-today.schema.json")(phone)).toBe(true);
+  const badFile = addRecord(
+    ws,
+    "task",
+    { title: "Readable beside corrupt line", status: "open" },
+    { by: "user" },
+  ).file;
+  ws.appendLine(badFile, "{ broken JSON");
+  const partial = await readOverviewPage(ws, new Date("2026-11-11T01:00:00Z"));
+  const partialPhone = buildPhoneToday(partial, "2026-11-11T01:00:00Z", ws);
+  expect(partial.warnings.length).toBeGreaterThan(0);
+  expect(partialPhone.mobile.tasks.some((row) => row.title === "Readable beside corrupt line")).toBe(true);
+  expect(partial.results.find((row) => row.id === first.id)?.by).toBe("unknown");
+  expect(partial.resultActivityDays).toBe(1); // STATUS date remains visible; incomplete task provenance is not a user claim.
+  expect(schemas().builtin("phone-today.schema.json")(partialPhone)).toBe(true);
+  await expect(
+    applyResultAction(ws, request("restore_task_revision", { id: first.id, expected_rev: 3, prior_rev: 1 })),
+  ).rejects.toMatchObject({ code: "CORRUPT" });
 });
 
 it("restores stored revisions by CAS, preserves history, and never replays an original completion after undo", async () => {
@@ -254,6 +271,13 @@ it("rejects new multiline without losing content, accepts blank completion, and 
     JSON.stringify({ ...action, device: "3fa9c1d2", at: new Date().toISOString() }),
   );
   expect(phoneReceipts(ws).find((row) => row.ref === action.client_id)?.status).toBe("rejected");
+  await applyPhoneActions(
+    new Workspace(ws.root),
+    "synthetic.actions.jsonl",
+    JSON.stringify({ ...action, device: "3fa9c1d2", at: new Date().toISOString() }),
+  );
+  expect(phoneReceipts(ws).find((row) => row.ref === action.client_id)?.status).toBe("rejected");
+
   expect(readRecords(ws, "task")[0]).toEqual(original);
   await applyResultAction(
     ws,
