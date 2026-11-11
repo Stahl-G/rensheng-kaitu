@@ -1,5 +1,5 @@
 import { rmSync } from "node:fs";
-import { readCalendar, readHome, readHomeSources, readOverviewPage } from "@kaitu/core";
+import { type ReadWarning, readCalendar, readHome, readHomeSources, readOverviewPage } from "@kaitu/core";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
@@ -42,6 +42,9 @@ test("command search keeps working sources executable and retries incomplete rea
   browserGlobals();
   const ws = await freshWorkspace();
   let overview = await readOverviewPage(ws);
+  let readWarnings: ReadWarning[] = [
+    { code: "invalid_record", location: "synthetic-unreadable", message: "Synthetic unreadable record" },
+  ];
   const loadLifeMap = vi
     .fn()
     .mockImplementationOnce(() => {
@@ -49,6 +52,7 @@ test("command search keeps working sources executable and retries incomplete rea
     })
     .mockRejectedValueOnce(new Error("Still unavailable"))
     .mockRejectedValueOnce(new Error("Still unavailable"))
+    .mockResolvedValueOnce({ features: [], warnings: readWarnings })
     .mockResolvedValue({ features: [] });
   let note = { file: "notes/synthetic.md", title: "Synthetic searchable note", kind: "笔记" };
   const listeners = new Set<() => void>();
@@ -62,8 +66,8 @@ test("command search keeps working sources executable and retries incomplete rea
     loadOnboarding: async () => ({ showGuide: false }),
     loadCalendarPush: async () => ({}),
     loadProjects: async () => [],
-    loadExploration: async () => ({ directions: [] }),
-    loadLibrary: async () => ({ inbox: [], notes: [note] }),
+    loadExploration: async () => ({ directions: [], warnings: readWarnings }),
+    loadLibrary: async () => ({ inbox: [], notes: [note], warnings: readWarnings }),
     loadLibraryDocument,
     loadLifeMap,
     subscribe: (listener: () => void) => {
@@ -84,7 +88,8 @@ test("command search keeps working sources executable and retries incomplete rea
     const query = (value: string) => panel().findByType("input").props.onChange({ target: { value } });
     const retry = () => panel().findByProps({ role: "alert" }).findByType("button");
     await act(async () => open());
-    expect(panel().findByProps({ role: "alert" }).findByType("span").children.join("")).toContain("足迹");
+    const failedSources = panel().findByProps({ role: "alert" }).findByType("span").children.join("");
+    for (const source of ["足迹", "方向", "笔记与决策"]) expect(failedSources).toContain(source);
     await act(async () => query("Synthetic"));
     expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
     await act(async () => panel().findByProps({ role: "option" }).props.onClick());
@@ -103,6 +108,12 @@ test("command search keeps working sources executable and retries incomplete rea
     expect(panel().findByType("input").props.value).toBe("unmatched search");
     await act(async () => retry().props.onClick());
     expect(loadLifeMap).toHaveBeenCalledTimes(4);
+    expect(panel().findByProps({ role: "alert" }).findByType("span").children.join("")).toContain("足迹");
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(0);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    readWarnings = [];
+    await act(async () => retry().props.onClick());
+    expect(loadLifeMap).toHaveBeenCalledTimes(5);
     expect(panel().findAllByProps({ role: "alert" })).toHaveLength(0);
     expect(panel().findByType("input").props.value).toBe("unmatched search");
     expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(1);

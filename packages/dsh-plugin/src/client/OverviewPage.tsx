@@ -1246,9 +1246,13 @@ function Overview({
     return {
       items: values,
       failedSources: [
-        ...(map.status === "rejected" ? [t("足迹", "Places")] : []),
-        ...(exploration.status === "rejected" ? [t("方向", "Directions")] : []),
-        ...(notes.status === "rejected" ? [t("笔记与决策", "Notes and decisions")] : []),
+        ...(map.status === "rejected" || map.value?.warnings?.length ? [t("足迹", "Places")] : []),
+        ...(exploration.status === "rejected" || exploration.value?.warnings?.length
+          ? [t("方向", "Directions")]
+          : []),
+        ...(notes.status === "rejected" || notes.value?.warnings?.length
+          ? [t("笔记与决策", "Notes and decisions")]
+          : []),
       ],
     };
   };
