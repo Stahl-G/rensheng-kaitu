@@ -93,6 +93,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
     if (
       r.kind === "action" &&
       !r.effect &&
+      !hasResultAction(ws, r.ref) &&
       !seen[r.ref]?.status &&
       !seen[r.ref]?.memory &&
       !seen[r.ref]?.task &&

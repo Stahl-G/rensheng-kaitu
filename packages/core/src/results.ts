@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { normalizeStatus } from "./doc-input.js";
-import { KaituError } from "./errors.js";
+import { KaituError, readWarning } from "./errors.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { snapshot } from "./history.js";
 import { listRecordTypes } from "./modules.js";
@@ -118,6 +118,12 @@ function statusDocument(ws: Workspace, file: string) {
 }
 function prepare(ws: Workspace, request: ResultRequest, at: string): Change {
   const { op, args } = request;
+  if (
+    !["complete_next_result", "restore_task_revision", "restore_next", "adopt_task", "cancel_task"].includes(
+      op,
+    )
+  )
+    throw new KaituError("不支持的操作 / Unsupported action", "BAD_ARGS");
   if (op === "restore_next" || (op === "complete_next_result" && args.file !== "task")) {
     if (!args.file || !args.expected_next) throw conflict();
     const before = statusDocument(ws, args.file).next.find((entry) => entry.id === args.id);
@@ -256,10 +262,29 @@ export interface ResultRow {
 /** Active results, not a transport ledger or undo history. Ordinary later edits retain completion provenance. */
 export function collectResults(
   ws: Workspace,
-  loaded?: Pick<WorkbenchData, "records" | "statuses">,
+  loaded?: Pick<WorkbenchData, "records" | "statuses"> & Partial<Pick<WorkbenchData, "warnings">>,
 ): ResultRow[] {
   const hasTasks = loaded ? !!loaded.records.task : listRecordTypes(ws).some((ref) => ref.type === "task");
-  const rows = hasTasks ? readRecordRevisions(ws, "task") : [];
+  let incompleteHistory = false;
+  const rows = hasTasks
+    ? readRecordRevisions(
+        ws,
+        "task",
+        loaded
+          ? {
+              onError: (error) => {
+                incompleteHistory = true;
+                const warning = readWarning(error);
+                if (
+                  loaded.warnings &&
+                  !loaded.warnings.some((item) => JSON.stringify(item) === JSON.stringify(warning))
+                )
+                  loaded.warnings.push(warning);
+              },
+            }
+          : {},
+      )
+    : [];
   const revisions = new Map<string, StoredRecord[]>();
   for (const row of rows) {
     const own = revisions.get(row.id) ?? [];
@@ -289,7 +314,7 @@ export function collectResults(
       title: String(task.title),
       text: result.text,
       completed_at: at,
-      by: completion.by === "user" ? "user" : "agent",
+      by: incompleteHistory ? "unknown" : completion.by === "user" ? "user" : "agent",
       rev: rev(task),
       ...(typeof task.source === "string" ? { source: task.source } : {}),
     });
@@ -334,7 +359,12 @@ export function resultActivityDays(results: ResultRow[], timeZone: string, now =
   const firstDay = from.toISOString().slice(0, 10);
   return new Set(
     results
-      .filter((row) => row.by !== "agent" && row.text.trim() && Date.parse(row.completed_at) <= now.getTime())
+      .filter(
+        (row) =>
+          (row.by === "user" || (row.by === "unknown" && row.file !== "task")) &&
+          row.text.trim() &&
+          Date.parse(row.completed_at) <= now.getTime(),
+      )
       .map((row) => localDate(new Date(row.completed_at), timeZone))
       .filter((day) => day >= firstDay && day <= today),
   ).size;

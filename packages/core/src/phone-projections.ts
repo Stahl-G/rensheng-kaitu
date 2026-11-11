@@ -84,7 +84,7 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
             "replace_memory",
           ]
         : ["complete_next_result", "restore_next", "complete_next", "capture_memory", "replace_memory"],
-      tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
+      tasks: (hasTasks ? listTasks(ws, { status: "all", onError: () => {} }) : []).map(
         ({ id, rev, title, status, ts, due, source }) => ({
           id,
           rev: rev ?? 1,
