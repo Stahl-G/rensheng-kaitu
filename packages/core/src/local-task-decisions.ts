@@ -116,7 +116,8 @@ export function submitLocalTaskDecision(
       const decisionId = request.args.decision_id;
       const original = local.requests.find((item) => item.action.client_id === decisionId)?.action;
       if (original && "id" in original.args) return `${original.args.file}:${original.args.id}`;
-      const decision = (decisions ??= taskDecisions(ws)).find((item) => item.decision_id === decisionId);
+      if (!decisions) decisions = taskDecisions(ws);
+      const decision = decisions.find((item) => item.decision_id === decisionId);
       return decision ? `${decision.file}:${decision.id}` : null;
     };
     const pending = local.requests.filter((item) => !item.receipt);
