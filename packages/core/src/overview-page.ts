@@ -384,7 +384,13 @@ export async function readOverviewPage(
       !data.inboxNotes,
     proposedTasks: (data.records.task ?? [])
       .filter((task) => task.status === "proposed")
-      .map(({ id, title }) => ({ id, title: String(title) })),
+      .map(({ id, title, rev, ts, source }) => ({
+        id,
+        title: String(title),
+        rev: rev ?? 1,
+        source: typeof source === "string" ? source : null,
+        file: recordFileFor(findRecordType(ws, "task"), localMonth(parseTs(ts), data.timeZone)),
+      })),
     blocks: status.now.blocks,
     next: allNext.slice(0, 3),
     allNext,

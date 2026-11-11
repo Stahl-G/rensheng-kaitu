@@ -335,6 +335,25 @@ function fileRevisions(
   return parsed.rows;
 }
 
+/** Cached revisions with their actual source file; callers must not infer identity from id alone. */
+export function readRecordRevisionsWithFiles(
+  ws: Workspace,
+  type: string,
+  onError?: (error: KaituError) => void,
+): { file: string; record: StoredRecord }[] {
+  const ref = findRecordType(ws, type);
+  const { dir, match } = recordFilePattern(ref);
+  const abs = resolveRecordPath(ws, ref, dir);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs)
+    .filter((n) => match.test(n))
+    .sort()
+    .flatMap((name) => {
+      const file = `${dir}/${name}`;
+      resolveRecordPath(ws, ref, file);
+      return fileRevisions(ws, file, ref, onError).map((record) => ({ file, record }));
+    });
+}
 function revisionsFor(
   ws: Workspace,
   ref: RecordTypeRef,

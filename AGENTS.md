@@ -24,3 +24,5 @@
 12. 普通个人事实、偏好与决定按当前用户授权自动记录，不要求逐条确认。生成指南与 import-chatgpt-memory Skill 必须一致；记忆新增可选 origin/observed_at/evidence/uncertainty/replaces 字段见 schemas/memory.schema.json。纠正以新条关联旧条，保留原文；AI估算和建议不得升级为用户事实或承诺。外发、共享、不可恢复删除、凭据和系统权限边界保持。
 
 13. 手机联网完成结果与撤销沿 phone-action 的 complete_next_result/undo_next_result 能力门控和既有持久账本；精确前提、同 client_id 同内容重试，回执 result 与 mobile.results 核对。普通 capture 不等于结果，桌面会话 token 不作跨端协议。数据规范仍见 schemas 与 docs/guides/phone-contract.md。
+
+14. task 建议采纳/拒绝与撤销使用 decide_task/undo_task_decision 能力门控、consumer_id/file/id/rev/source 精确前提及独立 decision 回执；重启从 mobile.task_decisions 核对。不同 consumer 请求留 pending，不写对方终态；换电脑先读新快照核对，不冒称跨设备逻辑身份。旧 adopt_task 兼容但不保证 CAS/撤销；不挪用 cancel_task、日程 decide_proposal 或完成结果回执。

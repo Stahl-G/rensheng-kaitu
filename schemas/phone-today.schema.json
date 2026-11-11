@@ -44,6 +44,11 @@
       "required": ["version", "actions", "tasks"],
       "properties": {
         "version": { "const": 1 },
+        "consumer_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "现有电脑工作区处理器作用域，不是共享资料夹全局身份或认证；换电脑处理器后重读快照。"
+        },
         "actions": { "type": "array", "items": { "type": "string" } },
         "tasks": {
           "type": "array",
@@ -57,6 +62,10 @@
               "title": { "type": "string", "minLength": 1 },
               "status": { "enum": ["proposed", "open", "done", "cancelled"] },
               "due": { "type": "string" },
+              "file": {
+                "type": "string",
+                "pattern": "^(?![/~])(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+              },
               "source": {
                 "type": "string",
                 "description": "已有任务来源原值，例如me/goals.json#id；不按标题猜关联"
@@ -91,6 +100,65 @@
                 "type": "string"
               },
               "completed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "can_undo": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "task_decisions": {
+          "type": "array",
+          "description": "已落盘的任务建议决定，撤销后保留undone；rev为原决定写成修订，不是当前最新修订。",
+          "items": {
+            "type": "object",
+            "required": [
+              "decision_id",
+              "consumer_id",
+              "file",
+              "id",
+              "rev",
+              "source",
+              "title",
+              "status",
+              "decided_at",
+              "can_undo"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "decision_id": {
+                "type": "string",
+                "pattern": "^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+              },
+              "consumer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file": {
+                "type": "string",
+                "pattern": "^(?![/~])(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "rev": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "source": {
+                "type": ["string", "null"]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "status": {
+                "enum": ["adopted", "dismissed", "undone"]
+              },
+              "decided_at": {
                 "type": "string",
                 "format": "date-time"
               },

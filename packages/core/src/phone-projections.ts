@@ -4,15 +4,16 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
-import { listRecordTypes } from "./modules.js";
+import { findRecordType, listRecordTypes, recordFileFor } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
 import { phoneInboxName } from "./phone-actions.js";
 import { phoneResults } from "./phone-results.js";
 import type { Experience, LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
+import { taskDecisionContext, taskDecisions } from "./task-decisions.js";
 import { listTasks } from "./tasks.js";
-import { localDate, parseTs } from "./time.js";
+import { localDate, localMonth, parseTs } from "./time.js";
 import { userNavigation } from "./user-profile.js";
 import type { Workspace } from "./workspace.js";
 
@@ -66,6 +67,8 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
       actions: hasTasks
         ? [
             "adopt_task",
+            "decide_task",
+            "undo_task_decision",
             "create_task",
             "update_task",
             "complete_task",
@@ -77,11 +80,14 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
             "replace_memory",
           ]
         : ["complete_next", "complete_next_result", "undo_next_result", "capture_memory", "replace_memory"],
+      ...taskDecisionContext(ws),
+      task_decisions: hasTasks ? taskDecisions(ws) : [],
       results: phoneResults(ws),
       tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
         ({ id, rev, title, status, ts, due, source }) => ({
           id,
           rev: rev ?? 1,
+          file: recordFileFor(findRecordType(ws, "task"), localMonth(parseTs(ts), data.timeZone)),
           title,
           status,
           ts,
