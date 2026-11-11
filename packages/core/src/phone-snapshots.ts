@@ -87,7 +87,8 @@ export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?
   const data = await readOverviewPage(ws, now, sources);
   const at = now.toISOString();
   const snapshots = {
-    today: () => buildPhoneToday(data, at, ws),
+    // Keep the last good published today when a source is damaged; direct UI reads remain partial.
+    today: () => buildPhoneToday(data, at, ws, { strict: true }),
     week: () => buildPhoneWeek(data, at),
     map: () => {
       const map = lifeMap(ws, now);
