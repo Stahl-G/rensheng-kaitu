@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { KaituError } from "./errors.js";
-import { taskResult } from "./results.js";
+import { type ResultRow, taskResult } from "./results.js";
 import { schemas } from "./schema.js";
 import type { Task } from "./tasks.js";
 import type { Goal, WorkbenchData } from "./workbench.js";
@@ -82,10 +82,10 @@ export function taskGoal(task: Task, goals: Goal[]): Goal | undefined {
     : goals.find((goal) => sameTitle(goal.title, ref.title));
 }
 
-/** 完成时间：备注里的「完成时间」，旧记录没有时退回创建时间。 */
+/** Unknown completion time stays unknown, never task creation time. */
 export function completedAt(task: Task): number {
   const at = Date.parse(noteLine(task.notes ?? "", "完成时间"));
-  return Number.isFinite(at) ? at : Date.parse(task.ts);
+  return Number.isFinite(at) ? at : Number.NaN;
 }
 
 export interface PlanGoal {
@@ -105,7 +105,10 @@ export interface PlansData {
 }
 
 /** 今天页「你带来的规划」：进行中的目标、各自的下一步和已记下的结果。只读已加载的数据。 */
-export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "projects">): PlansData {
+export function readPlans(
+  data: Pick<WorkbenchData, "goals" | "records" | "projects">,
+  sharedResults?: ResultRow[],
+): PlansData {
   // 只列正在推进的目标；暂停的不算「进行中」。
   const goals = data.goals.filter((goal) => !goal.status || goal.status === "active");
   const tasks = (data.records.task ?? []) as Task[];
@@ -142,7 +145,13 @@ export function readPlans(data: Pick<WorkbenchData, "goals" | "records" | "proje
       const own = linked.get(goal.id) ?? [];
       const open = own.filter((task) => task.status === "open").at(-1);
       const results = own
-        .filter((task) => task.status === "done" && noteLine(task.notes ?? "", "完成结果"))
+        .filter((task) =>
+          sharedResults
+            ? sharedResults.some((row) => row.file === "task" && row.id === task.id)
+            : task.status === "done" &&
+              Number.isFinite(completedAt(task)) &&
+              noteLine(task.notes ?? "", "完成结果").trim(),
+        )
         .sort((a, b) => completedAt(a) - completedAt(b));
       return {
         id: goal.id,

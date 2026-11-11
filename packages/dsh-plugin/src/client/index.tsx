@@ -215,17 +215,8 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              completeHomeNext: async (
-                target: import("@kaitu/core").HomeNextTarget,
-                result: string,
-                operationId: string,
-              ) => {
-                const r = await ctx.remote.kaitu.completeHomeNext(target, result, operationId);
-                if (!r.ok) throw r.error;
-                return r.value;
-              },
-              undoHomeNext: async (token: string) => {
-                const r = await ctx.remote.kaitu.undoHomeNext(token);
+              resultAction: async (root: string, request: import("@kaitu/core").ResultRequest) => {
+                const r = await ctx.remote.kaitu.resultAction(root, request);
                 if (!r.ok) throw r.error;
                 return r.value;
               },

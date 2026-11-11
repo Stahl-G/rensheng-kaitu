@@ -16,7 +16,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { localStateRoot } from "./local-state.js";
 
 // Disposable implementation data, never part of a workspace or its synchronization format.
-const version = 8;
+const version = 9;
 export type ProjectionInputs = { root: string; state: string };
 export type ProjectionManifest = [path: string, stamp: string][];
 type FingerprintKind = "directory" | "access" | "file";

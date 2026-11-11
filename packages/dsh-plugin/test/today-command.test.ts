@@ -34,7 +34,10 @@ test("Today retains a failed result, prevents double-submit and only shows undo 
       results: [],
     },
   };
-  let accept!: (value: { token: string; title: string }) => void;
+  let accept!: (value: {
+    status: "applied";
+    effect: { file: "task"; id: string; rev: number; prior_rev: number };
+  }) => void;
   const complete = vi
     .fn()
     .mockRejectedValueOnce(new Error("Offline"))
@@ -45,11 +48,19 @@ test("Today retains a failed result, prevents double-submit and only shows undo 
         }),
     );
   const undo = vi.fn().mockResolvedValue({ undone: true });
-  const session = createTodayBoardSession();
+  const session = createTodayBoardSession("synthetic", { getItem: () => null, setItem: () => {} });
   const props = {
     data,
-    complete,
-    undo,
+    resultAction: async (root: string, request: import("@kaitu/core").ResultRequest) => {
+      if (request.op === "restore_task_revision") {
+        await undo(request);
+        return {
+          status: "applied" as const,
+          effect: { file: "task" as const, id: request.args.id, rev: 3, prior_rev: 2 },
+        };
+      }
+      return complete(root, request);
+    },
     session,
     openProject: vi.fn(),
     library: vi.fn(),
@@ -81,13 +92,13 @@ test("Today retains a failed result, prevents double-submit and only shows undo 
       ),
     );
     expect(app.root.findByType("input").props.value).toBe("Finished the draft");
-    const operationId = session.operation.current?.id;
+    const operationId = session.operation.current?.request.client_id;
     const latest = app.root
       .findAllByType("button")
       .find((button) => button.children.includes("查看最新事项"));
     expect(latest).toBeDefined();
     await act(async () => latest?.props.onClick());
-    expect(session.operation.current?.id).toBe(operationId);
+    expect(session.operation.current?.request.client_id).toBe(operationId);
     expect(app.root.findAllByType("input")).toHaveLength(0);
     const retry = () => app.root.findByProps({ "aria-label": "上次结果待核实" }).findByType("button");
     await act(async () => {
@@ -95,7 +106,7 @@ test("Today retains a failed result, prevents double-submit and only shows undo 
       retry().props.onClick();
     });
     expect(complete).toHaveBeenCalledTimes(2);
-    expect(complete.mock.calls[0]?.[2]).toBe(complete.mock.calls[1]?.[2]);
+    expect(complete.mock.calls[0]?.[1]).toEqual(complete.mock.calls[1]?.[1]);
     await act(async () => app.unmount());
     await act(async () => {
       app = create(
@@ -108,11 +119,18 @@ test("Today retains a failed result, prevents double-submit and only shows undo 
     expect(app.root.findByProps({ "aria-label": "上次结果待核实" }).findByType("button").props.disabled).toBe(
       true,
     );
-    await act(async () => accept({ token: "receipt", title: step.title }));
+    await act(async () =>
+      accept({ status: "applied", effect: { file: "task", id: step.id, rev: 2, prior_rev: 1 } }),
+    );
     expect(app.root.findAllByType("input")).toHaveLength(0);
     const button = app.root.findAllByType("button").find((item) => item.children.includes("撤销"));
     await act(async () => button?.props.onClick());
-    expect(undo).toHaveBeenCalledWith("receipt");
+    expect(undo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        op: "restore_task_revision",
+        args: { id: step.id, expected_rev: 2, prior_rev: 1 },
+      }),
+    );
     await act(async () => app.update(createElement(TodayBoard, props)));
     expect(app.root.findByType("input").props.value).toBe("Finished the draft");
   } finally {
@@ -426,11 +444,11 @@ test.each(["CONFLICT", "kaitu/completion-rejected", undefined])(
         results: [],
       },
     };
-    const session = createTodayBoardSession();
+    const session = createTodayBoardSession("synthetic", { getItem: () => null, setItem: () => {} });
     const props = {
       data,
       session,
-      complete: vi
+      resultAction: vi
         .fn()
         .mockRejectedValue(
           code === "kaitu/completion-rejected"
@@ -465,7 +483,7 @@ test.each(["CONFLICT", "kaitu/completion-rejected", undefined])(
         );
       }
       expect(app.root.findByType("input").props.disabled).toBe(!code);
-      if (!code) expect(session.operation.current?.id).toBeTruthy();
+      if (!code) expect(session.operation.current?.request.client_id).toBeTruthy();
       expect(session.read().drafts[step.key]).toBe("Keep my draft");
       await act(async () =>
         app.update(

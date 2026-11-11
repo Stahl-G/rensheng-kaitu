@@ -13,8 +13,6 @@ import {
   type City,
   type FinanceAccess,
   type HandoverPack,
-  type HomeCompletion,
-  type HomeNextTarget,
   type HomeState,
   type Hometown,
   type ImportSource,
@@ -46,6 +44,7 @@ import {
   type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
+  type ResultRequest,
   type ResumeReceipt,
   type ResumeUpload,
   type SettingsData,
@@ -58,6 +57,7 @@ import {
   addGoalNext,
   adoptOnboardingMatter,
   adoptTask,
+  applyResultAction,
   archiveMemory,
   bindGithub,
   calendarPushEntries,
@@ -68,7 +68,6 @@ import {
   captureNoteOnce,
   changeExperienceBatch,
   changeOnboardingNext,
-  completeHomeNext,
   completeNext,
   configureAutomation,
   confirmOnboardingImport,
@@ -161,7 +160,6 @@ import {
   startLearning,
   syncProject,
   tryNews,
-  undoHomeNext,
   unhideExperience,
   uploadResume,
   workspaceBackupRequest,
@@ -283,26 +281,12 @@ export class KaituOverviewService extends TypertRemoteService {
     }
   }
 
-  @Remote("completeHomeNext")
-  async completeHomeNext(
-    target: HomeNextTarget,
-    result: string,
-    operationId: string,
-  ): Promise<HomeCompletion> {
+  @Remote("resultAction")
+  async resultAction(root: string, request: ResultRequest) {
     return this.write(() => {
-      const receipt = completeHomeNext(this.workspace, target, result, operationId);
-      this.scheduleVersion("你完成下一步并记下结果");
-      return Promise.resolve(receipt);
+      if (root !== this.workspace.root) throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+      return applyResultAction(this.workspace, request);
     }).catch(throwHomeCompletionError);
-  }
-
-  @Remote("undoHomeNext")
-  async undoHomeNext(token: string): Promise<{ undone: boolean }> {
-    return this.write(() => {
-      const result = undoHomeNext(this.workspace, token);
-      this.scheduleVersion("你撤销了下一步的完成");
-      return Promise.resolve(result);
-    });
   }
 
   @Remote("findWorkspaceFiles")

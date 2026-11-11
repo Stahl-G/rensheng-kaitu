@@ -1,8 +1,14 @@
 import type { PlansData } from "@kaitu/core";
-import { useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import css from "./Prototype.module.css";
 import { TodayGoal } from "./TodayPage.js";
 import { useT } from "./i18n.js";
+import {
+  type ResultTransport,
+  type TodayBoardSession,
+  createTodayBoardSession,
+  resultId,
+} from "./result-session.js";
 
 const AI_NAMES: Record<string, string> = {
   chatgpt: "ChatGPT",
@@ -20,6 +26,8 @@ type Mode = "next" | "complete" | "defer";
  */
 export function PlansCard({
   plans,
+  resultSession,
+  resultAction,
   goalId,
   addGoalNext,
   changeNext,
@@ -27,6 +35,8 @@ export function PlansCard({
   open,
 }: {
   plans: PlansData;
+  resultSession?: TodayBoardSession;
+  resultAction?: ResultTransport;
   goalId?: string;
   addGoalNext: (goalId: string, title: string) => Promise<unknown>;
   changeNext: (id: string, rev: number, action: string, value: string) => Promise<unknown>;
@@ -38,29 +48,63 @@ export function PlansCard({
   const [editing, setEditing] = useState<{
     goal: string;
     mode: Mode;
-    next?: { id: string; rev: number };
+    next?: { id: string; rev: number; title: string };
   } | null>(null);
   const [value, setValue] = useState("");
+  const local = useRef(createTodayBoardSession());
+  const owner = resultSession ?? local.current;
+  const resultState = useSyncExternalStore(owner.subscribe, owner.read);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const goals = goalId ? plans.goals.filter((goal) => goal.id === goalId) : plans.goals;
   if (!goals.length) return null;
   const start = (goal: PlansData["goals"][number], mode: Mode, initial = "") => {
     const same = editing?.goal === goal.id && editing.mode === mode;
-    const next = goal.next ? { id: goal.next.id, rev: goal.next.rev } : undefined;
+    const next = goal.next ? { id: goal.next.id, rev: goal.next.rev, title: goal.next.title } : undefined;
     setEditing(same ? null : { goal: goal.id, mode, ...(next ? { next } : {}) });
-    setValue(initial);
+    setValue(mode === "complete" && next ? (owner.read().drafts[`task:${next.id}`] ?? initial) : initial);
     setError("");
   };
-  const save = (goal: PlansData["goals"][number], mode: Mode) =>
-    mode === "next"
-      ? addGoalNext(goal.id, value.trim())
-      : changeNext(
-          editing?.next?.id ?? "",
-          editing?.next?.rev ?? 1,
-          mode,
-          mode === "complete" ? value.trim() : value,
-        );
+  const save = async (goal: PlansData["goals"][number], mode: Mode) => {
+    if (mode === "next") return addGoalNext(goal.id, value.trim());
+    if (mode === "defer") return changeNext(editing?.next?.id ?? "", editing?.next?.rev ?? 1, mode, value);
+    const next = editing?.next;
+    if (!next) throw new Error(t("事项已变化，请重新打开", "Step changed; reopen it"));
+    if (/[\r\n\u2028\u2029]/u.test(value) || Array.from(value).length > 2000)
+      throw new Error(
+        t("请保留草稿，改为一行且不超过2000字", "Keep the draft; use one line up to 2000 characters"),
+      );
+    const pending = owner.operation.current;
+    if (pending && pending.step.id !== next.id)
+      throw new Error(t("请先核对上次结果", "Confirm the previous result first"));
+    const saved = await owner.send(
+      resultAction,
+      pending ?? {
+        step: {
+          id: next.id,
+          file: "task",
+          key: `task:${next.id}`,
+          title: next.title,
+          parent: goal.title,
+          due: null,
+          precondition: { kind: "task", expectedRev: next.rev },
+        },
+        text: value,
+        request: {
+          client_id: resultId(),
+          op: "complete_next_result",
+          args: { file: "task", id: next.id, expected_rev: next.rev, result_text: value },
+        },
+      },
+    );
+    if (!saved)
+      throw new Error(owner.read().error || t("请先核对上次结果", "Confirm the previous result first"));
+  };
+  const editValue = (text: string) => {
+    setValue(text);
+    if (editing?.mode === "complete" && editing.next)
+      owner.set("drafts", (drafts) => ({ ...drafts, [`task:${editing.next?.id}`]: text }));
+  };
   const origin = (goal: PlansData["goals"][number]) => {
     if (!goal.origin) return t("你的目标", "Your goal");
     const date = goal.origin.date.slice(5).replace("-", "/");
@@ -75,7 +119,7 @@ export function PlansCard({
       <div className={css.row}>
         <div className={`${css["row-title"]} ${css.stack}`}>
           <TodayGoal text={goal.title} title />
-          <span className={css.small}>
+          <span className={css.small} style={{ whiteSpace: "pre-wrap" }}>
             {origin(goal)}
             {goal.results
               ? t(
@@ -147,14 +191,45 @@ export function PlansCard({
                   )
                 : t("安排到哪一天", "Which day")}
           </label>
-          <input
-            id={`goal-${editing.mode}-${goal.id}`}
-            type={editing.mode === "defer" ? "date" : "text"}
-            value={value}
-            maxLength={2000}
-            disabled={busy}
-            onChange={(event) => setValue(event.target.value)}
-          />
+          {/[\r\n\u2028\u2029]/u.test(value) && editing.mode === "complete" ? (
+            <textarea
+              id={`goal-${editing.mode}-${goal.id}`}
+              value={value}
+              disabled={busy || !!owner.operation.current}
+              onChange={(event) => editValue(event.target.value)}
+            />
+          ) : (
+            <input
+              id={`goal-${editing.mode}-${goal.id}`}
+              type={editing.mode === "defer" ? "date" : "text"}
+              value={value}
+              disabled={busy || (editing.mode === "complete" && !!owner.operation.current)}
+              onChange={(event) => editValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  (event.nativeEvent.isComposing ||
+                    event.repeat ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.altKey ||
+                    event.shiftKey)
+                )
+                  event.preventDefault();
+              }}
+              onPaste={(event) => {
+                const text = event.clipboardData.getData("text");
+                if (editing.mode === "complete" && /[\r\n\u2028\u2029]/u.test(text)) {
+                  event.preventDefault();
+                  editValue(
+                    value.slice(0, event.currentTarget.selectionStart ?? value.length) +
+                      text +
+                      value.slice(event.currentTarget.selectionEnd ?? value.length),
+                  );
+                }
+              }}
+            />
+          )}
           {error && (
             <p role="alert" className={css.error}>
               {error}
@@ -167,7 +242,7 @@ export function PlansCard({
             <button
               type="submit"
               className={`${css.btn} ${css["btn-primary"]}`}
-              disabled={busy || !value.trim()}
+              disabled={busy || (editing.mode !== "complete" && !value.trim())}
             >
               {busy ? t("保存中…", "Saving…") : t("保存", "Save")}
             </button>
@@ -178,6 +253,30 @@ export function PlansCard({
   );
   return (
     <section className={css.sec} aria-labelledby="plans-title">
+      {resultState.receipt && (
+        <div aria-live="polite">
+          <span>{resultState.receipt.text || t("已完成", "Completed")}</span>
+          <button
+            type="button"
+            className={css.btn}
+            disabled={resultState.pending}
+            onClick={() => void owner.undo(resultAction)}
+          >
+            {t("撤销", "Undo")}
+          </button>
+        </div>
+      )}
+      {resultState.error && <p role="alert">{resultState.error}</p>}
+      {owner.operation.current && (
+        <button
+          type="button"
+          className={css.btn}
+          disabled={resultState.pending}
+          onClick={() => void owner.send(resultAction)}
+        >
+          {t("核对上次结果", "Check previous result")}
+        </button>
+      )}
       <div className={css["sec-head"]}>
         <h2 id="plans-title" className={css.eyebrow}>
           {t("你带来的规划", "Your plans")}

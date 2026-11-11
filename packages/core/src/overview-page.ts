@@ -386,12 +386,12 @@ export async function readOverviewPage(
       !data.inboxNotes,
     proposedTasks: (data.records.task ?? [])
       .filter((task) => task.status === "proposed")
-      .map(({ id, title }) => ({ id, title: String(title) })),
+      .map(({ id, title, rev }) => ({ id, title: String(title), rev: rev ?? 1 })),
     blocks: status.now.blocks,
     next: allNext.slice(0, 3),
     allNext,
     versions,
-    plans: readPlans(data),
+    plans: readPlans(data, results),
     results,
     resultActivityDays: resultActivityDays(results, data.timeZone, now),
     capturedWeek,

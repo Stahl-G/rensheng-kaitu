@@ -51,19 +51,13 @@ export function LifeHome({
   openProject,
   openGoal,
   begin,
-  complete,
-  undo,
+  resultAction,
   schedule,
   reviewLinks,
   session,
 }: {
   session?: TodayBoardSession;
-  complete?: (
-    target: import("@kaitu/core").HomeNextTarget,
-    result: string,
-    operationId: string,
-  ) => Promise<import("@kaitu/core").HomeCompletion>;
-  undo?: (token: string) => Promise<{ undone: boolean }>;
+  resultAction?: import("./result-session.js").ResultTransport;
   schedule?: ReactNode;
   reviewLinks?: ReactNode;
   save?: (text: string) => void;
@@ -330,16 +324,13 @@ export function LifeHome({
         <TodayBoard
           session={session}
           data={home}
-          complete={complete}
-          undo={undo}
+          resultAction={resultAction}
           openProject={openProject}
           openGoal={openGoal}
           begin={firstVisit ? begin : undefined}
           library={library}
           ask={ask}
           canAsk={canAsk}
-          adopt={adopt}
-          dismiss={dismiss}
           busy={busy}
         />
       )}
