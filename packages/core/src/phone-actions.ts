@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { normalizeDocument } from "./doc-input.js";
 import { KaituError } from "./errors.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import {
@@ -14,9 +15,16 @@ import {
   replaceMemory,
 } from "./memory.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
+import { type PhoneResultLedgerEntry, applyPhoneResultAction } from "./phone-results.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
 import { schemas } from "./schema.js";
+import {
+  type TaskDecisionAction,
+  type TaskDecisionLedgerEntry,
+  applyTaskDecision,
+  taskDecisionContext,
+} from "./task-decisions.js";
 import { adoptTask, cancelTask, completeTask, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
 import { completeNext, decidePhoneProposal, statusFiles } from "./workbench.js";
@@ -37,18 +45,22 @@ interface Action {
     title?: string;
     due?: string | null;
     notes?: string;
+    result_text?: string;
+    completion_id?: string;
     candidate?: MemoryInput | null;
     expected?: MemoryExpectation;
   };
 }
 
 // 待办先记进操作账本再追加；中途失败时重投复用同一条记录，不会重复追加。
-type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> & {
-  task?: StoredRecord;
-  memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
-  capture?: ReturnType<typeof memoryCaptureSchema.parse>;
-  captureResult?: PhoneReceipt["memory"];
-};
+type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> &
+  PhoneResultLedgerEntry &
+  TaskDecisionLedgerEntry & {
+    task?: StoredRecord;
+    memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
+    capture?: ReturnType<typeof memoryCaptureSchema.parse>;
+    captureResult?: PhoneReceipt["memory"];
+  };
 function prepareTask(ws: Workspace, action: Action): StoredRecord {
   const { id, expected_rev, title, due, notes } = action.args;
   const current = readRecords(ws, "task").find((row) => row.id === id);
@@ -80,9 +92,23 @@ function prepareTask(ws: Workspace, action: Action): StoredRecord {
 }
 
 export async function applyPhoneActions(ws: Workspace, file: string, text: string) {
+  // Consumer scope is not authentication or a shared multi-computer workspace identity.
+  const consumer = taskDecisionContext(ws).consumer_id;
+  let pending = false;
   const ledgerFile = ".kaitu/phone-actions.json";
   // 账本记每个 client_id 第一次的结果；重投时成功的回 duplicate，冲突或拒绝的照原样再回一次。
-  const seen: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
+  let seen: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
+  // Preserve synchronous native task decisions that may land while legacy async actions await history.
+  let saved = new Map(Object.entries(seen).map(([id, entry]) => [id, JSON.stringify(entry)]));
+  const persist = () => {
+    const current: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
+    for (const [id, entry] of Object.entries(seen))
+      if (saved.get(id) !== JSON.stringify(entry)) current[id] = entry;
+    ws.writeJson(ledgerFile, current, { internal: true, mode: 0o600 });
+    for (const [id, entry] of Object.entries(current))
+      if (JSON.stringify(seen[id]) !== JSON.stringify(entry)) seen[id] = entry;
+    saved = new Map(Object.entries(seen).map(([id, entry]) => [id, JSON.stringify(entry)]));
+  };
   // 云端整理员处理过的操作只留在回执里，本机账本没有。
   for (const r of phoneReceipts(ws))
     if (
@@ -90,7 +116,9 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       !seen[r.ref]?.status &&
       !seen[r.ref]?.memory &&
       !seen[r.ref]?.task &&
-      !seen[r.ref]?.capture
+      !seen[r.ref]?.capture &&
+      !seen[r.ref]?.resultAction &&
+      !seen[r.ref]?.taskDecisionAction
     )
       seen[r.ref] =
         r.status === "conflict" || r.status === "rejected"
@@ -107,6 +135,14 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
     let action: Action;
     try {
       const value = JSON.parse(line);
+      if (
+        (value.op === "decide_task" || value.op === "undo_task_decision") &&
+        typeof value.args?.consumer_id === "string" &&
+        value.args.consumer_id !== consumer
+      ) {
+        pending = true;
+        continue;
+      }
       if (!validate(value)) throw new Error("手机操作格式不合法");
       action = value as Action;
     } catch {
@@ -125,7 +161,21 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       status: "applied",
       at: new Date().toISOString(),
     };
+    if (
+      action.op === "decide_task" ||
+      action.op === "undo_task_decision" ||
+      seen[action.client_id]?.taskDecisionAction
+    ) {
+      receipts.push(applyTaskDecision(ws, action as unknown as TaskDecisionAction));
+      seen = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
+      saved = new Map(Object.entries(seen).map(([id, entry]) => [id, JSON.stringify(entry)]));
+      continue;
+    }
     const first = seen[action.client_id];
+    if (action.op === "complete_next_result" || action.op === "undo_next_result" || first?.resultAction) {
+      receipts.push(applyPhoneResultAction(ws, action, seen, () => persist()));
+      continue;
+    }
     if (
       first?.capture &&
       (action.op !== "capture_memory" || !isDeepStrictEqual(first.capture, action.args))
@@ -183,7 +233,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
             const input = first?.capture ?? memoryCaptureSchema.parse(action.args);
             if (!first?.capture) {
               seen[action.client_id] = { capture: input };
-              ws.writeJson(ledgerFile, seen, { internal: true });
+              persist();
             }
             const result = await captureMemory(ws, input, { now: new Date(action.at) });
             if (!result.entry) {
@@ -206,9 +256,14 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
               if (!statusFiles(ws).some((item) => item.file === target))
                 throw new KaituError("找不到下一步来源", "CONFLICT");
               const data = parseFrontmatter<{ next?: { id: string }[] }>(ws.readText(target)).data;
+              const normalized = normalizeDocument("status.schema.json", data) as typeof data;
               if (
                 !isDeepStrictEqual(
-                  data.next?.find((item) => item.id === id),
+                  Array.isArray(data.next) ? data.next.find((item) => item.id === id) : undefined,
+                  action.args.expected_next,
+                ) &&
+                !isDeepStrictEqual(
+                  normalized.next?.find((item) => item.id === id),
                   action.args.expected_next,
                 )
               )
@@ -231,7 +286,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
               if (!current || current.ended || !isDeepStrictEqual(memoryExpectation(current), plan.expected))
                 throw new KaituError("这条记忆已更新或归档，请核对后再确认", "CONFLICT");
               seen[action.client_id] = { memory: plan };
-              ws.writeJson(ledgerFile, seen, { internal: true });
+              persist();
             }
             if (plan.candidate) {
               await replaceMemory(ws, plan.file, plan.candidate, {
@@ -270,7 +325,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
               const record = first?.task ?? prepareTask(ws, action);
               if (!first?.task) {
                 seen[action.client_id] = { task: record };
-                ws.writeJson(ledgerFile, seen, { internal: true });
+                persist();
               }
               await commitRecordTransaction(ws, [{ type: "task", record }], `手机更新待办：${record.title}`);
               receipt.target = { id: record.id, rev: record.rev ?? 1 };
@@ -301,10 +356,13 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
         ...(receipt.target ? { target: receipt.target } : {}),
         ...(receipt.memory ? { captureResult: receipt.memory } : {}),
       };
-      ws.writeJson(ledgerFile, seen, { internal: true });
+      persist();
     }
     receipts.push(receipt);
   }
-  ws.writeJson(ledgerFile, seen, { internal: true });
-  writePhoneReceipts(ws, receipts);
+  if (receipts.length) {
+    persist();
+    writePhoneReceipts(ws, receipts);
+  }
+  return pending ? { pending: true as const } : undefined;
 }

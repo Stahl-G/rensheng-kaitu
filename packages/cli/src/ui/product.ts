@@ -1,4 +1,11 @@
 import {
+  type TaskDecisionAction,
+  type TaskDecisionScope,
+  localTaskDecisions,
+  retryLocalTaskDecision,
+  submitLocalTaskDecision,
+} from "@kaitu/core";
+import {
   type AgentConnectionId,
   type AtlasGenerateInput,
   type AutomationKey,
@@ -196,6 +203,8 @@ export const productMutations = new Set([
   "completeNext",
   "completeHomeNext",
   "undoHomeNext",
+  "submitTaskDecision",
+  "retryTaskDecision",
   "adoptTask",
   "cancelTask",
   "proposeTask",
@@ -517,6 +526,12 @@ export async function productRequest(
           setImmediate(() => void snapshot(ws, message).catch(() => {}));
         },
       });
+    case "taskDecisionState":
+      return localTaskDecisions(ws, text(0));
+    case "submitTaskDecision":
+      return submitLocalTaskDecision(ws, args[0] as TaskDecisionScope, args[1] as TaskDecisionAction);
+    case "retryTaskDecision":
+      return retryLocalTaskDecision(ws, args[0] as TaskDecisionScope, text(1));
     case "captureReceipt":
       return readCaptureReceipt(ws, text(0));
     case "me":

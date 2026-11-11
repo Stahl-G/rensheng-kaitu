@@ -1282,3 +1282,21 @@ button.stepTitle {
     order: 2;
   }
 }
+
+.decisionEntry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.decisionEntry > button {
+  justify-self: start;
+}
+.decisionSource {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}

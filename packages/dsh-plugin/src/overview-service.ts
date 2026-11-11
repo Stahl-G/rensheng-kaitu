@@ -3,6 +3,15 @@ import type { Context } from "@deepseek-ai/cordis";
 import { Remote, TypertRemoteService } from "@deepseek-ai/dsh-typert-protocol";
 import type { CollectorService } from "@kaitu/channels/collectors";
 import {
+  type LocalTaskDecisions,
+  type PhoneReceipt,
+  type TaskDecisionAction,
+  type TaskDecisionScope,
+  localTaskDecisions,
+  retryLocalTaskDecision,
+  submitLocalTaskDecision,
+} from "@kaitu/core";
+import {
   type AgentConnectionId,
   type AutomationKey,
   type AutomationSettings,
@@ -303,6 +312,21 @@ export class KaituOverviewService extends TypertRemoteService {
       this.scheduleVersion("你撤销了下一步的完成");
       return Promise.resolve(result);
     });
+  }
+
+  @Remote("taskDecisionState")
+  async taskDecisionState(root: string): Promise<LocalTaskDecisions> {
+    return localTaskDecisions(this.workspace, root);
+  }
+
+  @Remote("submitTaskDecision")
+  async submitTaskDecision(scope: TaskDecisionScope, action: TaskDecisionAction): Promise<PhoneReceipt> {
+    return this.write(() => Promise.resolve(submitLocalTaskDecision(this.workspace, scope, action)));
+  }
+
+  @Remote("retryTaskDecision")
+  async retryTaskDecision(scope: TaskDecisionScope, clientId: string): Promise<PhoneReceipt> {
+    return this.write(() => Promise.resolve(retryLocalTaskDecision(this.workspace, scope, clientId)));
   }
 
   @Remote("findWorkspaceFiles")

@@ -229,6 +229,24 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw r.error;
                 return r.value;
               },
+              loadTaskDecisions: async (root: string) => {
+                const r = await ctx.remote.kaitu.taskDecisionState(root);
+                if (!r.ok) throw r.error;
+                return r.value;
+              },
+              submitTaskDecision: async (
+                scope: import("@kaitu/core").TaskDecisionScope,
+                action: import("@kaitu/core").TaskDecisionAction,
+              ) => {
+                const r = await ctx.remote.kaitu.submitTaskDecision(scope, action);
+                if (!r.ok) throw r.error;
+                return r.value;
+              },
+              retryTaskDecision: async (scope: import("@kaitu/core").TaskDecisionScope, id: string) => {
+                const r = await ctx.remote.kaitu.retryTaskDecision(scope, id);
+                if (!r.ok) throw r.error;
+                return r.value;
+              },
               loadHome: async () => {
                 const result = await ctx.remote.kaitu.home();
                 if (!result.ok) throw new Error(result.error.message);

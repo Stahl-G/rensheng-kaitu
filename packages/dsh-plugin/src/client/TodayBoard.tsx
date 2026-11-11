@@ -1,6 +1,7 @@
 import type { HomeCompletion, HomeNextTarget, HomeState, HomeThread } from "@kaitu/core";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import css from "./Prototype.module.css";
+import { type TaskDecisionServices, TaskSuggestions } from "./TaskSuggestions.js";
 import styles from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 import { todayNumber, todayProjectDate } from "./next-presentation.js";
@@ -68,6 +69,7 @@ export async function reverseTodayBoard(
 }
 export function TodayBoard({
   data,
+  decisions,
   complete,
   undo,
   openProject,
@@ -76,12 +78,10 @@ export function TodayBoard({
   begin,
   ask,
   canAsk,
-  adopt,
-  dismiss,
-  busy,
   session,
 }: {
   data: HomeState;
+  decisions?: TaskDecisionServices;
   session?: TodayBoardSession;
   complete?: (target: HomeNextTarget, result: string, operationId: string) => Promise<HomeCompletion>;
   undo?: (token: string) => Promise<{ undone: boolean }>;
@@ -240,7 +240,7 @@ export function TodayBoard({
             <div className={styles.completionReceipt} aria-live="polite">
               <span>{receipt.text}</span>
               <button type="button" className={css.btn} disabled={pending} onClick={() => void reverse()}>
-                {t("撤销", "Undo")} ⌘Z
+                {t("撤销", "Undo")}
               </button>
               <button type="button" className={css.link} onClick={() => setReceipt(undefined)}>
                 {t("下一件", "Next")}
@@ -365,23 +365,17 @@ export function TodayBoard({
                 {step.due && <time data-overdue={step.due < today}>{step.due}</time>}
               </div>
             ))}
-          {data.data?.pending.map((item) => (
+        </section>
+      )}
+      {decisions && (
+        <TaskSuggestions key={decisions.root} pending={data.data?.pending ?? []} services={decisions} />
+      )}
+      {!decisions && !!data.data?.pending.length && (
+        <section className={styles.stepList} aria-label={t("建议", "Suggestions")}>
+          {data.data.pending.map((item) => (
             <div className={styles.stepRow} key={item.id}>
-              <span aria-hidden="true">✎</span>
               <span className={styles.stepTitle}>{item.title}</span>
-              <small>{t("AI 建议", "AI suggestion")}</small>
-              <button type="button" className={css.btn} disabled={busy} onClick={() => adopt(item.id)}>
-                {t("采纳", "Adopt")}
-              </button>
-              <button
-                type="button"
-                className={css.link}
-                disabled={busy}
-                aria-label={t(`不要这条建议：${item.title}`, `Dismiss suggestion: ${item.title}`)}
-                onClick={() => dismiss(item.id)}
-              >
-                ×
-              </button>
+              <small>{t("待处理", "Pending")}</small>
             </div>
           ))}
         </section>

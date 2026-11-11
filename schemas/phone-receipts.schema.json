@@ -41,6 +41,34 @@
               }
             }
           },
+          "result": {
+            "type": "object",
+            "required": ["completion_id", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "completion_id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "status": {
+                "enum": ["completed", "undone"]
+              }
+            }
+          },
+          "decision": {
+            "type": "object",
+            "required": ["decision_id", "status"],
+            "additionalProperties": false,
+            "properties": {
+              "decision_id": {
+                "type": "string",
+                "pattern": "^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+              },
+              "status": {
+                "enum": ["adopted", "dismissed", "undone"]
+              }
+            }
+          },
           "at": { "type": "string", "format": "date-time" }
         }
       }

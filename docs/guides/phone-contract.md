@@ -94,3 +94,37 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
 手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。
+
+
+## 联网完成结果与持久撤销（0.1.4 候选，未合并）
+
+仅在 `today.mobile.actions` 显式声明 `complete_next_result` / `undo_next_result` 时投递。旧 `complete_next` 兼容不变；旧消费者没有这两个能力时，手机保留本机结果与待兼容状态，不把完成和普通 capture 拼成原子操作。
+
+- 完成：`op: complete_next_result`，`args: {file,id,result_text,expected_next}`；STATUS 的 expected_next 原样带回规范化的 source_precondition；原字段缺id/status或使用字符串简写时，投影与消费者共用既有 normalizeDocument 规则，写入只替换目标，不顺带改其他事项。task 用 `file: task` 和 `expected_rev`，不能传 by/rev。结果允许空白但不计入有结果天数。结果最多2000个Unicode码点，完整保留多行raw text；task.notes和STATUS将每一逻辑行以标准Markdown四空格缩进、前后空行作为字面代码块保存，CR/LF及Unicode分隔符都分行缩进，防止结果伪造完成时间、标题或拥有者事件。WAL与snapshot保留原始换行和空白；既有plans/onboarding/handover共用读取器兼容同行和缩进格式，空白内容不计结果；完成时间取电脑首次准备写入时的真实带offset时间，不用旧事项日期或手机回传时间冒充。
+- 撤销：`op: undo_next_result`，`args: {completion_id}`，completion_id 是首次完成的 client_id。撤销本身有新 client_id；网络失败继续原ID原内容重投，不能另造撤销ID试探。现有账本先持久保存目标 before/after 与结果，再写单个 STATUS 或追加 task 修订，最后持久终态再发回执。重启、写入成功但账本/回执失败后，原操作精确识别 after，不重复追加。未知I/O失败保留准备计划重试，不永久记成conflict。
+- 回执可选 `result: {completion_id,status: completed|undone}`。applied/duplicate 之外不能当完成成功。同client_id换内容返回conflict，不重解释为新操作。完成已撤销后重投首次完成仍返回undone，不能再次完成。
+- `today.mobile.results` 可选数组，每项 `{completion_id,id,file,title,text,completed_at,can_undo}`。仅列账本已确认且当前仍为同一完成内容的项，撤销/重开后移除。改标题可保留原完成结果，但 `can_undo` 会因精确after不匹配变false。非空text才有结果天数；pending、普通capture、AI自动标记与无持久操作证据的旧STATUS正文不算。时间按today.timezone计日。
+- 撤销先比较原完成后的精确条目或task完整修订和结果块，再恢复原状态/正文；后来修改过的目标返回conflict，不覆盖对端。STATUS其他事项/正文的独立改动保留。完成块末尾的标准Markdown JSON comment绑定op/client_id/id，撤销保留同目标的完成拥有者。按正文实际事件顺序确定同一file/id最后完成，不用同毫秒时间或ULID排序；旧完成不能撤销较新完成，较新完成撤销后旧结果不复活。撤销以标准 Markdown HTML comment 中的 JSON（op/client_id/completion_id/id）替换原完成块，随同一次原子写入保留撤销证据；终态账本失包后即使有后续编辑，也可确认原撤销已落盘且不重写后来内容。
+
+该账本属于电脑已有本机状态，不新增手机写正本权限或认证凭据。手机文件仍未签名，client_id、文件名、by和来源标签都不是设备认证或用户手势证明；沿既有Agent权限，只操作普通事项，不借此确认阶段、启用方向或执行外部副作用。结果保留来源关联，不宣称已实现可信手机确认通道。完成/撤销均需等明确回执；真实同步盘/跨语言联调与最终发布另行验收。
+
+联网结果归属只按已有task.source（例如me/goals.json#id）关联方向；mobile.tasks可选source原样投影，不用标题猜，也不赋予联网方向生命周期权限。
+
+## 任务建议决定与撤销（依赖联网结果候选协议，未合并）
+
+这是 `task.status=proposed` 的采纳或拒绝，不是记忆建议、日程 `decide_proposal` 或普通 open 待办的取消。只在 `today.mobile.actions` 明确声明 `decide_task` / `undo_task_decision` 时使用；旧 `adopt_task {id}` 继续兼容，但没有精确前提和持久撤销保证。
+
+- `today.mobile.consumer_id` 是生成此快照的电脑处理器工作区作用域，复用已有本机状态登记 ID。它不是共享资料夹的跨设备逻辑身份、设备认证或用户授权。重启及现有资料迁移保留此 ID；另一电脑接管会有不同 ID。本契约只支持单个处理器负责写入，不保证多电脑并发处理；并发外部工具绕过 core 直接写出字节完全相同的修订不提供独立操作归属证明，应先停用其他写入者。
+- `mobile.tasks[].file` 是显式投影的实际相对 JSONL 路径，例如 `me/data/tasks/2026-11.jsonl`。只有新任务建议动作使用该路径；完成结果的 `file: task` 逻辑域不变。路径取实际可读历史所在文件，不按 ts 或当前时区推算；同 ID 出现多文件时，mobile.tasks 不提供 file、Home.pending.file 为 null，客户端不能发新决定，须先核对冲突。决定/撤销只向经过类型目录及文件名校验的该实际文件追加，换时区或旧导入月份不移走记录。任务已有 `source` 原值可选，缺失时决定请求带 `expected_source: null`，不能按标题猜关联。
+- 决定请求：`{client_id,at,device,op:"decide_task",args:{consumer_id,file,id,expected_rev,expected_source,decision}}`。`decision` 为 `adopted` 或 `dismissed`；`expected_rev` 是所见 proposed 修订号，`expected_source` 为所见来源字符串或 null。新动作 `client_id` 支持 ULID 和标准连字符 UUID，旧操作仍用 ULID；phone 文件名的设备与 ULID 规则不变。
+- 撤销请求：`op:"undo_task_decision",args:{consumer_id,decision_id}`，用新 `client_id`。`decision_id` 固定是首次决定的 `client_id`。同一个动作在丢响应或重启后原 ID、原 op/args 重投；改内容返回 conflict，不重新解释旧 ID。同一 consumer/file/id/revision 已有未终态准备计划时，另一 client_id 不得占用同一决定；撤销按 decision_id 同样预约，须先恢复原 ID，不能用新 ID 把另一次同内容写入认作两次成功。旧 adopt/cancel 等 updateRecord 入口也不得写出被本处理器未终态计划预约的相同完整 after；不同的后续用户编辑仍可保存，并使旧计划冲突。
+- 拒绝追加 `cancelled` 修订；采纳追加 `open` 修订。原 proposed 行、原文、来源和历史保留。撤销只在当前完整记录仍精确等于原决定写成的 after 时追加恢复原 proposed 内容的新修订，不回退修订号，不抹掉后来的标题、来源、编辑、完成、取消或删除。跨文件同 ID 或同修订不同内容都冲突。
+- 成功回执独立增加 `decision:{decision_id,status:"adopted"|"dismissed"|"undone"}`，`target:{id,rev}` 是该次动作实际追加的修订号；不使用结果专用 `result`，不计为完成或七天结果。只有 applied/duplicate 且 decision 关联相符才确认这次决定；conflict/rejected 不可当成功。原决定撤销后重投原决定，仍返回 duplicate + undone，不重新采纳。
+- `mobile.task_decisions` 可选数组，每项 `{decision_id,consumer_id,file,id,rev,source,title,status,decided_at,can_undo}`。`rev` 是原决定写成的修订，不是当前最新修订；source 必有，为原值或 null；decided_at 是电脑准备时的真实时间。仅投影终态账本已确认的决定，撤销后保留 `status:undone,can_undo:false`；后续改动保留该审计项，但 can_undo 为 false。客户端重启后用此投影恢复操作入口，不只保存瞬时内存回执。pending proposed 消失本身不是成功凭据。
+- 决定与撤销沿既有 `.kaitu/phone-actions.json` 先持久保存精确请求与 before/after，再追加 task 修订，最后保存终态与回执。任一 I/O 失败保持可重试；已写成的精确历史修订可证明原操作，重投不重复追加，也不覆盖后来编辑。回执丢失时重试可补发。记录、终态和展示回执不承诺跨文件同时发布，必须等待真实回执或新快照确认。
+
+换电脑接管时，客户端读到新的 `consumer_id`，须将旧队列标为本地“处理器作用域已变化，需重新读取核对”，不能无限等待回执，也不能伪造服务端已拒绝或未执行的事实。旧电脑可能已经执行旧请求；重新操作前须核对新快照实际任务修订和 task_decisions，无法证明原状态时不自动重放决定。只要确认旧处理器已停止写入、新处理器是唯一写入者，新权威快照中该任务仍为 proposed，且 file/id/rev/source 与当前显示精确相符，用户重新点当前建议可用新 ID 提交，不要求永远等待离线旧电脑的终态。无法确认单写入者或快照权威性时继续保留本地作用域待核对状态。新处理器不把旧 ID 的请求改写成自己的请求。
+
+非目标 consumer 的条目保留在收件箱，不写终态账本或回执，不移入 processed。请每个新动作独立成文件，或仅把同 consumer 的动作放在一起。混合 consumer 文件只处理本机条目，并保持整文件 pending，让其他条目仍可读；本机条目重读沿持久账本去重。发布这些文件的客户端负责在全部条目取得可核实的结果后清理旧文件，接管时不能凭“未收到回执”删除或重新解释旧操作；本实现不自动清理异地请求。
+
+Mac 可同步调用共享 core `applyTaskDecision(ws,{client_id,op,args})`，参数与上述 op/args 相同，不需要 phone 的 at/device 包装；方法在任务、终态账本及展示回执写入后返回 `PhoneReceipt`，I/O 失败抛错供原 ID 重试。`taskDecisionContext(ws)` 返回 `{consumer_id}`，`taskDecisions(ws)` 返回与 mobile.task_decisions 一致的持久读模型。Home.pending 显式含 file/rev/source，UI 不自行推算。该入口不执行日历、外发或其他高影响动作，不扩展手机已有权限。

@@ -45,6 +45,7 @@ export * from "./record-reference.js";
 export * from "./inbox-notes.js";
 
 export * from "./tasks.js";
+export * from "./task-decisions.js";
 
 export * from "./upgrade.js";
 export * from "./template-version.js";
@@ -126,3 +127,5 @@ export * from "./weather.js";
 export * from "./life-atlas.js";
 
 export * from "./home-cache.js";
+
+export * from "./local-task-decisions.js";
