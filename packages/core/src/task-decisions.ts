@@ -151,7 +151,9 @@ export function applyTaskDecision(ws: Workspace, input: TaskDecisionAction): Pho
   )
     return { ...receipt, status: "conflict", message: "这个 client_id 已绑定首次操作，请沿首次内容重试" };
   if (existing?.status) {
-    const plan = existing.taskDecision ?? ledger[existing.taskDecisionUndo?.decision_id ?? ""]?.taskDecision;
+    const plan =
+      existing.taskDecision ??
+      ledger["decision_id" in action.args ? action.args.decision_id : ""]?.taskDecision;
     const replay = {
       ...receipt,
       status: existing.status === "applied" ? ("duplicate" as const) : existing.status,

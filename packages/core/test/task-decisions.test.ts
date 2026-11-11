@@ -134,6 +134,12 @@ it.each(["adopted", "dismissed"] as const)(
       target: { rev: 3 },
       decision: { status: "undone" },
     });
+    await deliver(reloaded, secondUndo);
+    expect(receipt(reloaded, secondUndo.client_id)).toMatchObject({
+      status: "duplicate",
+      target: { rev: 3 },
+      decision: { decision_id: action.client_id, status: "undone" },
+    });
     expect(readRecordRevisions(reloaded, "task").filter((row) => row.id === original.id)).toHaveLength(3);
   },
 );
