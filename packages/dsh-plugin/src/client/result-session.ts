@@ -132,7 +132,28 @@ export function createTodayBoardSession(
         operation.current = action;
         await persist(); // Persist original ID and full payload BEFORE the first send.
         const response = await transport(root, action.request);
-        if (!response || !["applied", "duplicate"].includes(response.status) || !response.effect)
+        if (
+          !response ||
+          !["applied", "duplicate"].includes(response.status) ||
+          !response.effect ||
+          response.effect.id !== action.step.id ||
+          response.effect.file !== action.step.file ||
+          (response.effect.file === "task"
+            ? !("rev" in response.effect) ||
+              !("prior_rev" in response.effect) ||
+              !Number.isInteger(response.effect.rev) ||
+              response.effect.rev < 1 ||
+              !Number.isInteger(response.effect.prior_rev) ||
+              response.effect.prior_rev < 1
+            : !("expected_next" in response.effect) ||
+              !("prior_next" in response.effect) ||
+              !response.effect.expected_next ||
+              typeof response.effect.expected_next !== "object" ||
+              !response.effect.prior_next ||
+              typeof response.effect.prior_next !== "object" ||
+              response.effect.expected_next.id !== action.step.id ||
+              response.effect.prior_next.id !== action.step.id)
+        )
           throw new Error("保存结果未确认，请重试 / Save unconfirmed; retry");
         operation.current = undefined;
         if (

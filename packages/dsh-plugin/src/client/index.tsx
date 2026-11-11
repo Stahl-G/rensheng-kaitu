@@ -220,14 +220,18 @@ export async function apply(ctx: Context) {
                 value: import("@kaitu/core").HomeResultDraft | null,
                 expected: import("@kaitu/core").HomeResultDraft | null,
               ) => {
-                const r = await ctx.remote.kaitu.resultDraft(root, value, expected);
+                const r = await ctx.remote.kaitu.resultDraft(
+                  root,
+                  JSON.stringify(value),
+                  JSON.stringify(expected),
+                );
                 if (!r.ok) throw r.error;
-                return r.value;
+                return JSON.parse(r.value);
               },
               resultAction: async (root: string, request: import("@kaitu/core").ResultRequest) => {
-                const r = await ctx.remote.kaitu.resultAction(root, request);
+                const r = await ctx.remote.kaitu.resultAction(root, JSON.stringify(request));
                 if (!r.ok) throw r.error;
-                return r.value;
+                return JSON.parse(r.value);
               },
               loadHome: async () => {
                 const result = await ctx.remote.kaitu.home();

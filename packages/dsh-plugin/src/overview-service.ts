@@ -13,7 +13,6 @@ import {
   type City,
   type FinanceAccess,
   type HandoverPack,
-  type HomeResultDraft,
   type HomeState,
   type Hometown,
   type ImportSource,
@@ -45,8 +44,6 @@ import {
   type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
-  type ResultEffect,
-  type ResultRequest,
   type ResumeReceipt,
   type ResumeUpload,
   type SettingsData,
@@ -78,6 +75,8 @@ import {
   createHomeCache,
   createProject,
   decideProposal,
+  decodeHomeResultDraft,
+  decodeHomeResultRequest,
   defaultRoot,
   directionsPrompt,
   dismissNews,
@@ -285,29 +284,26 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("resultDraft")
-  async resultDraft(
-    root: string,
-    value: HomeResultDraft | null,
-    expected: HomeResultDraft | null,
-  ): Promise<HomeResultDraft> {
+  async resultDraft(root: string, value: string, expected: string): Promise<string> {
     try {
-      return resultDraft(this.workspace, root, value, expected);
+      return JSON.stringify(
+        resultDraft(this.workspace, root, decodeHomeResultDraft(value), decodeHomeResultDraft(expected)),
+      );
     } catch (error) {
       return throwHomeCompletionError(error);
     }
   }
 
   @Remote("resultAction")
-  async resultAction(
-    root: string,
-    request: ResultRequest,
-  ): Promise<{ status: "applied" | "duplicate"; effect: ResultEffect }> {
+  async resultAction(root: string, payload: string): Promise<string> {
     try {
-      return await this.write(() => {
-        if (root !== this.workspace.root)
-          throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
-        return applyResultAction(this.workspace, request);
-      });
+      return JSON.stringify(
+        await this.write(() => {
+          if (root !== this.workspace.root)
+            throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+          return applyResultAction(this.workspace, decodeHomeResultRequest(payload));
+        }),
+      );
     } catch (error) {
       return throwHomeCompletionError(error);
     }

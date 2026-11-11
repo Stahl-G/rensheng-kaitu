@@ -8,7 +8,6 @@ import {
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
-  type HomeResultDraft,
   type ImportSource,
   KaituError,
   type LearningCheckinInput,
@@ -24,7 +23,6 @@ import {
   type OnboardingSetupInput,
   type OnboardingTarget,
   type ProjectGoal,
-  type ResultRequest,
   type StartLearningInput,
   type SyncProvider,
   type TaskInput,
@@ -55,6 +53,8 @@ import {
   confirmOnboardingSetup,
   createProject,
   decideProposal,
+  decodeHomeResultDraft,
+  decodeHomeResultRequest,
   directionsPrompt,
   discardFinanceImport,
   dismissDirectionLink,
@@ -505,12 +505,12 @@ export async function productRequest(
       return resultDraft(
         ws,
         text(0),
-        (args[1] ?? null) as HomeResultDraft | null,
-        (args[2] ?? null) as HomeResultDraft | null,
+        decodeHomeResultDraft(JSON.stringify(args[1] ?? null)),
+        decodeHomeResultDraft(JSON.stringify(args[2] ?? null)),
       );
     case "resultAction": {
       if (text(0) !== ws.root) throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
-      return applyResultAction(ws, args[1] as ResultRequest);
+      return applyResultAction(ws, decodeHomeResultRequest(JSON.stringify(args[1])));
     }
     case "captureOnce":
       return captureNoteOnce(ws, text(0), text(1), {

@@ -7,8 +7,10 @@ import {
   type ResultRequest,
   Workspace,
   addRecord,
+  parseFrontmatter,
   readRecordRevisions,
   readRecords,
+  stringifyFrontmatter,
   updateRecord,
 } from "../../core/src/index.js";
 import { clonedWorkspace } from "../../core/test/helpers.js";
@@ -38,12 +40,16 @@ function service(ws: Workspace): ResultTransport {
     write: (run: () => Promise<unknown>) => run(),
   } as unknown as KaituOverviewService;
   return (root, request) =>
-    KaituOverviewService.prototype.resultAction.call(owner, root, JSON.parse(JSON.stringify(request)));
+    KaituOverviewService.prototype.resultAction
+      .call(owner, root, JSON.stringify(request))
+      .then((value) => JSON.parse(value));
 }
 function drafts(ws: Workspace): DraftTransport {
   const owner = { workspace: ws } as unknown as KaituOverviewService;
   return (root, value, expected) =>
-    KaituOverviewService.prototype.resultDraft.call(owner, root, value, expected);
+    KaituOverviewService.prototype.resultDraft
+      .call(owner, root, JSON.stringify(value), JSON.stringify(expected))
+      .then((result) => JSON.parse(result));
 }
 const step = (id: string): Step => ({
   key: `task:${id}`,
@@ -357,6 +363,70 @@ test("lost pending-state response never sends early, and a fresh owner confirms 
     expect(transport.mock.calls[0]?.[1]).toEqual(original.request);
     expect(readRecordRevisions(ws, "task").filter((row) => row.id === task.id)).toHaveLength(2);
     fresh.expire();
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("JSON service boundaries preserve full STATUS preconditions, Unicode results and malformed replies remain retryable", async () => {
+  const ws = await clonedWorkspace();
+  try {
+    const prior = {
+      id: "nested",
+      title: "Synthetic",
+      status: "todo",
+      result: "old\nmultiline",
+      extra: { nested: [1, { keep: "未知" }] },
+    };
+    ws.writeText("me/STATUS.md", stringifyFrontmatter({ next: [prior] }, "# Unchanged body\n"));
+    const target: Step = {
+      ...step(prior.id),
+      file: "me/STATUS.md",
+      key: `me/STATUS.md:${prior.id}`,
+      precondition: { kind: "status", expectedNext: prior },
+    };
+    const text = "😀".repeat(2000);
+    const original = {
+      step: target,
+      text,
+      request: {
+        client_id: resultId(),
+        op: "complete_next_result" as const,
+        args: { file: target.file, id: prior.id, expected_next: prior, result_text: text },
+      },
+    };
+    const saved = { drafts: { [target.key]: text }, operation: original };
+    expect(await drafts(ws)(ws.root, saved, { drafts: {} })).toEqual(saved);
+    expect(await drafts(new Workspace(ws.root))(ws.root, null, null)).toEqual(saved);
+    const response = await service(ws)(ws.root, original.request);
+    expect(response.status).toBe("applied");
+    expect(response.effect).toEqual({
+      file: target.file,
+      id: prior.id,
+      prior_next: prior,
+      expected_next: { ...prior, status: "done", result: text, completed: expect.any(String) },
+    });
+    expect(JSON.parse(JSON.stringify(response))).toEqual(response);
+    await service(ws)(ws.root, { client_id: resultId(), op: "restore_next", args: response.effect });
+    expect(parseFrontmatter(ws.readText("me/STATUS.md"))).toMatchObject({
+      data: { next: [prior] },
+      body: "# Unchanged body\n",
+    });
+    await expect(
+      service(ws)(ws.root, {
+        ...original.request,
+        client_id: resultId(),
+        args: { ...original.request.args, expected_next: { ...prior, title: "Wrong" } },
+      }),
+    ).rejects.toMatchObject({ code: "kaitu/completion-rejected", details: { code: "CONFLICT" } });
+    const owner = createTodayBoardSession(ws.root, storage());
+    owner.set("drafts", saved.drafts);
+    await owner.send(async () => JSON.parse('{"status":"applied","effect":{}}'), original);
+    expect(owner.operation.current).toEqual(original);
+    expect(owner.read().drafts).toEqual(saved.drafts);
+    expect(owner.read().receipt).toBeUndefined();
+    await owner.send(async () => JSON.parse("lost response"));
+    expect(owner.operation.current).toEqual(original);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

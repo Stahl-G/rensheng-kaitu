@@ -15,6 +15,35 @@ export interface HomeResultDraft {
   operation?: HomeResultOperation;
 }
 const draftFile = ".kaitu/result-draft.json";
+function decodeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new KaituError("请求格式无效 / Invalid request", "BAD_ARGS");
+  }
+}
+export function decodeHomeResultRequest(text: string): ResultRequest {
+  const value = decodeJson(text) as Partial<ResultRequest> | null;
+  if (
+    !value ||
+    typeof value !== "object" ||
+    typeof value.client_id !== "string" ||
+    !/^[0-9A-HJKMNP-TV-Z]{26}$/.test(value.client_id) ||
+    !["complete_next_result", "restore_task_revision", "restore_next", "adopt_task", "cancel_task"].includes(
+      String(value.op),
+    ) ||
+    !value.args ||
+    typeof value.args !== "object" ||
+    typeof value.args.id !== "string"
+  )
+    throw new KaituError("请求格式无效 / Invalid request", "BAD_ARGS");
+  return value as ResultRequest;
+}
+export function decodeHomeResultDraft(text: string): HomeResultDraft | null {
+  const value = decodeJson(text);
+  if (value === null || validDraft(value)) return value;
+  throw new KaituError("草稿无效 / Invalid draft", "BAD_ARGS");
+}
 function validDraft(value: unknown): value is HomeResultDraft {
   const object = (item: unknown): item is Record<string, unknown> =>
     !!item && typeof item === "object" && !Array.isArray(item);
