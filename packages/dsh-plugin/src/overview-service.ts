@@ -287,8 +287,8 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("resultDraft")
   async resultDraft(
     root: string,
-    value: HomeResultDraft | null = null,
-    expected: HomeResultDraft | null = null,
+    value: HomeResultDraft | null,
+    expected: HomeResultDraft | null,
   ): Promise<HomeResultDraft> {
     try {
       return resultDraft(this.workspace, root, value, expected);
