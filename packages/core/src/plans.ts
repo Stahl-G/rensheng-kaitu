@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { KaituError } from "./errors.js";
+import { taskResult } from "./results.js";
 import { schemas } from "./schema.js";
 import type { Task } from "./tasks.js";
 import type { Goal, WorkbenchData } from "./workbench.js";
@@ -52,6 +53,10 @@ export function upsertGoal(
 }
 
 export function noteLine(notes: string, label: string): string {
+  if (label === "完成结果" || label === "完成时间") {
+    const result = taskResult(notes);
+    if (result) return label === "完成结果" ? result.text : result.at;
+  }
   return (
     notes
       .split("\n")

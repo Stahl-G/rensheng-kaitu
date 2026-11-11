@@ -125,3 +125,5 @@ export * from "./weather.js";
 export * from "./life-atlas.js";
 
 export * from "./home-cache.js";
+
+export * from "./results.js";
