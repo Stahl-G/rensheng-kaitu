@@ -4,16 +4,16 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
-import { findRecordType, listRecordTypes, recordFileFor } from "./modules.js";
+import { listRecordTypes } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
 import { phoneInboxName } from "./phone-actions.js";
 import { phoneResults } from "./phone-results.js";
 import type { Experience, LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
-import { taskDecisionContext, taskDecisions } from "./task-decisions.js";
+import { taskDecisionContext, taskDecisionFiles, taskDecisions } from "./task-decisions.js";
 import { listTasks } from "./tasks.js";
-import { localDate, localMonth, parseTs } from "./time.js";
+import { localDate, parseTs } from "./time.js";
 import { userNavigation } from "./user-profile.js";
 import type { Workspace } from "./workspace.js";
 
@@ -47,6 +47,7 @@ function nutrition(ws: Workspace, data: Overview) {
 export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspace) {
   const food = nutrition(ws, data);
   const hasTasks = listRecordTypes(ws).some((ref) => ref.type === "task");
+  const taskFiles = hasTasks ? taskDecisionFiles(ws) : new Map<string, string | null>();
   const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
     id,
     title,
@@ -87,7 +88,7 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
         ({ id, rev, title, status, ts, due, source }) => ({
           id,
           rev: rev ?? 1,
-          file: recordFileFor(findRecordType(ws, "task"), localMonth(parseTs(ts), data.timeZone)),
+          file: taskFiles.get(id) ?? undefined,
           title,
           status,
           ts,

@@ -3,17 +3,19 @@ import { expect, it, vi } from "vitest";
 import {
   Workspace,
   addRecord,
+  parseFrontmatter,
   phoneReceipts,
   processInbox,
   readHome,
   readHomeSources,
   readRecords,
   schemas,
+  stringifyFrontmatter,
   updateRecord,
   writePhoneSnapshots,
 } from "../src/index.js";
 import { applyPhoneActions } from "../src/phone-actions.js";
-import { readRecordRevisions } from "../src/records.js";
+import { appendPreparedRecords, readRecordRevisions } from "../src/records.js";
 import {
   type TaskDecisionAction,
   applyTaskDecision,
@@ -407,3 +409,101 @@ it("a different consumer leaves the inbox and existing successful/prepared recei
   });
   expect(current(mixed.ws, mixed.original.id)?.status).toBe("cancelled");
 });
+
+it.each(["adopted", "dismissed"] as const)(
+  "unfinished %s and undo plans cannot be claimed by another client ID",
+  async (decision) => {
+    const { ws, original, action } = await setup(decision);
+    const stop = vi.spyOn(ws, "appendLine").mockImplementation(() => {
+      throw new Error("prepared before append");
+    });
+    expect(() => applyTaskDecision(ws, action)).toThrow("prepared before append");
+    stop.mockRestore();
+    let reloaded = new Workspace(ws.root, { maintain: false });
+    const competing = { ...action, client_id: ulid() };
+    expect(applyTaskDecision(reloaded, competing).status).toBe("conflict");
+    expect(current(reloaded, original.id)).toEqual(original);
+    expect(taskDecisions(reloaded)).toEqual([]);
+    expect(applyTaskDecision(new Workspace(ws.root, { maintain: false }), action).status).toBe("applied");
+    reloaded = new Workspace(ws.root, { maintain: false });
+    expect(taskDecisions(reloaded)).toEqual([
+      expect.objectContaining({ decision_id: action.client_id, can_undo: true }),
+    ]);
+    const reversal = undo(reloaded, action.client_id);
+    const stopUndo = vi.spyOn(reloaded, "appendLine").mockImplementation(() => {
+      throw new Error("undo prepared before append");
+    });
+    expect(() => applyTaskDecision(reloaded, reversal)).toThrow("undo prepared before append");
+    stopUndo.mockRestore();
+    const next = new Workspace(ws.root, { maintain: false });
+    const competingUndo = undo(next, action.client_id);
+    expect(applyTaskDecision(next, competingUndo).status).toBe("conflict");
+    expect(current(next, original.id)?.rev).toBe(2);
+    expect(applyTaskDecision(new Workspace(ws.root, { maintain: false }), reversal).status).toBe("applied");
+    expect(taskDecisions(next)).toEqual([
+      expect.objectContaining({ decision_id: action.client_id, status: "undone", can_undo: false }),
+    ]);
+    expect(readRecordRevisions(next, "task").filter((row) => row.id === original.id)).toHaveLength(3);
+  },
+);
+
+it.each(["imported-month", "changed-timezone"] as const)(
+  "%s uses the actual task file for snapshots, decisions and undo, without writing a derived other file",
+  async (kind) => {
+    const ws = await clonedWorkspace();
+    const created = addRecord(ws, "task", {
+      ts: "2026-11-01T00:30:00Z",
+      title: "合成跨月建议",
+      source: "me/goals.json#synthetic-boundary",
+    });
+    let actualFile = created.file;
+    if (kind === "imported-month") {
+      actualFile = "me/data/tasks/2000-01.jsonl";
+      const unrelated = ws
+        .readText(created.file)
+        .split("\n")
+        .filter((line) => line.trim() && JSON.parse(line).id !== created.record.id);
+      ws.writeText(created.file, unrelated.join("\n"));
+      ws.appendLine(actualFile, JSON.stringify(created.record));
+    } else {
+      const rules = parseFrontmatter<Record<string, unknown>>(ws.readText("me/rules.md"));
+      rules.data.timezone = "America/Los_Angeles";
+      ws.writeText("me/rules.md", stringifyFrontmatter(rules.data, rules.body));
+    }
+    const originalBytes = ws.readText(actualFile);
+    const derived = kind === "imported-month" ? created.file : "me/data/tasks/2026-10.jsonl";
+    const derivedBytes = ws.exists(derived) ? ws.readText(derived) : null;
+    const projectedHome = readHome(await readHomeSources(ws));
+    expect(projectedHome.pending.find((item) => item.id === created.record.id)?.file).toBe(actualFile);
+    await writePhoneSnapshots(ws, new Date(), { force: true });
+    const tasks = ws.readJson<{ mobile: { tasks: { id: string; file?: string }[] } }>("phone/today.json")
+      .mobile.tasks;
+    expect(tasks.find((item) => item.id === created.record.id)?.file).toBe(actualFile);
+    const action: TaskDecisionAction = {
+      client_id: ulid(),
+      op: "decide_task",
+      args: {
+        ...taskDecisionContext(ws),
+        file: actualFile,
+        id: created.record.id,
+        expected_rev: 1,
+        expected_source: String(created.record.source),
+        decision: "dismissed",
+      },
+    };
+    expect(applyTaskDecision(ws, action).status).toBe("applied");
+    expect(
+      applyTaskDecision(new Workspace(ws.root, { maintain: false }), undo(ws, action.client_id)).status,
+    ).toBe("applied");
+    expect(ws.readText(actualFile)).toContain(originalBytes.trim());
+    expect(ws.readText(actualFile).trim().split("\n")).toHaveLength(3);
+    expect(ws.exists(derived) ? ws.readText(derived) : null).toBe(derivedBytes);
+    expect(current(ws, created.record.id)).toEqual({ ...created.record, by: "user", rev: 3 });
+    expect(() =>
+      appendPreparedRecords(ws, [
+        { type: "task", record: { ...created.record, by: "user", rev: 4 }, file: "health/2026-11.jsonl" },
+      ]),
+    ).toThrow("来源文件不属于此记录类型");
+    expect(ws.exists("health/2026-11.jsonl")).toBe(false);
+  },
+);

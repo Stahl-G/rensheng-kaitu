@@ -57,6 +57,18 @@ const conflict = (message = "这条建议已更新，请刷新后再处理") => 
 export function taskDecisionContext(ws: Workspace): { consumer_id: string } {
   return { consumer_id: stateBinding(ws.root).id };
 }
+/** Actual readable source locations, not a reconstruction from timestamp/current timezone. */
+export function taskDecisionFiles(
+  ws: Workspace,
+  onError?: (error: KaituError) => void,
+): Map<string, string | null> {
+  const files = new Map<string, string | null>();
+  for (const { file, record } of readRecordRevisionsWithFiles(ws, "task", onError)) {
+    if (!files.has(record.id)) files.set(record.id, file);
+    else if (files.get(record.id) !== file) files.set(record.id, null);
+  }
+  return files;
+}
 function load(ws: Workspace): Record<string, TaskDecisionLedgerEntry> {
   return ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
 }
@@ -87,7 +99,7 @@ function applyChange(ws: Workspace, plan: DecisionPlan, change: Change) {
     return;
   }
   if (!isDeepStrictEqual(current, change.before)) throw conflict();
-  appendPreparedRecords(ws, [{ type: "task", record: change.after }]);
+  appendPreparedRecords(ws, [{ type: "task", record: change.after, file: plan.file }]);
   const confirmed = taskHistory(ws, plan.file, plan.id);
   if (!isDeepStrictEqual(confirmed.revisions.get(change.after.rev ?? 1), change.after)) throw conflict();
 }
@@ -109,7 +121,7 @@ function prepare(ws: Workspace, action: TaskDecisionAction): DecisionPlan {
     status: args.decision === "adopted" ? "open" : "cancelled",
     rev: (current.rev ?? 1) + 1,
   };
-  validatePreparedRecords(ws, [{ type: "task", record: after }]);
+  validatePreparedRecords(ws, [{ type: "task", record: after, file: args.file }]);
   return {
     decision_id: action.client_id,
     consumer_id: args.consumer_id,
@@ -169,6 +181,21 @@ export function applyTaskDecision(ws: Workspace, input: TaskDecisionAction): Pho
     let plan: DecisionPlan;
     let change: Change;
     if (action.op === "decide_task") {
+      if (!("id" in action.args)) throw conflict();
+      if (!entry.taskDecision)
+        for (const [id, other] of Object.entries(ledger)) {
+          const pending = other.taskDecision;
+          if (
+            id !== action.client_id &&
+            !other.status &&
+            pending &&
+            pending.consumer_id === action.args.consumer_id &&
+            pending.file === action.args.file &&
+            pending.id === action.args.id &&
+            (pending.change.before.rev ?? 1) === action.args.expected_rev
+          )
+            throw conflict("这条建议有未完成操作，请沿原 client_id 重试并等待回执");
+        }
       plan = entry.taskDecision ?? prepare(ws, action);
       if (!entry.taskDecision) {
         entry.taskDecision = plan;
@@ -188,11 +215,18 @@ export function applyTaskDecision(ws: Workspace, input: TaskDecisionAction): Pho
         change = plan.change;
       } else {
         if (!entry.taskDecisionUndo) {
+          for (const [id, other] of Object.entries(ledger))
+            if (
+              id !== action.client_id &&
+              !other.status &&
+              other.taskDecisionUndo?.decision_id === plan.decision_id
+            )
+              throw conflict("这条决定有未完成撤销，请沿原 client_id 重试并等待回执");
           const { current } = taskHistory(ws, plan.file, plan.id);
           if (!isDeepStrictEqual(current, plan.change.after))
             throw conflict("处理后这条事项已修改，未撤销后续内容");
           const after = { ...plan.change.before, by: "user" as const, rev: plan.rev + 1 };
-          validatePreparedRecords(ws, [{ type: "task", record: after }]);
+          validatePreparedRecords(ws, [{ type: "task", record: after, file: plan.file }]);
           entry.taskDecisionUndo = {
             decision_id: plan.decision_id,
             change: { before: plan.change.after, after },

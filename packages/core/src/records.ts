@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { deepFreeze } from "./frozen.js";
@@ -415,14 +415,14 @@ export function readRecords(
 }
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
-function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord }[]) {
+function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord; file?: string }[]) {
   const tasks = entries.some((entry) => entry.type === "task")
     ? new Map(readRecords(ws, "task").map((record) => [record.id, record]))
     : undefined;
   const phases = entries.some((entry) => entry.type === "phase")
     ? new Map(readRecords(ws, "phase").map((record) => [record.id, record]))
     : undefined;
-  return entries.map(({ type, record }) => {
+  return entries.map(({ type, record, file: sourceFile }) => {
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
     validateRecord(
@@ -431,7 +431,12 @@ function preparedRecords(ws: Workspace, entries: { type: string; record: StoredR
       record,
       type === "phase" ? phases?.get(record.id) : type === "task" ? tasks?.get(record.id) : undefined,
     );
-    const file = recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
+    const file = sourceFile ?? recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
+    if (sourceFile) {
+      const pattern = recordFilePattern(ref);
+      if (dirname(file) !== pattern.dir || !pattern.match.test(basename(file)))
+        throw new KaituError("准备记录的来源文件不属于此记录类型", "INVALID_RECORD");
+    }
     resolveRecordPath(ws, ref, file);
     return { file, record, ref };
   });
@@ -439,14 +444,14 @@ function preparedRecords(ws: Workspace, entries: { type: string; record: StoredR
 
 export function validatePreparedRecords(
   ws: Workspace,
-  entries: { type: string; record: StoredRecord }[],
+  entries: { type: string; record: StoredRecord; file?: string }[],
 ): void {
   preparedRecords(ws, entries);
 }
 
 export function appendPreparedRecords(
   ws: Workspace,
-  entries: { type: string; record: StoredRecord }[],
+  entries: { type: string; record: StoredRecord; file?: string }[],
 ): void {
   const plans = preparedRecords(ws, entries);
   const files = new Map<string, string[]>();
