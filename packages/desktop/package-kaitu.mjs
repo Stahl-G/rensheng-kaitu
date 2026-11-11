@@ -235,6 +235,7 @@ async function packageApplication() {
     const payload = join(resources, "kaitu");
     await writePayload(payload);
     cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
+    cpSync(join(directory, "state-backup.mjs"), join(resources, "kaitu-state-backup.mjs"));
     if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
     await writeIcon(resources);
     await rewriteArchive(join(temporary, "app.asar"));
