@@ -240,7 +240,7 @@ export function TodayBoard({
             <div className={styles.completionReceipt} aria-live="polite">
               <span>{receipt.text}</span>
               <button type="button" className={css.btn} disabled={pending} onClick={() => void reverse()}>
-                {t("撤销", "Undo")} ⌘Z
+                {t("撤销", "Undo")}
               </button>
               <button type="button" className={css.link} onClick={() => setReceipt(undefined)}>
                 {t("下一件", "Next")}

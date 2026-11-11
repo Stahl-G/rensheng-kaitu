@@ -3,11 +3,14 @@ import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:f
 import { join } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import {
+  type HomeNextTarget,
+  type HomeState,
   type PhoneReceipt,
   type TaskDecisionAction,
   Workspace,
   addRecord,
   applyTaskDecision,
+  completeHomeNext,
   localStateRoot,
   moveWorkspace,
   readCalendar,
@@ -15,6 +18,7 @@ import {
   readHomeSources,
   readOverviewPage,
   readRecords,
+  undoHomeNext,
   updateRecord,
 } from "@kaitu/core";
 import { createElement } from "react";
@@ -26,6 +30,7 @@ import { clonedWorkspace } from "../../core/test/helpers.js";
 import { TYPERT } from "../lib/typert.host.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { type TaskDecisionServices, TaskSuggestions } from "../src/client/TaskSuggestions.js";
+import { TodayBoard } from "../src/client/TodayBoard.js";
 import { LifeHome } from "../src/client/TodayPage.js";
 import { KaituOverviewService } from "../src/overview-service.js";
 
@@ -372,19 +377,52 @@ function browserGlobals() {
 it("CmdZ uses local submission order, opens decision history across pages, preserves old completion and editor/IME modifiers", async () => {
   browserGlobals();
   const { ws, host } = await setup();
-  const overview = await readOverviewPage(ws);
-  const home = { data: readHome(await readHomeSources(ws)), loading: false, error: null };
-  let accept: (value: { token: string; title: string }) => void = () => {};
+  const oldTask = addRecord(ws, "task", { title: "Old", status: "open" }, { by: "user" }).record;
+  const lateTask = addRecord(ws, "task", { title: "Late", status: "open" }, { by: "user" }).record;
+  const stepFor = (task: typeof oldTask) => ({
+    key: `task:${task.id}`,
+    id: task.id,
+    file: "task",
+    title: String(task.title),
+    parent: "Goal",
+    due: null,
+    precondition: { kind: "task" as const, expectedRev: task.rev ?? 1 },
+  });
+  const step = stepFor(oldTask);
+  const oldCompletion = completeHomeNext(ws, step, "Old result", randomUUID());
+  let updateHome: ((state: HomeState) => void) | undefined;
+  const loadHome = async (): Promise<HomeState> => ({
+    data: readHome(await readHomeSources(ws)),
+    loading: false,
+    error: null,
+  });
+  const publishHome = async () => updateHome?.(await loadHome());
+  let accept: () => Promise<void> = async () => {};
   const complete = vi
     .fn()
     .mockImplementationOnce(
-      () =>
+      (target: HomeNextTarget, text: string, id: string) =>
         new Promise((resolve) => {
-          accept = resolve;
+          accept = async () => {
+            const receipt = completeHomeNext(ws, target, text, id);
+            await publishHome();
+            resolve(receipt);
+          };
         }),
     )
-    .mockResolvedValue({ token: "new", title: "New completion" });
-  const undo = vi.fn().mockResolvedValue({ undone: true });
+    .mockImplementation(async (target: HomeNextTarget, text: string, id: string) => {
+      const receipt = completeHomeNext(ws, target, text, id);
+      await publishHome();
+      return receipt;
+    });
+  const undo = vi.fn(async (token: string) => {
+    const receipt = undoHomeNext(ws, token);
+    await publishHome();
+    return receipt;
+  });
+  const initialHome = await loadHome();
+  const suggestionId = need(initialHome.data?.pending[0]).id;
+  const overview = await readOverviewPage(ws);
   const historyScroll = vi.fn();
   const historyFocus = vi.fn();
   const props = {
@@ -397,11 +435,21 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     loadCalendarPush: async () => ({}),
     loadProjects: async () => [],
     renderAsk: () => null,
-    loadHome: async () => home,
+    loadHome: async () => initialHome,
+    subscribeHome: (listener) => {
+      updateHome = listener;
+      return () => {
+        updateHome = undefined;
+      };
+    },
     completeHomeNext: complete,
     undoHomeNext: undo,
     loadTaskDecisions: (root: string) => host.taskDecisionState(root),
-    submitTaskDecision: (scope, action) => host.submitTaskDecision(scope, action),
+    submitTaskDecision: async (scope, action) => {
+      const receipt = await host.submitTaskDecision(scope, action);
+      await publishHome();
+      return receipt;
+    },
     retryTaskDecision: (scope, id) => host.retryTaskDecision(scope, id),
   } as OverviewPageProps;
   let app: ReturnType<typeof create> | undefined;
@@ -429,15 +477,31 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
     const owner = () => need(app).root.findByType(LifeHome);
-    const step = { key: "task:old", id: "old", file: "task", title: "Old", parent: "Goal", due: null };
-    owner().props.session.set("receipt", { value: { token: "old", title: "Old" }, step, text: "Old result" });
+    const completionUndo = () =>
+      need(owner().findByType(TodayBoard).findByProps({ "aria-live": "polite" }).findAllByType("button")[0]);
+    const untilReceiptClears = (action: () => void) =>
+      new Promise<void>((resolve) => {
+        const board = owner().props.session;
+        const stop = board.subscribe(() => {
+          if (!board.read().receipt) {
+            stop();
+            resolve();
+          }
+        });
+        action();
+      });
+    await act(async () =>
+      owner().props.session.set("receipt", { value: oldCompletion, step, text: "Old result" }),
+    );
     let waiting: Promise<unknown> | undefined;
     await act(async () => {
-      waiting = owner().props.complete(step, "Late result", randomUUID());
+      waiting = owner().props.complete(stepFor(lateTask), "Late result", randomUUID());
     });
-    await act(async () => owner().props.decisions.activity());
+    await act(async () => button(need(app), "采纳").props.onClick());
+    expect(readRecords(ws, "task").find((item) => item.id === suggestionId)?.status).toBe("open");
+    expect(completionUndo().children.join("")).toBe("撤销");
     await act(async () => {
-      accept({ token: "late", title: "Late" });
+      await accept();
       await waiting;
     });
     await act(async () => {
@@ -450,7 +514,8 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     expect(owner().props.decisions.historyRequest).toBe(0);
     expect(historyScroll).toHaveBeenCalledTimes(1);
     expect(historyFocus).toHaveBeenCalledWith({ preventScroll: true });
-    expect(owner().props.session.read().receipt.value.token).toBe("old");
+    expect(owner().props.session.read().receipt.value.token).toBe(oldCompletion.token);
+    expect(readRecords(ws, "task").find((item) => item.id === oldTask.id)?.status).toBe("done");
     await act(async () => {
       key("j");
     });
@@ -477,20 +542,35 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     ]) {
       expect(key("z", protection).defaultPrevented).toBe(false);
     }
+    await act(async () => untilReceiptClears(() => completionUndo().props.onClick()));
+    expect(undo).toHaveBeenCalledWith(oldCompletion.token);
+    const restored = need(readRecords(ws, "task").find((item) => item.id === oldTask.id));
+    expect(restored.status).toBe("open");
+    expect(readRecords(ws, "task").find((item) => item.id === suggestionId)?.status).toBe("open");
+    expect(readRecords(ws, "task").find((item) => item.id === lateTask.id)?.status).toBe("done");
+    expect(owner().props.session.read()).toMatchObject({
+      selected: step.key,
+      drafts: { [step.key]: "Old result" },
+      receipt: undefined,
+    });
+    expect(owner().findByType(TodayBoard).findByType("input").props.value).toBe("Old result");
+    let latest: { token: string; title: string } | undefined;
     await act(async () => {
-      await owner().props.complete(step, "Latest completion", randomUUID());
+      latest = await owner().props.complete(stepFor(restored), "Latest completion", randomUUID());
     });
     await act(async () =>
       owner().props.session.set("receipt", {
-        value: { token: "new", title: "New" },
+        value: need(latest),
         step,
         text: "Latest completion",
       }),
     );
-    await act(async () => {
-      key("z");
-    });
-    expect(undo).toHaveBeenCalledWith("new");
+    await act(async () =>
+      untilReceiptClears(() => {
+        key("z");
+      }),
+    );
+    expect(undo).toHaveBeenCalledWith(need(latest).token);
     expect(historyScroll).toHaveBeenCalledTimes(2);
   } finally {
     if (app) await act(async () => app?.unmount());
