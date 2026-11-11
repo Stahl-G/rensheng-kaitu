@@ -5,10 +5,10 @@ import type {
   OnboardingMatterDraft,
   PlansData,
 } from "@kaitu/core";
-import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { InboxEntry, LibraryData, OverviewData } from "../types.js";
-import { AgentPhrases } from "./AgentPhrases.js";
 import type { ChannelRequest, ChannelState } from "./ChannelSettings.js";
+import { DocumentBody } from "./DocumentBody.js";
 import inboxStyles from "./InboxPage.module.css";
 import {
   type LearningDraftProps,
@@ -172,7 +172,7 @@ export function LibraryPage({
   return (
     <div className={styles.page}>
       <ReadWarnings warnings={data?.warnings} />
-      <div className={styles.heading}>
+      <div className={styles.searchBar}>
         <input
           type="search"
           value={query}
@@ -439,7 +439,7 @@ export function LibraryPage({
         </section>
       </details>
       {!!overview?.versions.length && (
-        <section>
+        <section className={styles.recent}>
           <div className={styles.heading}>
             <h2>{t("最近的变化", "Recent changes")}</h2>
             {overview.daily && (
@@ -932,12 +932,14 @@ function InboxReview({
 }
 export function NotesPage({
   initialFile,
+  onAskContext,
   data,
   loadLibraryDocument,
   loadMediaImage,
   ...learning
 }: {
   initialFile?: string;
+  onAskContext?: (context: { title: string; prompt: string } | null) => void;
   data: LibraryData | null;
   topic: string;
   onTopic: (topic: string) => void;
@@ -949,17 +951,65 @@ export function NotesPage({
   LearningServices &
   LearningDraftProps) {
   const t = useT();
-  const [file, setFile] = useState<string | null>(initialFile ?? null);
+  const [selection, setSelection] = useState({ file: initialFile ?? (null as string | null), request: 0 });
+  const file = selection.file;
+  const setFile = useCallback(
+    (value: string | null) => setSelection((current) => ({ file: value, request: current.request + 1 })),
+    [],
+  );
+  const [filter, setFilter] = useState<"all" | "note" | "decision" | "learning">("all");
   const [body, setBody] = useState("");
+  const [loadedFile, setLoadedFile] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const initialNoteSelected = useRef(!!initialFile || !!learning.topic || !!learning.source);
+  const rows = (data?.notes ?? []).filter(
+    (item) =>
+      filter === "all" ||
+      (filter === "learning"
+        ? item.file.startsWith("learning/")
+        : !item.file.startsWith("learning/") && item.kind === (filter === "decision" ? "决定" : "笔记")),
+  );
+  const current = data?.notes.find((item) => item.file === file);
+  const askPrompt = file
+    ? t(
+        `请先读取开图资料 ${file}，根据这份原文与我继续讨论。区分原文事实、估算和建议；新的下一步保留待采纳。`,
+        `Read my Kaitu document ${file} and continue discussing it with me. Keep source facts, estimates and suggestions distinct, and leave new next steps pending adoption.`,
+      )
+    : "";
   useEffect(() => {
+    onAskContext?.(file ? { title: current?.title ?? file, prompt: askPrompt } : null);
+    return () => onAskContext?.(null);
+  }, [file, current?.title, askPrompt, onAskContext]);
+  const originalBody = body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  const firstHeading = /^# (.+)\r?\n/.exec(originalBody);
+  const documentBody =
+    firstHeading && firstHeading[1]?.trim() === current?.title
+      ? originalBody.slice(firstHeading[0].length).trimStart()
+      : originalBody;
+  useEffect(() => {
+    if (initialNoteSelected.current || !data) return;
+    initialNoteSelected.current = true;
+    setFile(data.notes.find((item) => !item.file.startsWith("learning/"))?.file ?? null);
+  }, [data, setFile]);
+  useEffect(() => {
+    if (learning.source || learning.topic) setFile(null);
+  }, [learning.source, learning.topic, setFile]);
+  useEffect(() => {
+    if (initialFile) setFile(initialFile);
+  }, [initialFile, setFile]);
+  useEffect(() => {
+    const file = selection.file;
     let active = true;
     setBody("");
+    setLoadedFile(null);
     setError("");
     if (file)
       void loadLibraryDocument(file)
         .then((text) => {
-          if (active) setBody(text);
+          if (active) {
+            setBody(text);
+            setLoadedFile(file);
+          }
         })
         .catch((err) => {
           if (active) setError(err instanceof Error ? err.message : String(err));
@@ -967,49 +1017,107 @@ export function NotesPage({
     return () => {
       active = false;
     };
-  }, [file, loadLibraryDocument]);
+  }, [selection, loadLibraryDocument]);
   return (
-    <div className={css.sec}>
-      {!file && <LearningPage {...learning} data={data} />}
-      {error && <p role="alert">{error}</p>}
-      {file ? (
-        <>
-          <button type="button" className={css.link} onClick={() => setFile(null)}>
-            {t("← 笔记与决策", "← Notes and decisions")}
+    <div className={styles.notebook}>
+      <section className={styles.noteList} aria-label={t("笔记与决策", "Notes and decisions")}>
+        <div className={styles.heading}>
+          <button
+            type="button"
+            className={css.link}
+            onClick={() => {
+              setFile(null);
+              learning.onTopic("");
+              setFilter("learning");
+            }}
+          >
+            {t("＋ 在学", "+ Learn")}
           </button>
-          <article className={`${css.card} ${css.sum} ${css.detailBody}`}>
-            {body.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "") || t("正在读取…", "Loading…")}
-            <MediaPreview key={file} content={body} load={loadMediaImage} />
-          </article>
-        </>
-      ) : !data ? (
-        <p>{t("正在读取…", "Loading…")}</p>
-      ) : !data.notes.some((item) => !item.file.startsWith("learning/")) ? (
-        <>
-          <p className={css.small}>{t("决策记录也会显示在这里。", "Your decisions also appear here.")}</p>
-          <AgentPhrases />
-        </>
-      ) : (
-        <div className={`${css.card} ${css["list-card"]}`}>
-          {data.notes
-            .filter((item) => !item.file.startsWith("learning/"))
-            .map((row) => (
+        </div>
+        <div className={styles.noteFilters} aria-label={t("筛选资料", "Filter notes")}>
+          {(
+            [
+              ["all", t("全部", "All")],
+              ["note", t("笔记", "Notes")],
+              ["decision", t("决策", "Decisions")],
+              ["learning", t("在学", "Learning")],
+            ] as const
+          ).map(([id, label]) => (
+            <button type="button" key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {!data ? (
+          <output>{t("正在读取…", "Loading…")}</output>
+        ) : rows.length ? (
+          rows.map((row) => (
+            <button
+              type="button"
+              key={row.file}
+              className={styles.noteItem}
+              aria-pressed={
+                row.file.startsWith("learning/")
+                  ? !file && learning.topic === row.file.split("/")[1]
+                  : file === row.file
+              }
+              onClick={() => {
+                if (row.file.startsWith("learning/")) {
+                  setFile(null);
+                  learning.onTopic(row.file.split("/")[1] ?? "");
+                } else setFile(row.file);
+              }}
+            >
+              <strong>{row.title}</strong>
+              <span>
+                {row.file.startsWith("learning/")
+                  ? t("在学", "Learning")
+                  : t(row.kind, row.kind === "决定" ? "Decision" : "Note")}
+                {row.status ? ` · ${row.status}` : ""}
+              </span>
+            </button>
+          ))
+        ) : (
+          <p className={styles.meta}>{t("暂无记录", "No records")}</p>
+        )}
+      </section>
+      <section className={styles.noteDetail} aria-label={t("资料正文", "Document")}>
+        {file ? (
+          <>
+            <div className={styles.documentActions}>
+              <button type="button" className={css.link} onClick={() => setFile(null)}>
+                {t("关闭", "Close")}
+              </button>
               <button
                 type="button"
-                className={`${css["note-row"]} ${css.summaryButton}`}
-                key={row.file}
-                onClick={() => setFile(row.file)}
+                className={styles.askDocument}
+                onClick={() => learning.onPrompt(askPrompt)}
               >
-                <span className={css.chip}>{t(row.kind, row.kind === "决定" ? "Decision" : "Note")}</span>
-                <span className={css.stack}>
-                  <b>{row.title}</b>
-                  <span className={css.small}>{row.status ?? row.file}</span>
-                </span>
-                <span>›</span>
+                {t("问问", "Ask")}
               </button>
-            ))}
-        </div>
-      )}
+            </div>
+            {error ? (
+              <p role="alert">
+                {error}{" "}
+                <button type="button" className={css.link} onClick={() => setFile(file)}>
+                  {t("重试", "Retry")}
+                </button>
+              </p>
+            ) : loadedFile !== file ? (
+              <output>{t("正在读取…", "Loading…")}</output>
+            ) : (
+              <article className={styles.document}>
+                <p className={styles.meta}>{file}</p>
+                <h2>{current?.title ?? file.split("/").at(-1)}</h2>
+                <DocumentBody content={documentBody} />
+                <MediaPreview key={file} content={body} load={loadMediaImage} />
+              </article>
+            )}
+          </>
+        ) : (
+          <LearningPage {...learning} data={data} />
+        )}
+      </section>
     </div>
   );
 }

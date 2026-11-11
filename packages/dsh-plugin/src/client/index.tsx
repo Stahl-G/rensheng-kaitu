@@ -210,6 +210,25 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              captureOnce: async (text: string, operationId: string) => {
+                const r = await ctx.remote.kaitu.captureOnce(text, operationId);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              completeHomeNext: async (
+                target: import("@kaitu/core").HomeNextTarget,
+                result: string,
+                operationId: string,
+              ) => {
+                const r = await ctx.remote.kaitu.completeHomeNext(target, result, operationId);
+                if (!r.ok) throw r.error;
+                return r.value;
+              },
+              undoHomeNext: async (token: string) => {
+                const r = await ctx.remote.kaitu.undoHomeNext(token);
+                if (!r.ok) throw r.error;
+                return r.value;
+              },
               loadHome: async () => {
                 const result = await ctx.remote.kaitu.home();
                 if (!result.ok) throw new Error(result.error.message);

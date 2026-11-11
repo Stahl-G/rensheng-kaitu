@@ -1,5 +1,7 @@
+import { type HomeResult, homeResults } from "./home-actions.js";
 import { readOverviewPage } from "./overview-page.js";
 import { readProjectsPage } from "./project-page.js";
+import { type StoredRecord, readRecordRevisions } from "./records.js";
 import { localDate } from "./time.js";
 import { type NextItem, type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -16,6 +18,7 @@ export interface HomeSources {
   projects: Projects;
   statuses: readonly LearningStatus[];
   records: WorkbenchData["records"];
+  taskRevisions?: readonly StoredRecord[];
 }
 
 /** I/O boundary: build in the background, cache the result, and invalidate it on workspace changes.
@@ -30,6 +33,7 @@ export async function readHomeSources(ws: Workspace, now = new Date()): Promise<
     projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
     statuses: data.statuses,
     records: data.records,
+    taskRevisions: readRecordRevisions(ws, "task", { onError: () => {} }),
   };
 }
 
@@ -69,6 +73,8 @@ export interface HomeData {
   lastAuthored: string | null;
   threads: HomeThread[];
   traces: HomeTrace[];
+  results?: HomeResult[];
+  steps?: (NonNullable<HomeThread["next"]> & { key: string; parent: string })[];
   pending: { id: string; title: string }[];
   /** No inferred mappings: a later atlas projection must prove matching source and permissions. */
   atlas: null;
@@ -254,6 +260,63 @@ export function readHome(input: HomeSources): HomeData {
   return {
     today: overview.today,
     lastAuthored: null,
+    results: homeResults(
+      records.task ?? [],
+      statuses,
+      overview.timeZone,
+      overview.today,
+      overview.cutoff,
+      input.taskRevisions,
+    ),
+    steps: [
+      ...statuses.flatMap((status) =>
+        (status.data.next ?? [])
+          .filter((item) => item.status === "todo")
+          .map((item) => ({
+            key: `${status.file}:${item.id}`,
+            id: item.id,
+            file: status.file,
+            title: item.title,
+            due: item.due ?? null,
+            priority: item.priority ?? "normal",
+            parent:
+              threads.find((thread) => thread.file === status.file)?.title ??
+              (status.data as { title?: string }).title ??
+              status.module,
+            precondition: { kind: "status" as const, expectedNext: item },
+          })),
+      ),
+      ...(records.task ?? [])
+        .filter((item) => item.status === "open")
+        .map((item) => ({
+          key: `task:${item.id}`,
+          id: item.id,
+          file: "task",
+          title: String(item.title),
+          due: typeof item.due === "string" ? item.due : null,
+          priority: "normal",
+          parent: threads.find((thread) => thread.next?.id === item.id)?.title ?? "",
+          precondition: { kind: "task" as const, expectedRev: item.rev ?? 1 },
+        })),
+    ]
+      .filter(
+        (item) =>
+          !statuses.some(
+            (status) =>
+              status.file === item.file &&
+              ["paused", "done", "archived"].includes(String((status.data as { stage?: string }).stage)),
+          ),
+      )
+      .sort((a, b) => {
+        const overdue = (item: typeof a) => (item.due && item.due < overview.today ? 0 : 1);
+        const priority = (item: typeof a) => (item.priority === "high" ? 0 : item.priority === "low" ? 2 : 1);
+        return (
+          overdue(a) - overdue(b) ||
+          priority(a) - priority(b) ||
+          (a.due ?? "9999").localeCompare(b.due ?? "9999")
+        );
+      })
+      .slice(0, 3),
     threads,
     traces: recentTraces.slice(0, 3),
     pending: overview.proposedTasks.slice(0, 2).map(({ id, title }) => ({ id, title })),

@@ -1,5 +1,5 @@
 .app {
-  --bg: #f2f3f5;
+  --bg: #f2f1ed;
   --surface: #ffffff;
   --sunken: #eceff2;
   --control: #e9edf2;
@@ -1633,6 +1633,24 @@
 .referenceApp .content {
   max-width: 1440px;
   padding-inline: 28px;
+}
+@media (max-width: 1080px) {
+  .referenceApp .top {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 16px;
+  }
+  .referenceApp .tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .referenceApp .tabs button {
+    padding-inline: 10px;
+  }
+  .referenceApp .tools {
+    grid-column: 2;
+  }
 }
 @media (max-width: 760px) {
   .referenceApp .top {

@@ -1,10 +1,11 @@
 import { rmSync } from "node:fs";
-import { readCalendar, readHome, readHomeSources, readOverviewPage } from "@kaitu/core";
+import { type ReadWarning, readCalendar, readHome, readHomeSources, readOverviewPage } from "@kaitu/core";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
 import { freshWorkspace } from "../../core/test/helpers.js";
 import { AskPage } from "../src/client/AskPage.js";
+import { CommandPalette } from "../src/client/CommandPalette.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { LifeHome } from "../src/client/TodayPage.js";
 
@@ -36,6 +37,112 @@ function browserGlobals() {
     },
   );
 }
+
+test("command search keeps working sources executable and retries incomplete reads without losing the query", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  let overview = await readOverviewPage(ws);
+  let readWarnings: ReadWarning[] = [
+    { code: "invalid_record", location: "synthetic-unreadable", message: "Synthetic unreadable record" },
+  ];
+  const loadLifeMap = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw new Error("Synthetic unreadable source");
+    })
+    .mockRejectedValueOnce(new Error("Still unavailable"))
+    .mockRejectedValueOnce(new Error("Still unavailable"))
+    .mockResolvedValueOnce({ features: [], warnings: readWarnings })
+    .mockResolvedValue({ features: [] });
+  let note = { file: "notes/synthetic.md", title: "Synthetic searchable note", kind: "笔记" };
+  const listeners = new Set<() => void>();
+  const loadLibraryDocument = vi.fn().mockResolvedValue("# Synthetic searchable note\n\nA real body.");
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: async () => overview,
+    loadCalendar: async () => readCalendar(ws),
+    loadMe: async () => ({}),
+    loadOnboarding: async () => ({ showGuide: false }),
+    loadCalendarPush: async () => ({}),
+    loadProjects: async () => [],
+    loadExploration: async () => ({ directions: [], warnings: readWarnings }),
+    loadLibrary: async () => ({ inbox: [], notes: [note], warnings: readWarnings }),
+    loadLibraryDocument,
+    loadLifeMap,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    renderAsk: () => null,
+  } as unknown as OverviewPageProps;
+  let app!: ReturnType<typeof create>;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(app.root.findByType(LifeHome).props.data.root).toBe(ws.root);
+    const open = () => app.root.findByProps({ "aria-label": "搜索或输入动作" }).props.onClick();
+    const panel = () => app.root.findByType(CommandPalette);
+    const query = (value: string) => panel().findByType("input").props.onChange({ target: { value } });
+    const retry = () => panel().findByProps({ role: "alert" }).findByType("button");
+    await act(async () => open());
+    const failedSources = panel().findByProps({ role: "alert" }).findByType("span").children.join("");
+    for (const source of ["足迹", "方向", "笔记与决策"]) expect(failedSources).toContain(source);
+    await act(async () => query("Synthetic"));
+    expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
+    await act(async () => panel().findByProps({ role: "option" }).props.onClick());
+    expect(loadLibraryDocument).toHaveBeenCalledWith(note.file);
+    expect(app.root.findAllByType(CommandPalette)).toHaveLength(0);
+    await act(async () => open());
+    await act(async () => query("unmatched search"));
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(0);
+    await act(async () => {
+      const click = retry().props.onClick;
+      click();
+      click();
+    });
+    expect(loadLifeMap).toHaveBeenCalledTimes(3);
+    expect(panel().findAllByProps({ role: "alert" })).toHaveLength(1);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    await act(async () => retry().props.onClick());
+    expect(loadLifeMap).toHaveBeenCalledTimes(4);
+    expect(panel().findByProps({ role: "alert" }).findByType("span").children.join("")).toContain("足迹");
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(0);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    readWarnings = [];
+    await act(async () => retry().props.onClick());
+    expect(loadLifeMap).toHaveBeenCalledTimes(5);
+    expect(panel().findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(1);
+    await act(async () => panel().findByType("dialog").props.onCancel({ preventDefault: vi.fn() }));
+    let finishOld!: (result: { features: [] }) => void;
+    loadLifeMap.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    );
+    await act(async () => open());
+    await act(async () => query("old workspace query"));
+    overview = { ...overview, root: "/synthetic/next-workspace" };
+    note = { ...note, file: "notes/fresh.md", title: "Fresh workspace note" };
+    await act(async () => {
+      for (const listener of [...listeners]) listener();
+    });
+    expect(panel().findByType("input").props.value).toBe("");
+    await act(async () => query(note.title));
+    expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
+    await act(async () => finishOld({ features: [] }));
+    expect(panel().findByType("input").props.value).toBe(note.title);
+    expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
+  } finally {
+    if (app) await act(async () => app.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 test("returning home confirms the previous save and keeps text edited while it was pending", async () => {
   browserGlobals();
@@ -201,7 +308,8 @@ test("home shows actual traces, hides empty traces and keeps genuine pending dec
     expect(content()).toContain(pending[0]?.title);
     await act(async () => update(state([], [])));
     expect(app?.root.findAllByType("aside")).toHaveLength(0);
-    expect(app?.root.findAllByProps({ "data-has-side": false })).toHaveLength(1);
+    expect(app?.root.findAllByProps({ "aria-label": "最近的痕迹" })).toHaveLength(0);
+    expect(content()).not.toContain(pending[0]?.title);
   } finally {
     if (app) await act(async () => app?.unmount());
     rmSync(ws.root, { recursive: true, force: true });

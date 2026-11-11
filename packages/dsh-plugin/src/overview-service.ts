@@ -13,6 +13,8 @@ import {
   type City,
   type FinanceAccess,
   type HandoverPack,
+  type HomeCompletion,
+  type HomeNextTarget,
   type HomeState,
   type Hometown,
   type ImportSource,
@@ -66,6 +68,7 @@ import {
   captureNoteOnce,
   changeExperienceBatch,
   changeOnboardingNext,
+  completeHomeNext,
   completeNext,
   configureAutomation,
   confirmOnboardingImport,
@@ -158,12 +161,14 @@ import {
   startLearning,
   syncProject,
   tryNews,
+  undoHomeNext,
   unhideExperience,
   uploadResume,
   workspaceBackupRequest,
   writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
+import { throwHomeCompletionError } from "./home-completion-error.js";
 import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
 import type {
@@ -276,6 +281,28 @@ export class KaituOverviewService extends TypertRemoteService {
       this.homeListeners.delete(notify);
       signal?.removeEventListener("abort", notify);
     }
+  }
+
+  @Remote("completeHomeNext")
+  async completeHomeNext(
+    target: HomeNextTarget,
+    result: string,
+    operationId: string,
+  ): Promise<HomeCompletion> {
+    return this.write(() => {
+      const receipt = completeHomeNext(this.workspace, target, result, operationId);
+      this.scheduleVersion("你完成下一步并记下结果");
+      return Promise.resolve(receipt);
+    }).catch(throwHomeCompletionError);
+  }
+
+  @Remote("undoHomeNext")
+  async undoHomeNext(token: string): Promise<{ undone: boolean }> {
+    return this.write(() => {
+      const result = undoHomeNext(this.workspace, token);
+      this.scheduleVersion("你撤销了下一步的完成");
+      return Promise.resolve(result);
+    });
   }
 
   @Remote("findWorkspaceFiles")
