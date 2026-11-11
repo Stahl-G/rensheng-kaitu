@@ -166,6 +166,9 @@ it("blocks external state links and custom storage but preserves readonly files 
     expect(() => prepareDshState(state, "0.2.2-rc.1")).toThrow();
     expect(stateInventory(state)).toEqual(before);
     rmSync(join(state, "external"));
+    symlinkSync(join(state, "sessions"), join(state, "absolute-internal"));
+    expect(() => prepareDshState(state, "0.2.2-rc.1")).toThrow();
+    rmSync(join(state, "absolute-internal"));
   }
   chmodSync(join(state, "unknown/future.bin"), 0o400);
   const before = stateInventory(state);
