@@ -6,7 +6,7 @@
   "type": "object",
   "required": ["client_id", "at", "device", "op", "args"],
   "properties": {
-    "client_id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "ULID，手机生成" },
+    "client_id": { "type": "string", "description": "旧操作为 ULID；新任务建议决策支持 ULID 或 UUID" },
     "at": { "type": "string", "format": "date-time" },
     "device": { "type": "string", "pattern": "^[0-9a-f]{8}$" },
     "op": {
@@ -25,7 +25,9 @@
         "replace_memory",
         "capture_memory",
         "complete_next_result",
-        "undo_next_result"
+        "undo_next_result",
+        "decide_task",
+        "undo_task_decision"
       ]
     },
     "args": { "type": "object" }
@@ -449,6 +451,101 @@
               "completion_id": {
                 "type": "string",
                 "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "enum": ["decide_task", "undo_task_decision"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "decide_task"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["consumer_id", "file", "id", "expected_rev", "expected_source", "decision"],
+            "additionalProperties": false,
+            "properties": {
+              "consumer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file": {
+                "type": "string",
+                "pattern": "^(?![/~])(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.(?:/|$))[^\\\\]+$"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+              },
+              "expected_rev": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "expected_source": {
+                "type": ["string", "null"]
+              },
+              "decision": {
+                "enum": ["adopted", "dismissed"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "op": {
+            "const": "undo_task_decision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["consumer_id", "decision_id"],
+            "additionalProperties": false,
+            "properties": {
+              "consumer_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "decision_id": {
+                "type": "string",
+                "pattern": "^(?:[0-9A-HJKMNP-TV-Z]{26}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
               }
             }
           }

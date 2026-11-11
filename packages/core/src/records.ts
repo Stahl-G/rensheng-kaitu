@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { deepFreeze } from "./frozen.js";
@@ -14,6 +15,7 @@ import { mergeNewsRecord } from "./news.js";
 import { normalizeRecordInput } from "./record-input.js";
 import { formatErrors, schemas } from "./schema.js";
 import { validSleepStages } from "./sleep-stages.js";
+import { stateBinding } from "./state-binding.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
@@ -250,6 +252,33 @@ export function updateRecord(
     rev: (current.rev ?? 1) + 1,
   };
   parseTs(merged.ts);
+  if (type === "task" && ws.exists(".kaitu/phone-actions.json")) {
+    // Legacy writers must not create an indistinguishable after revision owned by a prepared decision.
+    type Reservation = {
+      status?: string;
+      taskDecisionAction?: { args: { consumer_id?: string } };
+      taskDecision?: { change: { after: StoredRecord } };
+      taskDecisionUndo?: { change: { after: StoredRecord } };
+    };
+    const ledger =
+      ws.scanParsed<Record<string, Reservation>>(
+        ".kaitu/phone-actions.json",
+        "task-reservations",
+        JSON.parse,
+      ) ?? {};
+    const consumer = stateBinding(ws.root).id;
+    if (
+      Object.values(ledger).some(
+        (entry) =>
+          !entry.status &&
+          entry.taskDecisionAction?.args.consumer_id === consumer &&
+          [entry.taskDecision?.change.after, entry.taskDecisionUndo?.change.after].some(
+            (after) => after?.id === id && isDeepStrictEqual(after, merged),
+          ),
+      )
+    )
+      throw new KaituError("这条待办有未完成决定，请等待原操作回执", "CONFLICT");
+  }
   return write(ws, ref, merged, ws.timeZone(), current, opts.expected_revision);
 }
 
@@ -335,6 +364,25 @@ function fileRevisions(
   return parsed.rows;
 }
 
+/** Cached revisions with their actual source file; callers must not infer identity from id alone. */
+export function readRecordRevisionsWithFiles(
+  ws: Workspace,
+  type: string,
+  onError?: (error: KaituError) => void,
+): { file: string; record: StoredRecord }[] {
+  const ref = findRecordType(ws, type);
+  const { dir, match } = recordFilePattern(ref);
+  const abs = resolveRecordPath(ws, ref, dir);
+  if (!existsSync(abs)) return [];
+  return readdirSync(abs)
+    .filter((n) => match.test(n))
+    .sort()
+    .flatMap((name) => {
+      const file = `${dir}/${name}`;
+      resolveRecordPath(ws, ref, file);
+      return fileRevisions(ws, file, ref, onError).map((record) => ({ file, record }));
+    });
+}
 function revisionsFor(
   ws: Workspace,
   ref: RecordTypeRef,
@@ -396,14 +444,14 @@ export function readRecords(
 }
 
 /** 已准备好 id 的跨类型批次：先统一校验，再追加。供需要互相关联 id 的导入使用。 */
-function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord }[]) {
+function preparedRecords(ws: Workspace, entries: { type: string; record: StoredRecord; file?: string }[]) {
   const tasks = entries.some((entry) => entry.type === "task")
     ? new Map(readRecords(ws, "task").map((record) => [record.id, record]))
     : undefined;
   const phases = entries.some((entry) => entry.type === "phase")
     ? new Map(readRecords(ws, "phase").map((record) => [record.id, record]))
     : undefined;
-  return entries.map(({ type, record }) => {
+  return entries.map(({ type, record, file: sourceFile }) => {
     const ref = findRecordType(ws, type);
     parseTs(record.ts);
     validateRecord(
@@ -412,7 +460,12 @@ function preparedRecords(ws: Workspace, entries: { type: string; record: StoredR
       record,
       type === "phase" ? phases?.get(record.id) : type === "task" ? tasks?.get(record.id) : undefined,
     );
-    const file = recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
+    const file = sourceFile ?? recordFileFor(ref, localMonth(parseTs(record.ts), ws.timeZone()));
+    if (sourceFile) {
+      const pattern = recordFilePattern(ref);
+      if (dirname(file) !== pattern.dir || !pattern.match.test(basename(file)))
+        throw new KaituError("准备记录的来源文件不属于此记录类型", "INVALID_RECORD");
+    }
     resolveRecordPath(ws, ref, file);
     return { file, record, ref };
   });
@@ -420,14 +473,14 @@ function preparedRecords(ws: Workspace, entries: { type: string; record: StoredR
 
 export function validatePreparedRecords(
   ws: Workspace,
-  entries: { type: string; record: StoredRecord }[],
+  entries: { type: string; record: StoredRecord; file?: string }[],
 ): void {
   preparedRecords(ws, entries);
 }
 
 export function appendPreparedRecords(
   ws: Workspace,
-  entries: { type: string; record: StoredRecord }[],
+  entries: { type: string; record: StoredRecord; file?: string }[],
 ): void {
   const plans = preparedRecords(ws, entries);
   const files = new Map<string, string[]>();

@@ -555,7 +555,11 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
       const phone = phoneInboxName.test(basename(file));
       if (phone && file.endsWith(".actions.jsonl")) {
         await batchSnapshot(ws, "你在 iPhone 上处理了待办", async () => {
-          await applyPhoneActions(ws, file, text);
+          const applied = await applyPhoneActions(ws, file, text);
+          if (applied?.pending) {
+            result.pending.push(file);
+            return;
+          }
           moveInboxFile(ws, file, `inbox/processed/${localDate(new Date(), ws.timeZone())}`);
           result.processed.push(file);
         });

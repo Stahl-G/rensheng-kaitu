@@ -69,7 +69,7 @@ export interface HomeData {
   lastAuthored: string | null;
   threads: HomeThread[];
   traces: HomeTrace[];
-  pending: { id: string; title: string }[];
+  pending: Overview["proposedTasks"];
   /** No inferred mappings: a later atlas projection must prove matching source and permissions. */
   atlas: null;
 }
@@ -256,7 +256,7 @@ export function readHome(input: HomeSources): HomeData {
     lastAuthored: null,
     threads,
     traces: recentTraces.slice(0, 3),
-    pending: overview.proposedTasks.slice(0, 2).map(({ id, title }) => ({ id, title })),
+    pending: overview.proposedTasks.slice(0, 2),
     atlas: null,
   };
 }
