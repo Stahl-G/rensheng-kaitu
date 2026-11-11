@@ -41,6 +41,7 @@ function fixture() {
       JSON.stringify({ unit: { name: "schedule", version: 1 }, global: null, tables: { tasks: {} } }),
     ],
     ["profiles/desktop/cordis.patch.yml", "[]\n"],
+    ["profiles/.DS_Store", "synthetic ordinary metadata"],
     ["credentials/synthetic.json", '{"value":"synthetic-only"}'],
     ["sessions/nested/session.jsonl", '{"id":"synthetic"}\n'],
     ["unknown/future.bin", "\x00\x01future-state"],

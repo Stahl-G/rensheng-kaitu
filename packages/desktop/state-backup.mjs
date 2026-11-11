@@ -245,10 +245,12 @@ function assertDefaultStorage(root) {
       throw failure("配置目录不可备份 / Profile directory cannot be backed up");
     for (const name of readdirSync(profiles)) {
       const profile = join(profiles, name);
-      if (!lstatSync(profile).isDirectory())
+      const type = lstatSync(profile);
+      if (type.isSymbolicLink())
         throw failure(
           "自定义配置链接不支持自动升级 / Linked profiles are not supported by automatic upgrade",
         );
+      if (!type.isDirectory()) continue;
       for (const config of ["cordis.yml", "cordis.patch.yml"]) {
         const path = join(profile, config);
         if (!present(path)) continue;
