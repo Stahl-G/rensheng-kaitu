@@ -13,8 +13,6 @@ import {
   type City,
   type FinanceAccess,
   type HandoverPack,
-  type HomeCompletion,
-  type HomeNextTarget,
   type HomeState,
   type Hometown,
   type ImportSource,
@@ -58,6 +56,7 @@ import {
   addGoalNext,
   adoptOnboardingMatter,
   adoptTask,
+  applyResultAction,
   archiveMemory,
   bindGithub,
   calendarPushEntries,
@@ -68,7 +67,6 @@ import {
   captureNoteOnce,
   changeExperienceBatch,
   changeOnboardingNext,
-  completeHomeNext,
   completeNext,
   configureAutomation,
   confirmOnboardingImport,
@@ -77,6 +75,8 @@ import {
   createHomeCache,
   createProject,
   decideProposal,
+  decodeHomeResultDraft,
+  decodeHomeResultRequest,
   defaultRoot,
   directionsPrompt,
   dismissNews,
@@ -141,6 +141,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resultDraft,
   resumePrompt,
   saveAvatar,
   saveHometown,
@@ -161,7 +162,6 @@ import {
   startLearning,
   syncProject,
   tryNews,
-  undoHomeNext,
   unhideExperience,
   uploadResume,
   workspaceBackupRequest,
@@ -283,26 +283,30 @@ export class KaituOverviewService extends TypertRemoteService {
     }
   }
 
-  @Remote("completeHomeNext")
-  async completeHomeNext(
-    target: HomeNextTarget,
-    result: string,
-    operationId: string,
-  ): Promise<HomeCompletion> {
-    return this.write(() => {
-      const receipt = completeHomeNext(this.workspace, target, result, operationId);
-      this.scheduleVersion("你完成下一步并记下结果");
-      return Promise.resolve(receipt);
-    }).catch(throwHomeCompletionError);
+  @Remote("resultDraft")
+  async resultDraft(root: string, value: string, expected: string): Promise<string> {
+    try {
+      return JSON.stringify(
+        resultDraft(this.workspace, root, decodeHomeResultDraft(value), decodeHomeResultDraft(expected)),
+      );
+    } catch (error) {
+      return throwHomeCompletionError(error);
+    }
   }
 
-  @Remote("undoHomeNext")
-  async undoHomeNext(token: string): Promise<{ undone: boolean }> {
-    return this.write(() => {
-      const result = undoHomeNext(this.workspace, token);
-      this.scheduleVersion("你撤销了下一步的完成");
-      return Promise.resolve(result);
-    });
+  @Remote("resultAction")
+  async resultAction(root: string, payload: string): Promise<string> {
+    try {
+      return JSON.stringify(
+        await this.write(() => {
+          if (root !== this.workspace.root)
+            throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+          return applyResultAction(this.workspace, decodeHomeResultRequest(payload));
+        }),
+      );
+    } catch (error) {
+      return throwHomeCompletionError(error);
+    }
   }
 
   @Remote("findWorkspaceFiles")

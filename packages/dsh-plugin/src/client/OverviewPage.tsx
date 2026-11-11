@@ -34,7 +34,7 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { WarningText } from "./ReadWarnings.js";
 import type { ResumeServices } from "./ResumeImport.js";
-import { createTodayBoardSession, reverseTodayBoard } from "./TodayBoard.js";
+import { createTodayBoardSession } from "./TodayBoard.js";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
@@ -87,12 +87,8 @@ export interface OverviewPageProps
   hosted?: boolean;
   navigation?: PanelNavigation;
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
-  completeHomeNext?: (
-    target: import("@kaitu/core").HomeNextTarget,
-    result: string,
-    operationId: string,
-  ) => Promise<import("@kaitu/core").HomeCompletion>;
-  undoHomeNext?: (token: string) => Promise<{ undone: boolean }>;
+  resultDraft?: import("./result-session.js").DraftTransport;
+  resultAction?: import("./result-session.js").ResultTransport;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
   load: () => Promise<OverviewData>;
@@ -297,10 +293,15 @@ function Overview({
   }, [exploreEntries, firstExplore, pluginModules, setExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
-  const todaySession = useRef({ root: workspaceRoot, board: createTodayBoardSession() });
-  if (workspaceRoot && todaySession.current.root && todaySession.current.root !== workspaceRoot)
-    todaySession.current = { root: workspaceRoot, board: createTodayBoardSession() };
-  if (workspaceRoot) todaySession.current.root = workspaceRoot;
+  const resultOwners = useRef(new Map<string, ReturnType<typeof createTodayBoardSession>>());
+  const ownerRoot = workspaceRoot ?? "";
+  const resultOwner =
+    resultOwners.current.get(ownerRoot) ?? createTodayBoardSession(ownerRoot, undefined, props.resultDraft);
+  resultOwners.current.set(ownerRoot, resultOwner);
+  const todaySession = useRef({ root: workspaceRoot, board: resultOwner });
+  todaySession.current = { root: workspaceRoot, board: resultOwner };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Leaving a page expires its short undo affordance.
+  useEffect(() => () => resultOwner.expire(), [resultOwner, view]);
   const [exploreFacts, setExploreFacts] = useState<{
     root: string;
     hometown?: boolean;
@@ -1038,9 +1039,18 @@ function Overview({
       />
     );
   // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
+  const resultAction: import("./result-session.js").ResultTransport = async (root, request) => {
+    if (!props.resultAction)
+      throw new Error(t("结果保存不可用，请重新打开", "Result saving unavailable; reopen the app"));
+    const response = await props.resultAction(root, request);
+    if (todaySession.current.root === root) void refresh();
+    return response;
+  };
   const plansCard = data?.plans && (
     <PlansCard
       plans={data.plans}
+      resultSession={todaySession.current.board}
+      resultAction={resultAction}
       goalId={view === "records" && record === "projects" ? libraryGoal : undefined}
       addGoalNext={props.addGoalNext}
       changeNext={props.changeOnboardingNext}
@@ -1072,14 +1082,6 @@ function Overview({
         : view === "explore"
           ? homeState?.data?.threads.find((thread) => thread.id === directionFocus)?.title
           : undefined);
-  const undoHome = props.undoHomeNext
-    ? async (token: string) => {
-        const receipt = await props.undoHomeNext?.(token);
-        if (!receipt) throw new Error(t("撤销结果不明，请刷新", "Undo status uncertain. Refresh"));
-        void refresh();
-        return receipt;
-      }
-    : undefined;
   const commandActions: KaituCommand[] = [
     {
       id: "capture",
@@ -1125,7 +1127,7 @@ function Overview({
           },
         ]
       : []),
-    ...(props.completeHomeNext &&
+    ...(props.resultAction &&
     !todaySession.current.board.read().receipt &&
     commandCurrent?.file &&
     commandCurrent.precondition
@@ -1169,21 +1171,6 @@ function Overview({
         setCommandsOpen(false);
         action.run();
         return;
-      }
-      const target = event.target as HTMLElement | null;
-      const board = todaySession.current.board;
-      if (
-        key === "z" &&
-        undoHome &&
-        board.read().receipt &&
-        !board.read().pending &&
-        !target?.isContentEditable &&
-        !target?.closest?.("input, textarea, [contenteditable]:not([contenteditable=false]), [role=textbox]")
-      ) {
-        event.preventDefault();
-        void reverseTodayBoard(board, undoHome).then(() => {
-          if (board.read().error) setError(board.read().error);
-        });
       }
     };
     window.addEventListener("keydown", shortcut);
@@ -1555,18 +1542,7 @@ function Overview({
               <LifeHome
                 home={homeState}
                 session={todaySession.current.board}
-                complete={
-                  props.completeHomeNext
-                    ? async (target, result, operationId) => {
-                        const receipt = await props.completeHomeNext?.(target, result, operationId);
-                        if (!receipt)
-                          throw new Error(t("保存结果不明，请刷新", "Save status uncertain. Refresh"));
-                        void refresh();
-                        return receipt;
-                      }
-                    : undefined
-                }
-                undo={undoHome}
+                resultAction={resultAction}
                 schedule={
                   data?.blocks.length ? (
                     <section

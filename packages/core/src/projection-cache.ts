@@ -16,7 +16,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { localStateRoot } from "./local-state.js";
 
 // Disposable implementation data, never part of a workspace or its synchronization format.
-const version = 8;
+const version = 9;
 export type ProjectionInputs = { root: string; state: string };
 export type ProjectionManifest = [path: string, stamp: string][];
 type FingerprintKind = "directory" | "access" | "file";
@@ -105,7 +105,14 @@ function children(input: ProjectionInputs, path: string) {
       return false;
     return (
       path !== input.state ||
-      (!["cache", "secrets.json", "organizer.json", "history.git"].includes(entry.name) &&
+      (![
+        "cache",
+        "secrets.json",
+        "organizer.json",
+        "history.git",
+        "result-actions",
+        "result-draft.json",
+      ].includes(entry.name) &&
         !entry.name.startsWith("index.sqlite"))
     );
   });

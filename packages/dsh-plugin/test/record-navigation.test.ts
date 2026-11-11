@@ -1,7 +1,7 @@
 import { rmSync } from "node:fs";
 import {
   adoptOnboardingMatter,
-  completeHomeNext,
+  applyResultAction,
   createProject,
   lifeMap,
   readCalendar,
@@ -15,9 +15,9 @@ import {
   readOverviewPage,
   readProjectPage,
   readProjectsPage,
+  resultDraft,
   saveOnboardingMatter,
   setProject,
-  undoHomeNext,
   writeExploration,
 } from "@kaitu/core";
 import { createElement, useState } from "react";
@@ -63,6 +63,11 @@ async function setup(extra: Partial<OverviewPageProps> = {}) {
       disconnect() {}
     },
   );
+  const store = new Map<string, string>();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => store.set(key, value),
+  });
   const ws = await clonedWorkspace();
   const project = await createProject(ws, {
     title: "合成导航项目",
@@ -82,6 +87,7 @@ async function setup(extra: Partial<OverviewPageProps> = {}) {
   });
   const props = {
     hosted: true,
+    resultDraft: async (root, value, expected) => resultDraft(ws, root, value, expected),
     loadPreferences: async () => ({ locale: "zh-CN", followSystem: false, exploreEntries: ["directions"] }),
     load: async () => readOverviewPage(ws),
     loadHome: async () => ({ data: readHome(await readHomeSources(ws)), loading: false, error: null }),
@@ -265,18 +271,15 @@ test("plugin handoff returns to the same frame and retains an edited Ask draft",
   }
 });
 
-test("global shortcuts follow the selected step and undo its receipt after leaving Today, without taking text undo", async () => {
-  const complete = vi.fn<NonNullable<OverviewPageProps["completeHomeNext"]>>();
-  const undo = vi.fn<NonNullable<OverviewPageProps["undoHomeNext"]>>();
+test("global shortcuts follow the selected step but never take native text undo or restore an expired completion", async () => {
+  const resultAction = vi.fn<NonNullable<OverviewPageProps["resultAction"]>>();
   const renderAsk = vi.fn(() => null);
   const { ws, app } = await setup({
-    completeHomeNext: complete,
-    undoHomeNext: undo,
+    resultAction,
     captureOnce: vi.fn(),
     renderAsk,
   });
-  complete.mockImplementation(async (...args) => completeHomeNext(ws, ...args));
-  undo.mockImplementation(async (token) => undoHomeNext(ws, token));
+  resultAction.mockImplementation(async (_root, request) => applyResultAction(ws, request));
   const focus = vi.fn();
   const scrollIntoView = vi.fn();
   vi.spyOn(document, "getElementById").mockReturnValue({ focus, scrollIntoView } as unknown as HTMLElement);
@@ -330,7 +333,9 @@ test("global shortcuts follow the selected step and undo its receipt after leavi
     );
     await act(async () => board().findByType("form").props.onSubmit({ preventDefault: vi.fn() }));
     const session = app.root.findByType(LifeHome).props.session;
-    expect(session.read().receipt?.step.id).toBe(selected.id);
+    await act(async () => {
+      await vi.waitFor(() => expect(session.read().receipt?.step.id).toBe(selected.id));
+    });
     expect(readHome(await readHomeSources(ws)).steps?.some((step) => step.key === selected.key)).toBe(false);
     await navigate(app, "资料");
     expect(app.root.findAllByType(TodayBoard)).toHaveLength(0);
@@ -344,17 +349,20 @@ test("global shortcuts follow the selected step and undo its receipt after leavi
     }
     for (const extra of [{ shiftKey: true }, { altKey: true }, { isComposing: true }, { repeat: true }])
       expect(key("z", extra).defaultPrevented).toBe(false);
-    expect(undo).not.toHaveBeenCalled();
+    expect(resultAction).toHaveBeenCalledOnce();
     await act(async () => {
-      expect(key("z").defaultPrevented).toBe(true);
+      expect(key("z").defaultPrevented).toBe(false);
       key("z");
     });
-    expect(undo).toHaveBeenCalledOnce();
+    expect(resultAction).toHaveBeenCalledOnce();
     expect(session.read().receipt).toBeUndefined();
-    expect(readHome(await readHomeSources(ws)).steps?.some((step) => step.key === selected.key)).toBe(true);
-    expect(key("z").defaultPrevented).toBe(false);
+    expect(readHome(await readHomeSources(ws)).steps?.some((step) => step.key === selected.key)).toBe(false);
     await navigate(app, "今天");
-    expect(board().findByType("input").props.value).toBe("Actual result");
+    expect(
+      board()
+        .findAllByType("button")
+        .some((button) => button.children.includes("撤销")),
+    ).toBe(false);
   } finally {
     await act(async () => app.unmount());
     rmSync(ws.root, { recursive: true, force: true });

@@ -1,14 +1,23 @@
-import { type HomeResult, homeResults } from "./home-actions.js";
 import { readOverviewPage } from "./overview-page.js";
 import { readProjectsPage } from "./project-page.js";
-import { type StoredRecord, readRecordRevisions } from "./records.js";
+
+import type { ResultRow } from "./results.js";
 import { localDate } from "./time.js";
 import { type NextItem, type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 type Overview = Pick<
   Awaited<ReturnType<typeof readOverviewPage>>,
-  "today" | "timeZone" | "cutoff" | "plans" | "metrics" | "versions" | "proposedTasks" | "warnings"
+  | "today"
+  | "timeZone"
+  | "cutoff"
+  | "plans"
+  | "metrics"
+  | "versions"
+  | "proposedTasks"
+  | "warnings"
+  | "results"
+  | "resultActivityDays"
 >;
 type Projects = ReturnType<typeof readProjectsPage>;
 type LearningStatus = WorkbenchData["statuses"][number];
@@ -18,7 +27,6 @@ export interface HomeSources {
   projects: Projects;
   statuses: readonly LearningStatus[];
   records: WorkbenchData["records"];
-  taskRevisions?: readonly StoredRecord[];
 }
 
 /** I/O boundary: build in the background, cache the result, and invalidate it on workspace changes.
@@ -33,7 +41,6 @@ export async function readHomeSources(ws: Workspace, now = new Date()): Promise<
     projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
     statuses: data.statuses,
     records: data.records,
-    taskRevisions: readRecordRevisions(ws, "task", { onError: () => {} }),
   };
 }
 
@@ -73,9 +80,10 @@ export interface HomeData {
   lastAuthored: string | null;
   threads: HomeThread[];
   traces: HomeTrace[];
-  results?: HomeResult[];
+  results?: (ResultRow & { at: string; date: string })[];
+  resultActivityDays?: number;
   steps?: (NonNullable<HomeThread["next"]> & { key: string; parent: string })[];
-  pending: { id: string; title: string }[];
+  pending: { id: string; title: string; rev: number }[];
   /** No inferred mappings: a later atlas projection must prove matching source and permissions. */
   atlas: null;
 }
@@ -260,14 +268,15 @@ export function readHome(input: HomeSources): HomeData {
   return {
     today: overview.today,
     lastAuthored: null,
-    results: homeResults(
-      records.task ?? [],
-      statuses,
-      overview.timeZone,
-      overview.today,
-      overview.cutoff,
-      input.taskRevisions,
-    ),
+    results: overview.results
+      .filter((row) => Date.parse(row.completed_at) <= Date.parse(overview.cutoff))
+      .map((row) => ({
+        ...row,
+        at: row.completed_at,
+        date: localDate(new Date(row.completed_at), overview.timeZone),
+      }))
+      .filter((row) => row.date >= dateThreshold(overview.today, 6) && row.date <= overview.today),
+    resultActivityDays: overview.resultActivityDays,
     steps: [
       ...statuses.flatMap((status) =>
         (status.data.next ?? [])
@@ -319,7 +328,7 @@ export function readHome(input: HomeSources): HomeData {
       .slice(0, 3),
     threads,
     traces: recentTraces.slice(0, 3),
-    pending: overview.proposedTasks.slice(0, 2).map(({ id, title }) => ({ id, title })),
+    pending: overview.proposedTasks.slice(0, 2).map(({ id, title, rev }) => ({ id, title, rev })),
     atlas: null,
   };
 }

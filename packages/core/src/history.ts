@@ -23,6 +23,8 @@ export const NEVER_TRACK = [
   ".kaitu/feishu.json",
   "phone/",
   ".kaitu/phone-actions.json",
+  ".kaitu/result-actions/",
+  ".kaitu/result-draft.json",
   ".kaitu/secrets.json",
   ".kaitu/bank-mail-archive/",
   ".kaitu/github-state.json",
@@ -51,6 +53,8 @@ USER.md
 .kaitu/feishu.json
 phone/
 .kaitu/phone-actions.json
+.kaitu/result-actions/
+.kaitu/result-draft.json
 # 开图自动生成：以下内容不进版本历史
 .kaitu/secrets.json
 .kaitu/bank-mail-archive/

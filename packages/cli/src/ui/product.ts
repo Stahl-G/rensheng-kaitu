@@ -8,7 +8,6 @@ import {
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
-  type HomeNextTarget,
   type ImportSource,
   KaituError,
   type LearningCheckinInput,
@@ -33,6 +32,7 @@ import {
   addGoalNext,
   adoptOnboardingMatter,
   adoptTask,
+  applyResultAction,
   archiveMemory,
   bankNotificationCandidates,
   bindGithub,
@@ -46,7 +46,6 @@ import {
   changeLifeAtlas,
   changeOnboardingNext,
   commitFinanceImport,
-  completeHomeNext,
   completeNext,
   configureAutomation,
   confirmOnboardingImport,
@@ -54,6 +53,8 @@ import {
   confirmOnboardingSetup,
   createProject,
   decideProposal,
+  decodeHomeResultDraft,
+  decodeHomeResultRequest,
   directionsPrompt,
   discardFinanceImport,
   dismissDirectionLink,
@@ -132,6 +133,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resultDraft,
   resumePrompt,
   saveAvatar,
   saveHometown,
@@ -153,7 +155,6 @@ import {
   startLearning,
   syncProject,
   tryNews,
-  undoHomeNext,
   unhideExperience,
   uploadResume,
   workspaceBackupRequest,
@@ -194,8 +195,7 @@ export const productMutations = new Set([
   "moveStorage",
   "addCalendarSubscription",
   "completeNext",
-  "completeHomeNext",
-  "undoHomeNext",
+  "resultAction",
   "adoptTask",
   "cancelTask",
   "proposeTask",
@@ -501,15 +501,16 @@ export async function productRequest(
     }
     case "capture":
       return captureNote(ws, text(0));
-    case "completeHomeNext": {
-      const receipt = completeHomeNext(ws, args[0] as HomeNextTarget, text(1), text(2));
-      setImmediate(() => void snapshot(ws, "你完成下一步并记下结果").catch(() => {}));
-      return receipt;
-    }
-    case "undoHomeNext": {
-      const receipt = undoHomeNext(ws, text(0));
-      setImmediate(() => void snapshot(ws, "你撤销了下一步的完成").catch(() => {}));
-      return receipt;
+    case "resultDraft":
+      return resultDraft(
+        ws,
+        text(0),
+        decodeHomeResultDraft(JSON.stringify(args[1] ?? null)),
+        decodeHomeResultDraft(JSON.stringify(args[2] ?? null)),
+      );
+    case "resultAction": {
+      if (text(0) !== ws.root) throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+      return applyResultAction(ws, decodeHomeResultRequest(JSON.stringify(args[1])));
     }
     case "captureOnce":
       return captureNoteOnce(ws, text(0), text(1), {

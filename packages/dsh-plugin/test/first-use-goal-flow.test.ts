@@ -1,12 +1,14 @@
 import { rmSync } from "node:fs";
 import {
   adoptOnboardingMatter,
+  applyResultAction,
   changeOnboardingNext,
   onboardingStatus,
   readHome,
   readHomeSources,
   readOnboardingMatter,
   readOverviewPage,
+  resultDraft,
   saveOnboardingChoices,
   saveOnboardingMatter,
 } from "@kaitu/core";
@@ -19,6 +21,7 @@ import { OnboardingPage, STORAGE_STEP } from "../src/client/OnboardingPage.js";
 import { PlansCard } from "../src/client/Plans.js";
 import { StorageChoice } from "../src/client/StorageChoice.js";
 import { LifeHome, TodayStart } from "../src/client/TodayPage.js";
+import { createTodayBoardSession } from "../src/client/result-session.js";
 
 test("首次已确认的目标经过存放选择后带入手动采纳，并可完成及回读结果", async () => {
   vi.stubGlobal(
@@ -91,9 +94,15 @@ test("首次已确认的目标经过存放选择后带入手动采纳，并可�
     expect(overview.plans.goals).toHaveLength(1);
     expect(overview.plans.goals[0]).toMatchObject({ title: goal, next: { title: next } });
     await act(async () => app.unmount());
+    const resultSession = createTodayBoardSession(ws.root, undefined, async (root, value, expected) =>
+      resultDraft(ws, root, value, expected),
+    );
+    await resultSession.ready;
     await act(async () => {
       app = create(
         createElement(PlansCard, {
+          resultSession,
+          resultAction: async (_root, request) => applyResultAction(ws, request),
           plans: overview.plans,
           ...services,
           changeNext: services.changeOnboardingNext,

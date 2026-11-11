@@ -56,6 +56,15 @@
           },
           "status": {
             "enum": ["todo", "proposed", "done", "skipped"]
+          },
+          "result": {
+            "type": "string",
+            "description": "完成结果；新输入单行，已有多行文本保留。"
+          },
+          "completed": {
+            "type": "string",
+            "format": "date-time",
+            "description": "完成时间，沿用 iCalendar COMPLETED 名称，值为带时区的 ISO 8601。"
           }
         }
       }

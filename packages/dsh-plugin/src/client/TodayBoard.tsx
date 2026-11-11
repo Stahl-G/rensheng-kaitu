@@ -1,98 +1,41 @@
-import type { HomeCompletion, HomeNextTarget, HomeState, HomeThread } from "@kaitu/core";
+import type { HomeState, HomeThread } from "@kaitu/core";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import css from "./Prototype.module.css";
 import styles from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 import { todayNumber, todayProjectDate } from "./next-presentation.js";
 
-type Step = HomeNextTarget & { key: string; parent: string };
-interface TodayDraftState {
-  selected: string | undefined;
-  showLatest: boolean;
-  drafts: Record<string, string>;
-  pending: boolean;
-  error: string;
-  receipt: { value: HomeCompletion; step: Step; text: string } | undefined;
-}
-/** Kept by the page owner so navigation cannot lose a draft or an in-flight receipt. */
-export function createTodayBoardSession() {
-  let state: TodayDraftState = {
-    selected: undefined,
-    showLatest: false,
-    drafts: {},
-    pending: false,
-    error: "",
-    receipt: undefined,
-  };
-  const listeners = new Set<() => void>();
-  return {
-    operation: {
-      current: undefined as { fingerprint: string; id: string; step: Step; text: string } | undefined,
-    },
-    read: () => state,
-    subscribe: (listener: () => void) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    set: <K extends keyof TodayDraftState>(
-      key: K,
-      value: TodayDraftState[K] | ((current: TodayDraftState[K]) => TodayDraftState[K]),
-    ) => {
-      state = { ...state, [key]: typeof value === "function" ? value(state[key]) : value };
-      for (const listener of listeners) listener();
-    },
-  };
-}
-export type TodayBoardSession = ReturnType<typeof createTodayBoardSession>;
-/** The owner and the visible receipt use the same undo operation across navigation. */
-export async function reverseTodayBoard(
-  board: TodayBoardSession,
-  undo: (token: string) => Promise<{ undone: boolean }>,
-) {
-  const { receipt, pending } = board.read();
-  if (!receipt || pending) return;
-  board.set("pending", true);
-  board.set("error", "");
-  try {
-    await undo(receipt.value.token);
-    board.set("selected", receipt.step.key);
-    board.set("drafts", (current) => ({ ...current, [receipt.step.key]: receipt.text }));
-    board.set("receipt", undefined);
-  } catch (err) {
-    board.set("error", err instanceof Error ? err.message : String(err));
-  } finally {
-    board.set("pending", false);
-  }
-}
+import {
+  type ResultTransport,
+  type Step,
+  type TodayBoardSession,
+  createTodayBoardSession,
+  resultId,
+} from "./result-session.js";
+export { createTodayBoardSession, type TodayBoardSession } from "./result-session.js";
 export function TodayBoard({
   data,
-  complete,
-  undo,
+  resultAction,
   openProject,
   openGoal,
   library,
   begin,
   ask,
   canAsk,
-  adopt,
-  dismiss,
+
   busy,
   session,
 }: {
   data: HomeState;
   session?: TodayBoardSession;
-  complete?: (target: HomeNextTarget, result: string, operationId: string) => Promise<HomeCompletion>;
-  undo?: (token: string) => Promise<{ undone: boolean }>;
+  resultAction?: ResultTransport;
   openProject: (id: string) => void;
   openGoal?: (id: string) => void;
   library: () => void;
   begin?: () => void;
   ask: (text: string) => void;
   canAsk: boolean;
-  adopt: (id: string) => void;
-  dismiss: (id: string) => void;
+
   busy: boolean;
 }) {
   const t = useT();
@@ -113,11 +56,11 @@ export function TodayBoard({
   const setDrafts = (
     value: Record<string, string> | ((current: Record<string, string>) => Record<string, string>),
   ) => board.set("drafts", value);
-  const setPending = (value: boolean) => board.set("pending", value);
   const setError = (value: string) => board.set("error", value);
-  const setReceipt = (value: TodayDraftState["receipt"]) => board.set("receipt", value);
+  const setReceipt = () => board.expire();
   const [review, setReview] = useState(false);
   const field = useRef<HTMLInputElement>(null);
+  const composing = useRef(false);
   const operation = board.operation;
   const focus =
     (!showLatest ? operation.current?.step : undefined) ??
@@ -133,7 +76,12 @@ export function TodayBoard({
       ? new Date(Date.parse(`${today}T12:00:00Z`) - (6 - index) * 86400000).toISOString().slice(0, 10)
       : "",
   );
-  const resultDays = new Set(results?.map((item) => item.date));
+  const resultDays = new Set(
+    results
+      ?.filter((item) => item.by === "user" || (item.file !== "task" && item.by === "unknown"))
+      .map((item) => item.date),
+  );
+  const activityDays = data.data?.resultActivityDays;
   const openThread = (thread: HomeThread) =>
     thread.kind === "project"
       ? openProject(thread.id)
@@ -149,42 +97,56 @@ export function TodayBoard({
     return () => window.removeEventListener("kaitu:complete-current", focusCurrent);
   }, []);
   const finish = async () => {
-    const target = operation.current?.step ?? focus;
-    const text = operation.current?.text ?? result;
-    if (!target || !complete || board.read().pending || !text.trim()) return;
-    setPending(true);
-    setError("");
-    const fingerprint = JSON.stringify([target, text.trim()]);
-    if (operation.current?.fingerprint !== fingerprint)
-      operation.current = { fingerprint, id: crypto.randomUUID(), step: target, text };
-    try {
-      const value = await complete(target, text, operation.current.id);
-      board.set("showLatest", false);
-      setReceipt({ value, step: target, text });
-      operation.current = undefined;
-    } catch (err) {
-      const failure = err && typeof err === "object" ? err : {};
-      const remoteCode = "code" in failure ? failure.code : undefined;
-      const details =
-        "details" in failure && failure.details && typeof failure.details === "object" ? failure.details : {};
-      const code =
-        remoteCode === "kaitu/completion-rejected" && "code" in details ? details.code : remoteCode;
-      if (["CONFLICT", "BAD_ARGS", "INVALID_DOCUMENT", "INVALID_RECORD"].includes(String(code)))
-        operation.current = undefined;
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setPending(false);
+    if (operation.current) return board.send(resultAction);
+    if (!focus?.precondition || !focus.file) return;
+    if (/[\r\n\u2028\u2029]/u.test(result) || Array.from(result).length > 2000) {
+      setError(t("请保留草稿，改为一行且不超过2000字", "Keep the draft; use one line up to 2000 characters"));
+      return;
     }
+    await board.send(resultAction, {
+      step: focus,
+      text: result,
+      request: {
+        client_id: resultId(),
+        op: "complete_next_result",
+        args: {
+          file: focus.file,
+          id: focus.id,
+          result_text: result,
+          ...(focus.precondition.kind === "task"
+            ? { expected_rev: focus.precondition.expectedRev }
+            : { expected_next: { ...focus.precondition.expectedNext } }),
+        },
+      },
+    });
   };
-  const reverse = () => undo && reverseTodayBoard(board, undo);
+  const decide = (item: NonNullable<HomeState["data"]>["pending"][number], adopt: boolean) =>
+    board.send(resultAction, {
+      step: {
+        id: item.id,
+        key: `task:${item.id}`,
+        file: "task",
+        title: item.title,
+        parent: t("AI 建议", "AI suggestion"),
+        due: null,
+        precondition: { kind: "task", expectedRev: item.rev },
+      },
+      text: adopt ? t("已采纳", "Adopted") : t("已忽略", "Dismissed"),
+      request: {
+        client_id: resultId(),
+        op: adopt ? "adopt_task" : "cancel_task",
+        args: { id: item.id, expected_rev: item.rev },
+      },
+    });
+  const reverse = () => board.undo(resultAction);
   return (
     <div className={styles.todayBoard}>
       <button
         type="button"
         className={styles.resultWeek}
         aria-label={t(
-          `近 7 天有结果的天数：${results ? resultDays.size : "未知"}，打开近期回顾`,
-          `Days with results in the past seven days: ${results ? resultDays.size : "unknown"}. Open review`,
+          `近 7 天有结果的天数：${activityDays ?? "未知"}，打开近期回顾`,
+          `Days with results in the past seven days: ${activityDays ?? "unknown"}. Open review`,
         )}
         aria-expanded={review}
         onClick={() => setReview(!review)}
@@ -193,7 +155,7 @@ export function TodayBoard({
         {days.map((day) => (
           <i key={day} title={day} data-result={resultDays.has(day)} data-today={day === today} />
         ))}
-        <b>{results ? resultDays.size : "—"}</b>
+        <b>{activityDays ?? "—"}</b>
       </button>
       {review && (
         <section className={styles.weekReview} aria-label={t("近期回顾", "Recent review")}>
@@ -210,7 +172,7 @@ export function TodayBoard({
             <article key={`${item.file}:${item.id}:${item.at}`}>
               <time dateTime={item.at}>{todayProjectDate(item.date, today, locale)}</time>
               <strong>{item.title}</strong>
-              <p>{item.text}</p>
+              <p style={{ whiteSpace: "pre-wrap" }}>{item.text}</p>
             </article>
           ))}
         </section>
@@ -238,39 +200,80 @@ export function TodayBoard({
           </h2>
           {receipt ? (
             <div className={styles.completionReceipt} aria-live="polite">
-              <span>{receipt.text}</span>
+              <span>{receipt.text || t("已完成", "Completed")}</span>
               <button type="button" className={css.btn} disabled={pending} onClick={() => void reverse()}>
-                {t("撤销", "Undo")} ⌘Z
+                {t("撤销", "Undo")}
               </button>
-              <button type="button" className={css.link} onClick={() => setReceipt(undefined)}>
+              <button type="button" className={css.link} onClick={() => setReceipt()}>
                 {t("下一件", "Next")}
               </button>
             </div>
           ) : (
             <>
-              {complete && shown.file && shown.precondition ? (
+              {shown.file && shown.precondition ? (
                 <form
                   className={styles.resultForm}
                   onSubmit={(event) => {
                     event.preventDefault();
-                    void finish();
+                    if (!composing.current) void finish();
                   }}
                 >
-                  <input
-                    ref={field}
-                    aria-label={t("结果", "Result")}
-                    placeholder={t("结果", "Result")}
-                    maxLength={2000}
-                    value={result}
-                    disabled={pending || !!operation.current}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      if (focus) setDrafts((current) => ({ ...current, [focus.key]: value }));
-                    }}
-                  />
+                  {/[\r\n\u2028\u2029]/u.test(result) ? (
+                    <textarea
+                      aria-label={t("结果", "Result")}
+                      value={result}
+                      disabled={pending || !!operation.current}
+                      onChange={(event) => {
+                        if (focus) setDrafts((current) => ({ ...current, [focus.key]: event.target.value }));
+                      }}
+                    />
+                  ) : (
+                    <input
+                      ref={field}
+                      onCompositionStart={() => {
+                        composing.current = true;
+                      }}
+                      onCompositionEnd={() => {
+                        composing.current = false;
+                      }}
+                      onKeyDown={(event) => {
+                        if (
+                          event.key === "Enter" &&
+                          (event.nativeEvent.isComposing ||
+                            event.repeat ||
+                            event.metaKey ||
+                            event.ctrlKey ||
+                            event.altKey ||
+                            event.shiftKey)
+                        )
+                          event.preventDefault();
+                      }}
+                      onPaste={(event) => {
+                        const pasted = event.clipboardData.getData("text");
+                        if (/[\r\n\u2028\u2029]/u.test(pasted) && focus) {
+                          event.preventDefault();
+                          const input = event.currentTarget;
+                          const value =
+                            result.slice(0, input.selectionStart ?? result.length) +
+                            pasted +
+                            result.slice(input.selectionEnd ?? result.length);
+                          setDrafts((current) => ({ ...current, [focus.key]: value }));
+                          setError(t("请保留草稿，改为一行", "Keep the draft; use one line"));
+                        }
+                      }}
+                      aria-label={t("结果", "Result")}
+                      placeholder={t("结果", "Result")}
+                      value={result}
+                      disabled={pending || !!operation.current}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (focus) setDrafts((current) => ({ ...current, [focus.key]: value }));
+                      }}
+                    />
+                  )}
                   <button
                     className={`${css.btn} ${css["btn-strong"]}`}
-                    disabled={pending || !result.trim() || (showLatest && !!operation.current)}
+                    disabled={pending || (showLatest && !!operation.current)}
                     type="submit"
                   >
                     {pending
@@ -346,7 +349,7 @@ export function TodayBoard({
                   onClick={() => {
                     setSelected(step.key);
                     if (operation.current) board.set("showLatest", true);
-                    setReceipt(undefined);
+                    setReceipt();
                     requestAnimationFrame(() => field.current?.focus());
                   }}
                 />
@@ -356,7 +359,7 @@ export function TodayBoard({
                   onClick={() => {
                     setSelected(step.key);
                     if (operation.current) board.set("showLatest", true);
-                    setReceipt(undefined);
+                    setReceipt();
                   }}
                 >
                   {step.title}
@@ -370,15 +373,20 @@ export function TodayBoard({
               <span aria-hidden="true">✎</span>
               <span className={styles.stepTitle}>{item.title}</span>
               <small>{t("AI 建议", "AI suggestion")}</small>
-              <button type="button" className={css.btn} disabled={busy} onClick={() => adopt(item.id)}>
+              <button
+                type="button"
+                className={css.btn}
+                disabled={busy || pending || !!operation.current}
+                onClick={() => void decide(item, true)}
+              >
                 {t("采纳", "Adopt")}
               </button>
               <button
                 type="button"
                 className={css.link}
-                disabled={busy}
+                disabled={busy || pending || !!operation.current}
                 aria-label={t(`不要这条建议：${item.title}`, `Dismiss suggestion: ${item.title}`)}
-                onClick={() => dismiss(item.id)}
+                onClick={() => void decide(item, false)}
               >
                 ×
               </button>

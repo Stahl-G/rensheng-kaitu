@@ -215,19 +215,23 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              completeHomeNext: async (
-                target: import("@kaitu/core").HomeNextTarget,
-                result: string,
-                operationId: string,
+              resultDraft: async (
+                root: string,
+                value: import("@kaitu/core").HomeResultDraft | null,
+                expected: import("@kaitu/core").HomeResultDraft | null,
               ) => {
-                const r = await ctx.remote.kaitu.completeHomeNext(target, result, operationId);
+                const r = await ctx.remote.kaitu.resultDraft(
+                  root,
+                  JSON.stringify(value),
+                  JSON.stringify(expected),
+                );
                 if (!r.ok) throw r.error;
-                return r.value;
+                return JSON.parse(r.value);
               },
-              undoHomeNext: async (token: string) => {
-                const r = await ctx.remote.kaitu.undoHomeNext(token);
+              resultAction: async (root: string, request: import("@kaitu/core").ResultRequest) => {
+                const r = await ctx.remote.kaitu.resultAction(root, JSON.stringify(request));
                 if (!r.ok) throw r.error;
-                return r.value;
+                return JSON.parse(r.value);
               },
               loadHome: async () => {
                 const result = await ctx.remote.kaitu.home();
