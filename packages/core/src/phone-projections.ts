@@ -1,3 +1,4 @@
+import { normalizeStatus } from "./doc-input.js";
 import { experienceInterval, experienceLayer, partialDateBounds } from "./experience-time.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
@@ -61,8 +62,18 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
     ...(food ? { nutrition: food } : {}),
     mobile: {
       version: 1,
+      result_contract: 1,
+      results: data.results.map((row) => ({
+        ...row,
+        completion_id: `data:${encodeURIComponent(row.file)}:${encodeURIComponent(row.id)}`,
+        can_undo: false,
+      })),
+      activity_days: data.resultActivityDays,
       actions: hasTasks
         ? [
+            "complete_next_result",
+            "restore_task_revision",
+            "restore_next",
             "adopt_task",
             "create_task",
             "update_task",
@@ -72,15 +83,16 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
             "capture_memory",
             "replace_memory",
           ]
-        : ["complete_next", "capture_memory", "replace_memory"],
+        : ["complete_next_result", "restore_next", "complete_next", "capture_memory", "replace_memory"],
       tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
-        ({ id, rev, title, status, ts, due }) => ({
+        ({ id, rev, title, status, ts, due, source }) => ({
           id,
           rev: rev ?? 1,
           title,
           status,
           ts,
           ...(due ? { due } : {}),
+          ...(source ? { source } : {}),
         }),
       ),
     },
@@ -93,9 +105,9 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
       proposed,
       ...(ws.exists(file)
         ? {
-            source_precondition: parseFrontmatter<{ next?: { id: string }[] }>(
-              ws.readText(file),
-            ).data.next?.find((item) => item.id === id),
+            source_precondition: (
+              normalizeStatus(parseFrontmatter(ws.readText(file)).data).next as { id: string }[] | undefined
+            )?.find((item) => item.id === id),
           }
         : {}),
     })),

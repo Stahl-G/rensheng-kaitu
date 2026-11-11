@@ -44,6 +44,30 @@
       "required": ["version", "actions", "tasks"],
       "properties": {
         "version": { "const": 1 },
+        "result_contract": { "const": 1 },
+        "activity_days": { "type": "integer", "minimum": 0, "maximum": 7 },
+        "results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "id", "title", "text", "completed_at", "by", "completion_id", "can_undo"],
+            "properties": {
+              "file": { "type": "string" },
+              "id": { "type": "string", "minLength": 1 },
+              "title": { "type": "string" },
+              "text": { "type": "string" },
+              "completed_at": { "type": "string", "format": "date-time" },
+              "by": { "enum": ["user", "agent", "unknown"] },
+              "source": { "type": "string" },
+              "rev": { "type": "integer", "minimum": 1 },
+              "completion_id": {
+                "type": "string",
+                "description": "旧候选兼容显示键；不是操作ID，不能用于撤销。"
+              },
+              "can_undo": { "const": false }
+            }
+          }
+        },
         "actions": { "type": "array", "items": { "type": "string" } },
         "tasks": {
           "type": "array",
@@ -56,7 +80,8 @@
               "ts": { "type": "string", "format": "date-time" },
               "title": { "type": "string", "minLength": 1 },
               "status": { "enum": ["proposed", "open", "done", "cancelled"] },
-              "due": { "type": "string" }
+              "due": { "type": "string" },
+              "source": { "type": "string" }
             }
           }
         }

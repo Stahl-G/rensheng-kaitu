@@ -84,16 +84,21 @@ export function proposeTask(ws: Workspace, input: TaskInput, actor = "Agent") {
 }
 
 /** 只由用户界面或已接收的手机采纳操作调用；重复点击不追加修订。 */
-export async function adoptTask(ws: Workspace, id: string) {
+export async function adoptTask(ws: Workspace, id: string, expected_rev?: number) {
   const task = listTasks(ws, { status: "all" }).find((task) => task.id === id);
   if (!task) throw new KaituError("待办建议不存在", "NOT_FOUND");
-  if (task.status === "open") return { record: task, version: null };
+  if (expected_rev !== undefined && (task.rev ?? 1) !== expected_rev)
+    throw new KaituError("待办已更新，请刷新 / Task changed; refresh", "CONFLICT");
+  if (task.status === "open" && expected_rev === undefined) return { record: task, version: null };
   if (task.status !== "proposed") throw new KaituError("待办已处理，请刷新", "CONFLICT");
   const result = updateRecord(ws, "task", id, { status: "open" }, { by: "user" });
   return { ...result, version: await snapshot(ws, `你采纳了待办：${task.title}`) };
 }
 
 async function setTaskStatus(ws: Workspace, id: string, status: TaskStatus, options: TaskWriteOptions) {
+  const task = listTasks(ws, { status: "all" }).find((task) => task.id === id);
+  if (!task || (task.status !== "open" && !(status === "cancelled" && task.status === "proposed")))
+    throw new KaituError("待办已处理，请刷新 / Task already handled; refresh", "CONFLICT");
   const result = updateRecord(ws, "task", id, { status }, { ...options, by: options.by ?? "user" });
   const action = status === "done" ? "完成" : "取消";
   const version = await snapshot(ws, `${options.actor ?? "你"}${action}了待办：${result.record.title}`);

@@ -94,3 +94,30 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
 手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。
+
+## 单行结果与短时撤销（result_contract 1）
+
+发送时同时检查新鲜 today 的 `mobile.result_contract === 1`、`mobile.actions` 包含动作，并保留客户端原有电脑快照水位检查。mobile.version 仍是 1。只看 adopt_task 名称不够：旧电脑已声明该名称却忽略 expected_rev，绝不退回无 CAS 的采纳。缺能力时保留原操作 ID、内容和草稿，等待兼容电脑，不改写为旧 complete_next/complete_task。
+
+`applyResultAction` 的 client_id 与手机一致，只接受 26 位 ULID；桌面旧 UUID 调用须改为 ULID，不会隐式转换，重试复用原 ULID。
+
+每个新操作一个独立 `.actions.jsonl` 文件，只含一行 JSON；同目标上一次未知结果未核清前不提交后续操作。重投必须沿用原 client_id 和全部原参数。不同内容重用 ID 返回 conflict。文件消失、文件级收件成功均不是动作已完成的证明。
+
+- `complete_next_result`：args `{file,id,result_text,expected_rev}`（task）或 `{file,id,result_text,expected_next}`（STATUS）。任务须 open，STATUS 须 todo，前提精确匹配才完成。结果允许空白，空白不计推进；新输入必须单行且最多 2000 字符，换行/超长显式 rejected，不截断不折叠。旧多行草稿保留待修改，用新 ID 提交修改后的操作；未知结果不得因此换 ID 重试。
+- `adopt_task`：args `{id,expected_rev}`，只把 proposed 采纳为 open；旧无 expected_rev 形式兼容既有入口，但新客户端不发送它。
+- `cancel_task`：args `{id,expected_rev}`，允许 open 或 proposed 变为 cancelled；建议的“不采用”复用此动作。
+- `restore_task_revision`：args `{id,expected_rev,prior_rev}`，仅在当前修订匹配时，把已有旧修订的内容追加为 rev+1，不重写历史。
+- `restore_next`：args `{file,id,expected_next,prior_next}`，只在当前目标条目完整等于 expected_next 时恢复 prior_next；其他条目、未知字段和正文保留。独立修改目标条目返回 conflict。
+
+成功/重复回执含 `effect`。task 为 `{file:"task",id,rev,prior_rev}`，STATUS 为 `{file,id,expected_next,prior_next}`。短时撤销提示把 effect 转成上面的恢复动作，分配新的 client_id。该回执不是永久撤销列表，mobile.results 不提供历史撤销。I/O 结果未知保留本机持久请求与写前计划，重启重投原 ID；已写修订不再追加，已撤销操作不重放。STATUS 的前提是数据精确值，未知写入尚未沿原 ID 核清，外部工具就恢复为相同旧值的 ABA 无法从两个业务字段识别，不声称有来源所有权。
+
+例：`{"client_id":"01K00000000000000000000001","at":"2026-11-11T08:00:00Z","device":"3fa9c1d2","op":"complete_next_result","args":{"file":"task","id":"01K00000000000000000000002","expected_rev":1,"result_text":"完成初稿"}}`。
+回执 effect `{file:"task",id:"01K00000000000000000000002",rev:2,prior_rev:1}` 对应恢复 args `{id:"01K00000000000000000000002",expected_rev:2,prior_rev:1}`。
+
+任务继续用 notes 中的「完成结果：」「完成时间：」，来源链接与旧多行内容保留。STATUS 的 next 条目只增加可选 `result` 与 `completed`；completed 取名参考 [RFC 5545 §3.8.2.1 COMPLETED](https://www.rfc-editor.org/rfc/rfc5545#section-3.8.2.1)，存带时区的 ISO 8601；结果没有对应的专用 iCalendar 属性，采用普通 result。正文不增加机器块或 HTML 注释。
+
+core 的 collectResults / resultActivityDays 同时给桌面 overview.results/resultActivityDays 和 phone.today.mobile.results/activity_days 提供数据，不依赖手机操作账本。只列当前有效非空完成结果，恢复为未完成后移出列表但历史仍在。按工作区本地时区，含今天的七个自然日去重；同日两条结果是两行、一天。task 追溯本次完成的修订来源，后续改标题/到期日不丢结果或把 Agent 完成升级成用户完成；任务旧结果缺有效带时区完成时间时保留原 notes 原文，不进入有日期的结果集合或七天日期。STATUS 显式 result+completed 计入日期，但没有作者字段，无法区分 AI 写入的显式结果，不能宣称排除了全部 AI 结果。
+
+旧候选的 results DTO 仍能读取 completion_id/file/id/title/text/completed_at/can_undo。这里 completion_id 是 `data:<编码file>:<编码id>` 显示键，不是原操作 ID，can_undo 恒为 false。新客户端只用 file+id 作为数据 identity，撤销只用回执 effect 和新动作，不能把显示键交给旧 undo_next_result。旧候选若发送多行结果，得到 rejected，保留原稿；不静默丢内容。
+
+旧 main 不认识 complete_next_result/restore_task_revision/restore_next，逐行拒绝后归档原文件；保留客户端原请求与 ID，升级后才能重投。旧主线混合文件可能已经执行其中合法行，同时给整个文件 rejected，不能宣称整文件未执行。新消费者不把未知动作解释成别的动作，原文件归档保留；若曾收到终态 conflict/rejected，修改后应使用新 ID，若仅有旧版文件级拒绝且证实目标未执行，可原 ID 重投。
