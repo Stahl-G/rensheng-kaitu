@@ -1,3 +1,4 @@
+import { normalizeDocument } from "./doc-input.js";
 import { experienceInterval, experienceLayer, partialDateBounds } from "./experience-time.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { inboxNotes } from "./inbox-notes.js";
@@ -6,9 +7,11 @@ import { listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
 import type { readOverviewPage } from "./overview-page.js";
 import { phoneInboxName } from "./phone-actions.js";
+import { phoneResults } from "./phone-results.js";
 import type { Experience, LifeMapData } from "./places.js";
 import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
+import { taskDecisionContext, taskDecisionFiles, taskDecisions } from "./task-decisions.js";
 import { listTasks } from "./tasks.js";
 import { localDate, parseTs } from "./time.js";
 import { userNavigation } from "./user-profile.js";
@@ -44,6 +47,7 @@ function nutrition(ws: Workspace, data: Overview) {
 export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspace) {
   const food = nutrition(ws, data);
   const hasTasks = listRecordTypes(ws).some((ref) => ref.type === "task");
+  const taskFiles = hasTasks ? taskDecisionFiles(ws) : new Map<string, string | null>();
   const block = ({ id, title, kind, status, start, end, module, calendar }: Overview["blocks"][number]) => ({
     id,
     title,
@@ -64,23 +68,32 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
       actions: hasTasks
         ? [
             "adopt_task",
+            "decide_task",
+            "undo_task_decision",
             "create_task",
             "update_task",
             "complete_task",
             "cancel_task",
             "complete_next",
+            "complete_next_result",
+            "undo_next_result",
             "capture_memory",
             "replace_memory",
           ]
-        : ["complete_next", "capture_memory", "replace_memory"],
+        : ["complete_next", "complete_next_result", "undo_next_result", "capture_memory", "replace_memory"],
+      ...taskDecisionContext(ws),
+      task_decisions: hasTasks ? taskDecisions(ws) : [],
+      results: phoneResults(ws),
       tasks: (hasTasks ? listTasks(ws, { status: "all" }) : []).map(
-        ({ id, rev, title, status, ts, due }) => ({
+        ({ id, rev, title, status, ts, due, source }) => ({
           id,
           rev: rev ?? 1,
+          file: taskFiles.get(id) ?? undefined,
           title,
           status,
           ts,
           ...(due ? { due } : {}),
+          ...(typeof source === "string" ? { source } : {}),
         }),
       ),
     },
@@ -93,9 +106,11 @@ export function buildPhoneToday(data: Overview, generatedAt: string, ws: Workspa
       proposed,
       ...(ws.exists(file)
         ? {
-            source_precondition: parseFrontmatter<{ next?: { id: string }[] }>(
-              ws.readText(file),
-            ).data.next?.find((item) => item.id === id),
+            source_precondition: (
+              normalizeDocument("status.schema.json", parseFrontmatter(ws.readText(file)).data) as {
+                next?: { id: string }[];
+              }
+            ).next?.find((item) => item.id === id),
           }
         : {}),
     })),

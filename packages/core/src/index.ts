@@ -45,6 +45,7 @@ export * from "./record-reference.js";
 export * from "./inbox-notes.js";
 
 export * from "./tasks.js";
+export * from "./task-decisions.js";
 
 export * from "./upgrade.js";
 export * from "./template-version.js";

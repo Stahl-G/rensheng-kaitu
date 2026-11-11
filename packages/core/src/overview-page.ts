@@ -12,6 +12,7 @@ import { latestDaily } from "./overview.js";
 import { readPlans } from "./plans.js";
 import type { StoredRecord } from "./records.js";
 import { dailyRecordTotals, summarizeStatus, workoutSessions } from "./status.js";
+import { taskDecisionFiles } from "./task-decisions.js";
 import { localDate, localMonth, parseTs } from "./time.js";
 import { type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -69,6 +70,10 @@ export async function readOverviewPage(
 ) {
   const data = loaded ?? readWorkbench(ws, now);
   const status = summarizeStatus(data);
+  // Workbench already owns partial-read warnings; preserve them without duplicating errors.
+  const taskFiles = (data.records.task ?? []).some((task) => task.status === "proposed")
+    ? taskDecisionFiles(ws, () => {})
+    : new Map<string, string | null>();
   const cutoff = now.toISOString();
   const localDays = new Map<string, string>();
   const day = (ts: unknown) => {
@@ -384,7 +389,13 @@ export async function readOverviewPage(
       !data.inboxNotes,
     proposedTasks: (data.records.task ?? [])
       .filter((task) => task.status === "proposed")
-      .map(({ id, title }) => ({ id, title: String(title) })),
+      .map(({ id, title, rev, source }) => ({
+        id,
+        title: String(title),
+        rev: rev ?? 1,
+        source: typeof source === "string" ? source : null,
+        file: taskFiles.get(id) ?? null,
+      })),
     blocks: status.now.blocks,
     next: allNext.slice(0, 3),
     allNext,

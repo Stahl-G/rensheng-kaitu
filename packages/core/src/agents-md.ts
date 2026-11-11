@@ -124,6 +124,8 @@ USER.md 缺失或写着「暂不可用」时，改读 me/goals.json、me/profile
 目录地图（只读本次需要的）：
 - me/：档案、目标、规则与确认过的阶段；NOW.md：最近计划。
 - memory/：记忆索引与条目；以索引/列表为当前状态；有 ended 或被其他活跃条目的 replaces 关联的是旧事实，不当作当前画像。
+- 任务建议决定/撤销只在 today.mobile.actions 声明 decide_task/undo_task_decision 时投递；consumer_id/file/id/expected_rev/expected_source 原样带回，以独立 decision 回执与 mobile.task_decisions 核对；不同 consumer 保留 pending，换电脑先重读，旧 adopt_task 不冒称 CAS 或可撤销。
+- 手机记结果/撤销只在 today.mobile.actions 声明 complete_next_result/undo_next_result 时投递；同 client_id 原样重试，以回执 result 和 mobile.results 核对，不用普通原文代替结果关联，不把桌面内存 token 当跨端撤销。
 - 手机自然记忆仅在 today.mobile.actions 声明 capture_memory 时投递，沿用相同来源/幂等/纠正规则；以回执 memory.file/status 核对共享库结果，未支持时不得声称已入共享库。
 - projects/、learning/、decisions/：项目、学习与决定的状态及日志。
 - explore/、health/、feed/：方向与足迹、健康、资讯，按模块说明取。
