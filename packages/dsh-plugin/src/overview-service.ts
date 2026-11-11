@@ -155,7 +155,6 @@ import {
   setFinanceAccess,
   setNewsFeedback,
   setWeatherPlace,
-  snapshot,
   snapshotNow,
   startLearning,
   syncProject,
@@ -214,7 +213,6 @@ export interface KaituServiceHost {
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
   private readonly files: ReturnType<typeof dshFiles>;
-  private readonly scheduleVersion: (message: string) => void;
   private readonly homeCache: ReturnType<typeof createHomeCache> | null;
   private readonly homeListeners = new Set<() => void>();
   private disposed = false;
@@ -256,13 +254,6 @@ export class KaituOverviewService extends TypertRemoteService {
         await disposeNoteIndex(this.workspace);
       });
     }
-    this.scheduleVersion = (message) => {
-      setImmediate(() => {
-        void this.write(() => snapshot(this.workspace, message)).catch((error) =>
-          ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`),
-        );
-      });
-    };
     const performWrite = this.write;
     const invalidate = () => {
       this.files.invalidate();
@@ -537,14 +528,14 @@ export class KaituOverviewService extends TypertRemoteService {
   async learningStart(
     input: StartLearningInput,
   ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
-    return this.write(() => startLearning(this.workspace, input, new Date(), this.scheduleVersion));
+    return this.write(() => startLearning(this.workspace, input));
   }
 
   @Remote("learningSave")
   async learningSave(
     input: LearningCheckinInput,
   ): Promise<LearningTopic & { version: string | null; versionError?: string; replayed?: boolean }> {
-    return this.write(() => saveLearningCheckin(this.workspace, input, new Date(), this.scheduleVersion));
+    return this.write(() => saveLearningCheckin(this.workspace, input));
   }
 
   @Remote("calendar")
@@ -714,9 +705,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("captureOnce")
   async captureOnce(text: string, operationId: string): Promise<Awaited<ReturnType<typeof captureNoteOnce>>> {
-    return this.write(() =>
-      captureNoteOnce(this.workspace, text, operationId, { scheduleVersion: this.scheduleVersion }),
-    );
+    return this.write(() => captureNoteOnce(this.workspace, text, operationId));
   }
 
   @Remote("captureReceipt")
