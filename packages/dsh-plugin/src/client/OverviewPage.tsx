@@ -304,7 +304,12 @@ function Overview({
     kind: "completion",
     sequence: 0,
   });
-  const [decisionHistoryRequest, setDecisionHistoryRequest] = useState(0);
+  const decisionHistorySequence = useRef(0);
+  const [decisionHistoryRequest, setDecisionHistoryRequest] = useState<{
+    root: string;
+    id: number;
+    board: ReturnType<typeof createTodayBoardSession>;
+  } | null>(null);
   const todaySession = useRef({ root: workspaceRoot, board: createTodayBoardSession() });
   if (workspaceRoot && todaySession.current.root && todaySession.current.root !== workspaceRoot) {
     todaySession.current = { root: workspaceRoot, board: createTodayBoardSession() };
@@ -1191,7 +1196,11 @@ function Overview({
         event.preventDefault();
         setView("overview");
         setGuide(null);
-        setDecisionHistoryRequest((value) => value + 1);
+        setDecisionHistoryRequest({
+          root: todaySession.current.root ?? "",
+          id: ++decisionHistorySequence.current,
+          board,
+        });
         return;
       }
       if (
@@ -1586,7 +1595,17 @@ function Overview({
                         activity: () => {
                           localUndo.current = { kind: "decision", sequence: localUndo.current.sequence + 1 };
                         },
-                        historyRequest: decisionHistoryRequest,
+                        historyRequest:
+                          decisionHistoryRequest?.root === data.root &&
+                          decisionHistoryRequest.board === todaySession.current.board
+                            ? decisionHistoryRequest.id
+                            : 0,
+                        historyRevealed: (id) =>
+                          setDecisionHistoryRequest((current) =>
+                            current?.id === id && current.board === todaySession.current.board
+                              ? null
+                              : current,
+                          ),
                         changed: () => {
                           void refresh();
                         },

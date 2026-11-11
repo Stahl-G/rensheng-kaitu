@@ -236,6 +236,7 @@ function services(ws: Workspace, host: KaituOverviewService): TaskDecisionServic
     changed: vi.fn(),
     activity: vi.fn(),
     historyRequest: 0,
+    historyRevealed: vi.fn(),
   };
 }
 const button = (app: ReturnType<typeof create>, text: string) => {
@@ -443,10 +444,27 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
       expect(key("z").defaultPrevented).toBe(true);
     });
     expect(undo).not.toHaveBeenCalled();
-    expect(owner().props.decisions.historyRequest).toBeGreaterThan(0);
+    expect(owner().props.decisions.historyRequest).toBe(0);
     expect(historyScroll).toHaveBeenCalledTimes(1);
     expect(historyFocus).toHaveBeenCalledWith({ preventScroll: true });
     expect(owner().props.session.read().receipt.value.token).toBe("old");
+    await act(async () => {
+      key("j");
+    });
+    const navigation = need(app).root.findByProps({ "aria-label": "主要导航" });
+    const today = need(
+      navigation
+        .findAllByType("button")
+        .find((item) => item.findAllByType("span").some((span) => span.children.join("") === "今天")),
+    );
+    await act(async () => today.props.onClick());
+    expect(historyScroll).toHaveBeenCalledTimes(1);
+    expect(historyFocus).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      key("z");
+    });
+    expect(historyScroll).toHaveBeenCalledTimes(2);
+    expect(owner().props.decisions.historyRequest).toBe(0);
     for (const protection of [
       { isComposing: true },
       { repeat: true },
@@ -470,7 +488,7 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
       key("z");
     });
     expect(undo).toHaveBeenCalledWith("new");
-    expect(historyScroll).toHaveBeenCalledTimes(1);
+    expect(historyScroll).toHaveBeenCalledTimes(2);
   } finally {
     if (app) await act(async () => app?.unmount());
   }
@@ -541,6 +559,63 @@ it("same-root loader replacement resets only its owner and late callbacks cannot
     expect(button(need(app), "撤销").props.disabled).toBe(false);
   } finally {
     for (const release of releases) release();
+    if (app) await act(async () => app?.unmount());
+  }
+});
+
+it("decision history initially renders a bounded recent batch and More reveals real core decisions incrementally", async () => {
+  const { ws, host, scope } = await setup();
+  for (let index = 0; index < 45; index++)
+    addRecord(ws, "task", {
+      title: `History item ${index + 1}`,
+      source: "https://example.test/synthetic/long-source/",
+    });
+  const proposals = (await readOverviewPage(ws)).proposedTasks.filter((item) =>
+    item.title.startsWith("History item"),
+  );
+  for (const item of proposals) {
+    if (!item.file) throw new Error("Missing actual source file");
+    expect(
+      applyTaskDecision(ws, {
+        client_id: randomUUID(),
+        op: "decide_task",
+        args: {
+          consumer_id: scope.consumer_id,
+          file: item.file,
+          id: item.id,
+          expected_rev: item.rev,
+          expected_source: item.source,
+          decision: "dismissed",
+        },
+      }).status,
+    ).toBe("applied");
+  }
+  let app: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      app = create(
+        createElement(TaskSuggestions, {
+          services: services(ws, host),
+          pending: readHome(await readHomeSources(ws)).pending,
+        }),
+      );
+    });
+    expect(need(app).root.findAllByType("article")).toHaveLength(0);
+    await act(async () => button(need(app), "已处理建议").props.onClick());
+    expect(need(app).root.findAllByType("article")).toHaveLength(20);
+    expect(need(app).root.findAllByType("article")[0]?.findByType("strong").children.join("")).toBe(
+      "History item 45",
+    );
+    await act(async () => button(need(app), "更多").props.onClick());
+    expect(need(app).root.findAllByType("article")).toHaveLength(40);
+    await act(async () => button(need(app), "更多").props.onClick());
+    expect(need(app).root.findAllByType("article")).toHaveLength(45);
+    expect(
+      need(app)
+        .root.findAllByType("button")
+        .filter((item) => item.children.join("") === "更多"),
+    ).toHaveLength(0);
+  } finally {
     if (app) await act(async () => app?.unmount());
   }
 });

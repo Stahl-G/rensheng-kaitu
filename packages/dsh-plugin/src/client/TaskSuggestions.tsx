@@ -18,6 +18,7 @@ export interface TaskDecisionServices {
   changed: () => void;
   activity: () => void;
   historyRequest: number;
+  historyRevealed: (request: number) => void;
 }
 export function TaskSuggestions({
   pending,
@@ -31,6 +32,7 @@ export function TaskSuggestions({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(20);
   const historyButton = useRef<HTMLButtonElement>(null);
   const revealed = useRef(0);
   const active = useRef<object>();
@@ -69,10 +71,13 @@ export function TaskSuggestions({
   useEffect(() => {
     const request = services.historyRequest;
     if (!history || !request || revealed.current === request) return;
+    const button = historyButton.current;
+    if (!button) return;
     revealed.current = request;
-    historyButton.current?.scrollIntoView({ block: "nearest" });
-    historyButton.current?.focus({ preventScroll: true });
-  }, [history, services.historyRequest]);
+    button.scrollIntoView({ block: "nearest" });
+    button.focus({ preventScroll: true });
+    services.historyRevealed(request);
+  }, [history, services.historyRequest, services.historyRevealed]);
   const run = async (operation: (scope: TaskDecisionScope) => Promise<PhoneReceipt>) => {
     const owner = active.current;
     if (!state || !owner || inFlight.current?.owner === owner) return;
@@ -217,7 +222,7 @@ export function TaskSuggestions({
       </button>
       {history &&
         state?.decisions
-          .slice()
+          .slice(-historyLimit)
           .reverse()
           .map((item) => (
             <article className={styles.decisionEntry} key={item.decision_id}>
@@ -251,6 +256,11 @@ export function TaskSuggestions({
               {item.status !== "undone" && !item.can_undo && <span>{t("事项已更新", "Item changed")}</span>}
             </article>
           ))}
+      {history && state && state.decisions.length > historyLimit && (
+        <button type="button" className={css.link} onClick={() => setHistoryLimit((value) => value + 20)}>
+          {t("更多", "More")}
+        </button>
+      )}
     </section>
   );
 }
