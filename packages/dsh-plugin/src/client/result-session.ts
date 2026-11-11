@@ -144,6 +144,8 @@ export function createTodayBoardSession(
           delete drafts[action.step.key];
           state = { ...state, drafts };
         }
+        if (action.request.op.startsWith("restore_") && action.restoreDraft)
+          state = { ...state, drafts: { ...state.drafts, [action.step.key]: action.text } };
         try {
           await persist();
         } catch (error) {
@@ -154,8 +156,6 @@ export function createTodayBoardSession(
         board.expire();
         if (action.request.op.startsWith("restore_")) {
           board.set("selected", action.step.key);
-          if (action.restoreDraft)
-            board.set("drafts", (drafts) => ({ ...drafts, [action.step.key]: action.text }));
         } else if (response.status === "applied" && showReceipt) {
           board.set("receipt", { ...action, effect: response.effect, expires: Date.now() + RESULT_UNDO_MS });
           timer = setTimeout(board.expire, RESULT_UNDO_MS);

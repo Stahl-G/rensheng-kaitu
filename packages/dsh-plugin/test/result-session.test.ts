@@ -101,7 +101,8 @@ test("real service write with lost reply survives owner and service reconstructi
     expect(reopened.operation.current).toBeUndefined();
     expect(reopened.read().receipt).toBeUndefined(); // Duplicate never says the old effect is still current.
     expect(readRecords(ws, "task").find((row) => row.id === task.id)?.source).toBe(task.source);
-    expect(statSync(ws.resolve(".kaitu/result-draft.json", { internal: true })).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32")
+      expect(statSync(ws.resolve(".kaitu/result-draft.json", { internal: true })).mode & 0o777).toBe(0o600);
     const other = createTodayBoardSession(`${ws.root}-other`, storage());
     expect(other.operation.current).toBeUndefined();
     await expect(service(ws)(`${ws.root}-other`, original.request)).rejects.toMatchObject({
