@@ -23,7 +23,10 @@
         "answer_question",
         "trial_checkin",
         "replace_memory",
-        "capture_memory"
+        "capture_memory",
+        "complete_next_result",
+        "restore_task_revision",
+        "restore_next"
       ]
     },
     "args": { "type": "object" }
@@ -375,6 +378,69 @@
             "additionalProperties": false
           }
         }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "complete_next_result" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["file", "id", "result_text"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string", "minLength": 1 },
+              "id": { "type": "string", "minLength": 1 },
+              "result_text": { "type": "string" },
+              "expected_rev": { "type": "integer", "minimum": 1 },
+              "expected_next": { "type": "object" }
+            },
+            "if": { "properties": { "file": { "const": "task" } } },
+            "then": { "required": ["expected_rev"] },
+            "else": { "required": ["expected_next"] }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "restore_task_revision" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["id", "expected_rev", "prior_rev"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "expected_rev": { "type": "integer", "minimum": 1 },
+              "prior_rev": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "restore_next" } } },
+      "then": {
+        "properties": {
+          "args": {
+            "type": "object",
+            "required": ["file", "id", "expected_next", "prior_next"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string", "minLength": 1 },
+              "id": { "type": "string", "minLength": 1 },
+              "expected_next": { "type": "object" },
+              "prior_next": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "op": { "const": "adopt_task" } } },
+      "then": {
+        "properties": { "args": { "properties": { "expected_rev": { "type": "integer", "minimum": 1 } } } }
       }
     }
   ]
