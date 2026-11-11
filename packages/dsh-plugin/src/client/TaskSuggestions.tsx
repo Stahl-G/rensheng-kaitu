@@ -31,6 +31,8 @@ export function TaskSuggestions({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
+  const historyButton = useRef<HTMLButtonElement>(null);
+  const revealed = useRef(0);
   const active = useRef<object>();
   const inFlight = useRef<{ owner: object }>();
   const loadSequence = useRef(0);
@@ -64,6 +66,13 @@ export function TaskSuggestions({
   useEffect(() => {
     if (services.historyRequest) setHistory(true);
   }, [services.historyRequest]);
+  useEffect(() => {
+    const request = services.historyRequest;
+    if (!history || !request || revealed.current === request) return;
+    revealed.current = request;
+    historyButton.current?.scrollIntoView({ block: "nearest" });
+    historyButton.current?.focus({ preventScroll: true });
+  }, [history, services.historyRequest]);
   const run = async (operation: (scope: TaskDecisionScope) => Promise<PhoneReceipt>) => {
     const owner = active.current;
     if (!state || !owner || inFlight.current?.owner === owner) return;
@@ -197,7 +206,13 @@ export function TaskSuggestions({
           </button>
         </div>
       )}
-      <button type="button" className={css.link} aria-expanded={history} onClick={() => setHistory(!history)}>
+      <button
+        ref={historyButton}
+        type="button"
+        className={css.link}
+        aria-expanded={history}
+        onClick={() => setHistory(!history)}
+      >
         {t("已处理建议", "Decision history")}
       </button>
       {history &&
@@ -205,7 +220,7 @@ export function TaskSuggestions({
           .slice()
           .reverse()
           .map((item) => (
-            <article key={item.decision_id}>
+            <article className={styles.decisionEntry} key={item.decision_id}>
               <strong>{item.title}</strong>
               <span>
                 {item.status === "undone"
@@ -214,7 +229,7 @@ export function TaskSuggestions({
                     ? t("已采纳", "Adopted")
                     : t("已拒绝", "Dismissed")}
               </span>
-              {item.source && <span>{item.source}</span>}
+              {item.source && <span className={styles.decisionSource}>{item.source}</span>}
               {item.status !== "undone" && (
                 <button
                   type="button"

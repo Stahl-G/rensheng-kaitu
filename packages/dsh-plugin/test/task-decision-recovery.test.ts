@@ -381,6 +381,8 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     )
     .mockResolvedValue({ token: "new", title: "New completion" });
   const undo = vi.fn().mockResolvedValue({ undone: true });
+  const historyScroll = vi.fn();
+  const historyFocus = vi.fn();
   const props = {
     hosted: true,
     loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
@@ -414,7 +416,12 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
   };
   try {
     await act(async () => {
-      app = create(createElement(OverviewPage, props));
+      app = create(createElement(OverviewPage, props), {
+        createNodeMock: (element) =>
+          element.type === "button" && element.props.children === "已处理建议"
+            ? { scrollIntoView: historyScroll, focus: historyFocus }
+            : null,
+      });
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
     const owner = () => need(app).root.findByType(LifeHome);
@@ -437,6 +444,8 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     });
     expect(undo).not.toHaveBeenCalled();
     expect(owner().props.decisions.historyRequest).toBeGreaterThan(0);
+    expect(historyScroll).toHaveBeenCalledTimes(1);
+    expect(historyFocus).toHaveBeenCalledWith({ preventScroll: true });
     expect(owner().props.session.read().receipt.value.token).toBe("old");
     for (const protection of [
       { isComposing: true },
@@ -461,6 +470,7 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
       key("z");
     });
     expect(undo).toHaveBeenCalledWith("new");
+    expect(historyScroll).toHaveBeenCalledTimes(1);
   } finally {
     if (app) await act(async () => app?.unmount());
   }
