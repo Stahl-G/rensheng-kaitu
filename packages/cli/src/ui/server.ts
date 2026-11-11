@@ -1,9 +1,11 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { type FSWatcher, existsSync, readFileSync, unwatchFile, watch, watchFile } from "node:fs";
 import { type IncomingMessage, type ServerResponse, createServer } from "node:http";
 import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Context } from "@deepseek-ai/cordis";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
 import { createHomeCache, phoneReadable } from "@kaitu/core";
@@ -67,11 +69,12 @@ import {
   syncStatus,
   workspaceFileStampsAsync,
 } from "@kaitu/core";
+import { KaituFinanceService, KaituOverviewService } from "@kaitu/dsh-plugin/service";
 import { dshCommand } from "../dsh.js";
 import type { AskService } from "./ask.js";
 import { browserAsk } from "./browser-ask.js";
 import { phoneAnswer } from "./phone-answer.js";
-import { planMutations, productMutations, productRequest } from "./product.js";
+import { type ProductServices, productMutations, productRequest } from "./product.js";
 
 export interface UiOptions {
   port?: number;
@@ -218,6 +221,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
     throw new KaituError("端口必须是 1–65535 的整数", "BAD_ARGS");
   }
+  const serviceContext = new Context();
+  // 要等网络的写入按请求开始时的资料位置和版本落盘；等待期间换了位置或恢复了版本，迟到的结果作废。
+  const requestWriter = new AsyncLocalStorage<ReturnType<typeof workspaceWriter>>();
   const clients = new Set<ServerResponse>();
   const askClients = new Set<ServerResponse>();
   const uploads = new Map<
@@ -305,6 +311,22 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   });
   // 共享检查只限本次同步启动窗口；微任务后读数失效，后续检查重新读取原件。
   let stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive, home.startupChecks);
+  // 界面接口和 DSH 插件是同一份实现；这里只交出本机服务已经在管的东西。
+  const services: ProductServices = {
+    kaitu: new KaituOverviewService(
+      serviceContext,
+      {},
+      ws,
+      (operation) => (requestWriter.getStore() ?? workspaceWriter())(operation),
+      undefined,
+      { home, files, calendarPush, syncCalendar, savesVersions: true, changed: notify },
+    ),
+    kaituFinance: new KaituFinanceService(serviceContext, {}, ws, (operation) =>
+      workspaceWriter()(operation).finally(notify),
+    ),
+  };
+  const request = (method: string, args: unknown[], write?: Parameters<typeof productRequest>[5]) =>
+    productRequest(ws, method, args, options.ask, calendarPush, write, services);
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
@@ -643,9 +665,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           return json(res, 200, folder);
         }
         if (["configureCalendarPush", "retryCalendarPush", "removeCalendarPush"].includes(method)) {
-          const result = await calendarOperation(() =>
-            productRequest(ws, method, args, options.ask, calendarPush),
-          );
+          const result = await calendarOperation(() => request(method, args));
           notify();
           return json(res, 200, result);
         }
@@ -656,11 +676,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           notify();
           return json(res, 200, result);
         }
+        if (["projectBindGithub", "projectSync"].includes(method))
+          return json(res, 200, await requestWriter.run(workspaceWriter(), () => request(method, args)));
         if (
-          ["projectBindGithub", "projectSync", "onboardingMatterOrganize"].includes(method) ||
+          method === "onboardingMatterOrganize" ||
           (method === "workspaceBackup" && ["create", "connect"].includes(String(args[0])))
         ) {
-          const result = await productRequest(ws, method, args, options.ask, calendarPush, workspaceWriter());
+          const result = await request(method, args, workspaceWriter());
           notify();
           return json(res, 200, result);
         }
@@ -687,7 +709,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           method === "openAi"
             ? await openAi()
             : method.startsWith("ask") || method === "projectGoalSuggest"
-              ? await productRequest(ws, method, args, options.ask, calendarPush)
+              ? await request(method, args)
               : relocate || method === "restoreVersion"
                 ? await exclusive(() =>
                     withoutSnapshotTimer(async () => {
@@ -701,7 +723,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                       try {
                         await pauseWatching();
                         if (relocate) await options.onWorkspaceChanging?.();
-                        return await productRequest(ws, method, args, options.ask, calendarPush);
+                        return await request(method, args);
                       } finally {
                         try {
                           await resumeWatching();
@@ -717,10 +739,9 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                     }),
                   )
                 : productMutations.has(method) && !backupRead
-                  ? await exclusive(() => productRequest(ws, method, args, options.ask, calendarPush))
-                  : await productRequest(ws, method, args, options.ask, calendarPush);
+                  ? await exclusive(() => request(method, args))
+                  : await request(method, args);
         if (method === "configureAutomation") await options.onAutomationChanged?.();
-        if (planMutations.has(method)) syncCalendar();
         if (productMutations.has(method) && !backupRead) notify();
         if (
           method === "openAi" &&

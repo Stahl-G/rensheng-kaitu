@@ -166,7 +166,7 @@ const props: OverviewPageProps = {
   captureOnce: (text, operationId) => call("captureOnce", text, operationId),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
-    call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),
+    call("weatherPlace", name, latitude, longitude, source),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
   loadExperienceImports: () => call("experienceImports"),

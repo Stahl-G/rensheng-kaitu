@@ -23,7 +23,9 @@
 3. **两边确实不同的事，写成服务的宿主选项，不写成第二份实现**：首页缓存、文件索引、系统日历执行器、版本记录由谁调度。
 4. **只在独立版存在的方法留在 `product.ts`**，并且一眼看得出为什么：
    - 问问（`ask*`）：插件里由 DSH 原生会话承担。
-   - 要调模型的整理（`onboardingMatterOrganize`、`directionGeneration`、`directionMap*`、`lifeAtlas*`、`projectGoalSuggest`、`resumeExtract`、`resumeConnection`、`suggestNewsKeywords`）：插件里交给宿主对话。
+   - 要调模型的整理（`onboardingMatterOrganize`、`directionGeneration`、`directionMapGenerate`、`projectGoalSuggest`、`resumeExtract`、`resumeConnection`、`suggestNewsKeywords`）：插件里交给宿主对话。
+   - 插件端还没有的页面数据（`lifeAtlas*`、`directionMap`、`directionMapDismiss`）：以后插件要用时，加进服务类，再从这里删掉。
+   - 系统日历的开关、重试、清除（`configureCalendarPush`、`retryCalendarPush`、`removeCalendarPush`）：独立版把等系统日历放在资料写入队列之外。
    - 要先停监听和手机服务的操作（`restoreVersion`、`moveStorage`、`workspaceBackup`）：由 `server.ts` 编排。
 5. **客户端只有一份「页面属性 ← 方法」的对应表**，两个入口各自只提供怎么发请求，以及各自宿主独有的几项（问问面板、文件选择、插件管理）。
 
@@ -53,7 +55,7 @@
 
 ## 顺序
 
-1. 服务加宿主选项；`product.ts` 改为检查参数后转给服务；`server.ts` 建服务对象并交出写入队列。
+1. 服务加宿主选项；`product.ts` 改为检查参数后转给服务；`server.ts` 建服务对象并交出写入队列。**已完成（2026-11-11）**：`product.ts` 693 行 → 约 260 行。
 2. 客户端两个入口共用一份对应表。
 3. 走查、实测、更新 PR 描述和 HANDOFF。
 
