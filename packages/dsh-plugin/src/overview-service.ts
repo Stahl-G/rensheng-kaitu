@@ -75,6 +75,7 @@ import {
   createProject,
   decideProposal,
   defaultRoot,
+  deferSnapshots,
   directionsPrompt,
   dismissNews,
   disposeNoteIndex,
@@ -155,6 +156,7 @@ import {
   setNewsFeedback,
   setWeatherPlace,
   snapshot,
+  snapshotNow,
   startLearning,
   syncProject,
   tryNews,
@@ -199,6 +201,7 @@ export class KaituOverviewService extends TypertRemoteService {
   private readonly homeCache: ReturnType<typeof createHomeCache>;
   private readonly homeListeners = new Set<() => void>();
   private disposed = false;
+  private slots: Promise<void> = Promise.resolve();
 
   constructor(
     ctx: Context,
@@ -235,14 +238,43 @@ export class KaituOverviewService extends TypertRemoteService {
       });
     };
     const performWrite = this.write;
-    this.write = async (operation) => {
-      try {
-        return await performWrite(operation);
-      } finally {
-        this.files.invalidate();
-        this.homeCache.invalidate();
-      }
+    const invalidate = () => {
+      this.files.invalidate();
+      this.homeCache.invalidate();
     };
+    // 文件写完就把结果交回界面；存版本留在同一个队列位置里接着做，后面的写入照旧排在它之后。
+    this.write = <T>(operation: () => Promise<T>) =>
+      new Promise<T>((resolve, reject) => {
+        const slot = this.slots.then(() =>
+          performWrite(async () => {
+            const messages: string[] = [];
+            const resume = deferSnapshots(this.workspace, (message) => messages.push(message));
+            try {
+              resolve(await operation());
+            } catch (error) {
+              reject(error);
+            } finally {
+              resume();
+              invalidate();
+            }
+            if (!messages.length) return;
+            try {
+              for (const message of messages) await snapshotNow(this.workspace, message);
+            } catch (error) {
+              ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`);
+            } finally {
+              invalidate();
+            }
+          }),
+        );
+        this.slots = slot.catch(reject);
+      });
+    ctx.effect(() => () => this.settled());
+  }
+
+  /** 已交回界面的写入，其版本记录全部做完后兑现。 */
+  settled(): Promise<void> {
+    return this.slots;
   }
 
   @Remote("home")
