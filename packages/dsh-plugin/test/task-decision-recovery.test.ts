@@ -215,6 +215,9 @@ it("supported local workspace move preserves unknown request discovery without s
   });
   await expect(host.submitTaskDecision(scope, action)).rejects.toThrow("lost receipt");
   vi.restoreAllMocks();
+  // Model standalone's pre-relocation watcher pause with real service disposal.
+  // The legacy DSH moveStorage entry does not provide this lifecycle; Windows holds watched roots open.
+  for (const ctx of contexts.splice(0)) await ctx.fiber.dispose();
   await moveWorkspace(ws, `${ws.root}-moved`, false);
   const reopened = service(new Workspace(ws.root));
   const recovered = await reopened.taskDecisionState(ws.root);
