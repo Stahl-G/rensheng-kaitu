@@ -278,6 +278,8 @@ export class KaituOverviewService extends TypertRemoteService {
               invalidate();
             }
             if (!messages.length) return;
+            // 先把响应交给调用方，再开始版本的同步扫描；等待仍属于当前槽，关闭会一起排空。
+            await new Promise<void>((resolve) => setImmediate(resolve));
             try {
               for (const message of messages) await snapshotNow(this.workspace, message);
             } catch (error) {

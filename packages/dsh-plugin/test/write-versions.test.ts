@@ -44,8 +44,8 @@ it.each(["captureOnce", "learningStart", "learningSave"] as const)(
       const file = "path" in result ? result.path : "learning/synthetic-learning/STATUS.md";
       if (!file) throw new Error("Missing saved file");
       expect(ws.exists(file)).toBe(true);
-      // A timer that has not registered its work cannot be drained on shutdown.
-      expect(snapshotNow).toHaveBeenCalledTimes(1);
+      // Even the version's synchronous scan starts after the caller receives its result.
+      expect(snapshotNow).not.toHaveBeenCalled();
       let settled = false;
       let disposed = false;
       const waiting = service.settled().then(() => {
@@ -54,7 +54,8 @@ it.each(["captureOnce", "learningStart", "learningSave"] as const)(
       const closing = ctx.fiber.dispose().then(() => {
         disposed = true;
       });
-      await Promise.resolve();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(snapshotNow).toHaveBeenCalledTimes(1);
       expect(settled).toBe(false);
       expect(disposed).toBe(false);
       release();
