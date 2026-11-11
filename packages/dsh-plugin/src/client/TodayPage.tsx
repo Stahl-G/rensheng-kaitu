@@ -9,6 +9,7 @@ import type {
   OverviewNext,
 } from "../types.js";
 import css from "./Prototype.module.css";
+import type { TaskDecisionServices } from "./TaskSuggestions.js";
 import { TodayBoard, type TodayBoardSession } from "./TodayBoard.js";
 import todayCss from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
@@ -23,6 +24,7 @@ import {
 
 export function LifeHome({
   home,
+  decisions,
   save,
   data,
   firstVisit,
@@ -58,6 +60,7 @@ export function LifeHome({
   session,
 }: {
   session?: TodayBoardSession;
+  decisions?: TaskDecisionServices;
   complete?: (
     target: import("@kaitu/core").HomeNextTarget,
     result: string,
@@ -328,6 +331,7 @@ export function LifeHome({
       )}
       {home && (
         <TodayBoard
+          decisions={decisions}
           session={session}
           data={home}
           complete={complete}

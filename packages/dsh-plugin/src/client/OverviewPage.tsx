@@ -93,6 +93,9 @@ export interface OverviewPageProps
     operationId: string,
   ) => Promise<import("@kaitu/core").HomeCompletion>;
   undoHomeNext?: (token: string) => Promise<{ undone: boolean }>;
+  loadTaskDecisions?: import("./TaskSuggestions.js").TaskDecisionServices["load"];
+  submitTaskDecision?: import("./TaskSuggestions.js").TaskDecisionServices["submit"];
+  retryTaskDecision?: import("./TaskSuggestions.js").TaskDecisionServices["retry"];
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
   load: () => Promise<OverviewData>;
@@ -297,9 +300,16 @@ function Overview({
   }, [exploreEntries, firstExplore, pluginModules, setExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
+  const localUndo = useRef<{ kind: "completion" | "decision"; sequence: number }>({
+    kind: "completion",
+    sequence: 0,
+  });
+  const [decisionHistoryRequest, setDecisionHistoryRequest] = useState(0);
   const todaySession = useRef({ root: workspaceRoot, board: createTodayBoardSession() });
-  if (workspaceRoot && todaySession.current.root && todaySession.current.root !== workspaceRoot)
+  if (workspaceRoot && todaySession.current.root && todaySession.current.root !== workspaceRoot) {
     todaySession.current = { root: workspaceRoot, board: createTodayBoardSession() };
+    localUndo.current = { kind: "completion", sequence: localUndo.current.sequence + 1 };
+  }
   if (workspaceRoot) todaySession.current.root = workspaceRoot;
   const [exploreFacts, setExploreFacts] = useState<{
     root: string;
@@ -1174,6 +1184,18 @@ function Overview({
       const board = todaySession.current.board;
       if (
         key === "z" &&
+        localUndo.current.kind === "decision" &&
+        !target?.isContentEditable &&
+        !target?.closest?.("input, textarea, [contenteditable]:not([contenteditable=false]), [role=textbox]")
+      ) {
+        event.preventDefault();
+        setView("overview");
+        setGuide(null);
+        setDecisionHistoryRequest((value) => value + 1);
+        return;
+      }
+      if (
+        key === "z" &&
         undoHome &&
         board.read().receipt &&
         !board.read().pending &&
@@ -1554,14 +1576,38 @@ function Overview({
             <>
               <LifeHome
                 home={homeState}
+                decisions={
+                  data?.root && props.loadTaskDecisions && props.submitTaskDecision && props.retryTaskDecision
+                    ? {
+                        root: data.root,
+                        load: props.loadTaskDecisions,
+                        submit: props.submitTaskDecision,
+                        retry: props.retryTaskDecision,
+                        activity: () => {
+                          localUndo.current = { kind: "decision", sequence: localUndo.current.sequence + 1 };
+                        },
+                        historyRequest: decisionHistoryRequest,
+                        changed: () => {
+                          void refresh();
+                        },
+                      }
+                    : undefined
+                }
                 session={todaySession.current.board}
                 complete={
                   props.completeHomeNext
                     ? async (target, result, operationId) => {
+                        const root = workspaceRoot;
+                        const sequence = localUndo.current.sequence + 1;
+                        localUndo.current = { kind: "completion", sequence };
                         const receipt = await props.completeHomeNext?.(target, result, operationId);
                         if (!receipt)
                           throw new Error(t("保存结果不明，请刷新", "Save status uncertain. Refresh"));
-                        void refresh();
+                        if (todaySession.current.root === root) {
+                          if (localUndo.current.sequence === sequence)
+                            localUndo.current = { kind: "completion", sequence };
+                          void refresh();
+                        }
                         return receipt;
                       }
                     : undefined
