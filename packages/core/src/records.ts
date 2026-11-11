@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { deepFreeze } from "./frozen.js";
@@ -14,6 +15,7 @@ import { mergeNewsRecord } from "./news.js";
 import { normalizeRecordInput } from "./record-input.js";
 import { formatErrors, schemas } from "./schema.js";
 import { validSleepStages } from "./sleep-stages.js";
+import { stateBinding } from "./state-binding.js";
 import { isoInZone, localMonth, parseTs } from "./time.js";
 import { ulid } from "./ulid.js";
 import type { Workspace } from "./workspace.js";
@@ -250,6 +252,33 @@ export function updateRecord(
     rev: (current.rev ?? 1) + 1,
   };
   parseTs(merged.ts);
+  if (type === "task" && ws.exists(".kaitu/phone-actions.json")) {
+    // Legacy writers must not create an indistinguishable after revision owned by a prepared decision.
+    type Reservation = {
+      status?: string;
+      taskDecisionAction?: { args: { consumer_id?: string } };
+      taskDecision?: { change: { after: StoredRecord } };
+      taskDecisionUndo?: { change: { after: StoredRecord } };
+    };
+    const ledger =
+      ws.scanParsed<Record<string, Reservation>>(
+        ".kaitu/phone-actions.json",
+        "task-reservations",
+        JSON.parse,
+      ) ?? {};
+    const consumer = stateBinding(ws.root).id;
+    if (
+      Object.values(ledger).some(
+        (entry) =>
+          !entry.status &&
+          entry.taskDecisionAction?.args.consumer_id === consumer &&
+          [entry.taskDecision?.change.after, entry.taskDecisionUndo?.change.after].some(
+            (after) => after?.id === id && isDeepStrictEqual(after, merged),
+          ),
+      )
+    )
+      throw new KaituError("这条待办有未完成决定，请等待原操作回执", "CONFLICT");
+  }
   return write(ws, ref, merged, ws.timeZone(), current, opts.expected_revision);
 }
 

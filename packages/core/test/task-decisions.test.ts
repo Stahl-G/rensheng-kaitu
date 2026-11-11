@@ -3,6 +3,8 @@ import { expect, it, vi } from "vitest";
 import {
   Workspace,
   addRecord,
+  adoptTask,
+  cancelTask,
   parseFrontmatter,
   phoneReceipts,
   processInbox,
@@ -420,6 +422,12 @@ it.each(["adopted", "dismissed"] as const)(
     expect(() => applyTaskDecision(ws, action)).toThrow("prepared before append");
     stop.mockRestore();
     let reloaded = new Workspace(ws.root, { maintain: false });
+    const legacy =
+      decision === "adopted"
+        ? adoptTask(reloaded, original.id)
+        : cancelTask(reloaded, original.id, { by: "user" });
+    await expect(legacy).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(current(reloaded, original.id)).toEqual(original);
     const competing = { ...action, client_id: ulid() };
     expect(applyTaskDecision(reloaded, competing).status).toBe("conflict");
     expect(current(reloaded, original.id)).toEqual(original);
@@ -507,3 +515,21 @@ it.each(["imported-month", "changed-timezone"] as const)(
     expect(ws.exists("health/2026-11.jsonl")).toBe(false);
   },
 );
+
+it("a prepared decision does not block a distinct later user edit, and cannot undo or claim it", async () => {
+  const { ws, original, action } = await setup();
+  const stop = vi.spyOn(ws, "appendLine").mockImplementation(() => {
+    throw new Error("pending decision");
+  });
+  expect(() => applyTaskDecision(ws, action)).toThrow("pending decision");
+  stop.mockRestore();
+  const reloaded = new Workspace(ws.root, { maintain: false });
+  updateRecord(reloaded, "task", original.id, { notes: "后续真实合成编辑" }, { by: "user" });
+  expect(applyTaskDecision(reloaded, action).status).toBe("conflict");
+  expect(current(reloaded, original.id)).toMatchObject({
+    status: "proposed",
+    notes: "后续真实合成编辑",
+    rev: 2,
+  });
+  expect(taskDecisions(reloaded)).toEqual([]);
+});
