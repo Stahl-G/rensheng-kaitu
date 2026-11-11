@@ -99,6 +99,8 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 发送时同时检查新鲜 today 的 `mobile.result_contract === 1`、`mobile.actions` 包含动作，并保留客户端原有电脑快照水位检查。mobile.version 仍是 1。只看 adopt_task 名称不够：旧电脑已声明该名称却忽略 expected_rev，绝不退回无 CAS 的采纳。缺能力时保留原操作 ID、内容和草稿，等待兼容电脑，不改写为旧 complete_next/complete_task。
 
+`applyResultAction` 的 client_id 与手机一致，只接受 26 位 ULID；桌面旧 UUID 调用须改为 ULID，不会隐式转换，重试复用原 ULID。
+
 每个新操作一个独立 `.actions.jsonl` 文件，只含一行 JSON；同目标上一次未知结果未核清前不提交后续操作。重投必须沿用原 client_id 和全部原参数。不同内容重用 ID 返回 conflict。文件消失、文件级收件成功均不是动作已完成的证明。
 
 - `complete_next_result`：args `{file,id,result_text,expected_rev}`（task）或 `{file,id,result_text,expected_next}`（STATUS）。任务须 open，STATUS 须 todo，前提精确匹配才完成。结果允许空白，空白不计推进；新输入必须单行且最多 2000 字符，换行/超长显式 rejected，不截断不折叠。旧多行草稿保留待修改，用新 ID 提交修改后的操作；未知结果不得因此换 ID 重试。
