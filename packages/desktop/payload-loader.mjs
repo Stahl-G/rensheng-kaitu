@@ -62,6 +62,8 @@ if (process.env.ELECTRON_RUN_AS_NODE === "1" && process.argv[1] === fileURLToPat
   const resources = dirname(fileURLToPath(import.meta.url));
   process.env.KAITU_HOST_RESOURCES = resources;
   try {
+    const { prepareDshState, backupStateRoot } = await import("./kaitu-state-backup.mjs");
+    prepareDshState(backupStateRoot(state, process.env.KAITU_BACKUP_ROOT), DSH_VERSION);
     const payload =
       process.env.KAITU_EMBEDDED_AI === "1" && process.env.KAITU_PARENT_PAYLOAD
         ? process.env.KAITU_PARENT_PAYLOAD

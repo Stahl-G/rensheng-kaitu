@@ -56,3 +56,37 @@ setInterval(() => {}, 1000);
     }
   },
 );
+
+it.skipIf(process.platform === "win32")(
+  "后台宿主必须回报日程可用，初始化失败和提前退出不能当成功",
+  async () => {
+    const directory = mkdtempSync(join(tmpdir(), "kaitu-automation-health-"));
+    const worker = join(directory, "worker.mjs");
+    writeFileSync(
+      worker,
+      `#!${process.execPath}
+process.stdout.write(JSON.stringify({ type: 'kaitu:automation', ready: process.env.READY === 'yes' })+'\\n');
+process.on('message', m => { if (m.type === 'kaitu:quit') process.exit(0); });
+setInterval(() => {}, 1000);`,
+      { mode: 0o700 },
+    );
+    for (const ready of ["yes", "no"]) {
+      const ai = createAiProcess(worker, { ...process.env, READY: ready });
+      try {
+        const result = ai.open({ background: true, waitForAutomation: true });
+        if (ready === "yes") expect((await result).pid).toBeGreaterThan(0);
+        else await expect(result).rejects.toMatchObject({ code: "DSH_STATE_UNSAFE" });
+      } finally {
+        await ai.close();
+      }
+    }
+    writeFileSync(worker, `#!${process.execPath}\nprocess.exit(0);\n`, { mode: 0o700 });
+    const early = createAiProcess(worker, { ...process.env });
+    try {
+      await expect(early.open({ background: true, waitForAutomation: true })).rejects.toThrow();
+    } finally {
+      await early.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  },
+);

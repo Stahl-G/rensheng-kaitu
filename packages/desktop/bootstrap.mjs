@@ -2,7 +2,8 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { BrowserWindow, Menu, app, dialog, shell } from "electron";
-import { rollback, selectPayload } from "../kaitu-loader.mjs";
+import { DSH_VERSION, rollback, selectPayload } from "../kaitu-loader.mjs";
+import { backupStateRoot, prepareDshState } from "../kaitu-state-backup.mjs";
 import { desktopPaths } from "./kaitu-environment.mjs";
 
 // 在原主进程导入和单实例锁之前设置，包括 Electron 的 relaunch 路径。
@@ -11,49 +12,64 @@ process.env.KAITU_HOST_RESOURCES = process.resourcesPath;
 const embedded = process.env.KAITU_EMBEDDED_AI === "1";
 process.env.DSH_HOME = state;
 app.setName("人生开图");
-for (const name of ["userData", "sessionData", "logs", "crashDumps"]) {
-  const directory = join(
-    state,
-    !embedded && ["userData", "sessionData"].includes(name)
-      ? "workbench-userData"
-      : name === "sessionData"
-        ? "userData"
-        : name,
-  );
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  app.setPath(name, directory);
-}
-if (embedded) {
-  let visible = process.env.KAITU_AI_BACKGROUND !== "1";
-  void app.whenReady().then(() => app.dock?.hide());
-  app.on("kaitu:host-ready", (target) => {
-    const url = URL.parse(target);
-    if (url?.protocol === "http:" && url.hostname === "127.0.0.1" && url.searchParams.has("token"))
-      process.stdout.write(`${JSON.stringify({ type: "kaitu:web", url: url.href })}\n`);
-  });
-  app.on("browser-window-created", (_event, window) => {
-    window.on("show", () => {
-      if (!visible) window.hide();
+// Do not await Electron readiness at module top level: ready follows ESM evaluation.
+void boot();
+
+async function boot() {
+  try {
+    prepareDshState(backupStateRoot(state, process.env.KAITU_BACKUP_ROOT), DSH_VERSION);
+  } catch (error) {
+    // Never fall through to payload initialization or DSH after a failed preflight.
+    await app.whenReady();
+    dialog.showErrorBox("开图内核升级未完成 / Kaitu engine upgrade stopped", String(error));
+    app.exit(1);
+    process.exit(1);
+    return;
+  }
+  for (const name of ["userData", "sessionData", "logs", "crashDumps"]) {
+    const directory = join(
+      state,
+      !embedded && ["userData", "sessionData"].includes(name)
+        ? "workbench-userData"
+        : name === "sessionData"
+          ? "userData"
+          : name,
+    );
+    mkdirSync(directory, { recursive: true, mode: 0o700 });
+    app.setPath(name, directory);
+  }
+  if (embedded) {
+    let visible = process.env.KAITU_AI_BACKGROUND !== "1";
+    void app.whenReady().then(() => app.dock?.hide());
+    app.on("kaitu:host-ready", (target) => {
+      const url = URL.parse(target);
+      if (url?.protocol === "http:" && url.hostname === "127.0.0.1" && url.searchParams.has("token"))
+        process.stdout.write(`${JSON.stringify({ type: "kaitu:web", url: url.href })}\n`);
     });
-  });
-  process.on("message", (message) => {
-    if (message?.type === "kaitu:focus") {
-      visible = true;
-      const windows = BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed());
-      const window = windows.find((window) => window.isVisible()) ?? windows.at(-1);
-      if (window) {
-        if (window.isMinimized()) window.restore();
-        window.show();
-        window.focus();
+    app.on("browser-window-created", (_event, window) => {
+      window.on("show", () => {
+        if (!visible) window.hide();
+      });
+    });
+    process.on("message", (message) => {
+      if (message?.type === "kaitu:focus") {
+        visible = true;
+        const windows = BrowserWindow.getAllWindows().filter((window) => !window.isDestroyed());
+        const window = windows.find((window) => window.isVisible()) ?? windows.at(-1);
+        if (window) {
+          if (window.isMinimized()) window.restore();
+          window.show();
+          window.focus();
+        }
       }
-    }
-    if (message?.type === "kaitu:quit") app.emit("kaitu:quit");
-  });
-  process.once("disconnect", () => app.emit("kaitu:quit"));
-  await import("./lib/main.js");
-} else {
-  // Electron emits ready only after its ESM entry finishes evaluating.
-  void startWorkbench();
+      if (message?.type === "kaitu:quit") app.emit("kaitu:quit");
+    });
+    process.once("disconnect", () => app.emit("kaitu:quit"));
+    await import("./lib/main.js");
+  } else {
+    // Electron emits ready only after its ESM entry finishes evaluating.
+    void startWorkbench();
+  }
 }
 
 async function startWorkbench() {

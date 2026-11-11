@@ -63,6 +63,7 @@ await writePayload({
   target: { platform: "win32", arch: "x64" },
 });
 cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
+cpSync(join(directory, "state-backup.mjs"), join(resources, "kaitu-state-backup.mjs"));
 if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
 rmSync(join(resources, "app-update.yml"), { force: true });
 
