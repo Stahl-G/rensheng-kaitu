@@ -45,6 +45,7 @@ import {
   type OrganizerStatus,
   type Preferences,
   type ProjectGoal,
+  type ResultEffect,
   type ResultRequest,
   type ResumeReceipt,
   type ResumeUpload,
@@ -288,7 +289,7 @@ export class KaituOverviewService extends TypertRemoteService {
     root: string,
     value: HomeResultDraft | null = null,
     expected: HomeResultDraft | null = null,
-  ) {
+  ): Promise<HomeResultDraft> {
     try {
       return resultDraft(this.workspace, root, value, expected);
     } catch (error) {
@@ -297,7 +298,10 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   @Remote("resultAction")
-  async resultAction(root: string, request: ResultRequest) {
+  async resultAction(
+    root: string,
+    request: ResultRequest,
+  ): Promise<{ status: "applied" | "duplicate"; effect: ResultEffect }> {
     try {
       return await this.write(() => {
         if (root !== this.workspace.root)
