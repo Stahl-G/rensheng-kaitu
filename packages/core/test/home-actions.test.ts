@@ -5,9 +5,12 @@ import {
   addRecord,
   applyResultAction,
   collectResults,
+  isTracked,
   parseFrontmatter,
   readHome,
   readHomeSources,
+  resultDraft,
+  snapshot,
   stringifyFrontmatter,
   ulid,
   updateRecord,
@@ -17,6 +20,9 @@ import { clonedWorkspace } from "./helpers.js";
 test("Mac home and goals read the shared results while local activity counts days, not rows", async () => {
   const ws = await clonedWorkspace("Asia/Shanghai");
   try {
+    resultDraft(ws, ws.root, { drafts: { synthetic: "Unfinished result text" } }, { drafts: {} });
+    await snapshot(ws, "Synthetic draft isolation");
+    expect(await isTracked(ws, ".kaitu/result-draft.json")).toBe(false);
     ws.writeJson("me/goals.json", [{ id: "goal", title: "Synthetic goal", status: "active" }]);
     await addGoalNext(ws, "goal", "First task");
     let input = await readHomeSources(ws, new Date("2026-11-11T02:00:00Z"));

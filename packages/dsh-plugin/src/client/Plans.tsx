@@ -59,6 +59,7 @@ export function PlansCard({
   const goals = goalId ? plans.goals.filter((goal) => goal.id === goalId) : plans.goals;
   if (!goals.length) return null;
   const start = (goal: PlansData["goals"][number], mode: Mode, initial = "") => {
+    if (mode === "complete" && resultState.pending) return;
     const same = editing?.goal === goal.id && editing.mode === mode;
     const next = goal.next ? { id: goal.next.id, rev: goal.next.rev, title: goal.next.title } : undefined;
     setEditing(same ? null : { goal: goal.id, mode, ...(next ? { next } : {}) });
@@ -140,7 +141,7 @@ export function PlansCard({
             <button
               type="button"
               className={css.link}
-              disabled={busy}
+              disabled={busy || resultState.pending}
               onClick={() => start(goal, "complete")}
             >
               {t("完成", "Done")}

@@ -303,6 +303,20 @@ test("unreadable local pending state blocks first send and preserves its bytes; 
     expect(ws.readJson<{ drafts: Record<string, string> }>(".kaitu/result-draft.json").drafts.one).toBe(
       "Original unfinished draft",
     );
+    for (const value of [
+      { drafts: [], operation: {} },
+      { drafts: { one: 3 } },
+      { drafts: {}, operation: { request: {}, step: {}, text: "original" } },
+    ]) {
+      const original = JSON.stringify(value);
+      ws.writeText(".kaitu/result-draft.json", original, { internal: true });
+      const invalid = createTodayBoardSession(ws.root, undefined, drafts(new Workspace(ws.root)));
+      await invalid.ready;
+      const send = vi.fn<ResultTransport>();
+      await invalid.send(send, action(step("one")));
+      expect(send).not.toHaveBeenCalled();
+      expect(ws.readText(".kaitu/result-draft.json")).toBe(original);
+    }
     ws.writeText(".kaitu/result-draft.json", "broken original bytes", { internal: true });
     const broken = createTodayBoardSession(ws.root, undefined, drafts(new Workspace(ws.root)));
     await broken.ready;
