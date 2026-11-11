@@ -5,6 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 import { KaituError } from "./errors.js";
 import { localStateRoot } from "./local-state.js";
 import type { PhoneReceipt } from "./phone-receipts.js";
+import { schemas } from "./schema.js";
 import {
   type TaskDecision,
   type TaskDecisionAction,
@@ -90,10 +91,18 @@ export function submitLocalTaskDecision(
   scope: TaskDecisionScope,
   action: TaskDecisionAction,
 ): PhoneReceipt {
+  if (
+    !schemas().builtin("phone-action.schema.json")({
+      ...action,
+      at: new Date().toISOString(),
+      device: "00000000",
+    })
+  )
+    throw new KaituError("建议操作格式不合法", "BAD_ARGS");
   const local = journal(ws);
   if (
-    scope.root !== local.root ||
-    scope.consumer_id !== taskDecisionContext(ws).consumer_id ||
+    scope?.root !== local.root ||
+    scope?.consumer_id !== taskDecisionContext(ws).consumer_id ||
     action.args.consumer_id !== scope.consumer_id
   )
     throw new KaituError("工作区身份已变化，原请求待核对", "CONFLICT");

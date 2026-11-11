@@ -117,7 +117,11 @@ export function TaskSuggestions({
           (item) =>
             !state?.decisions.some(
               (decision) =>
-                decision.id === item.id && decision.status !== "undone" && decision.rev > item.rev,
+                decision.id === item.id &&
+                decision.file === item.file &&
+                decision.source === item.source &&
+                decision.status !== "undone" &&
+                decision.rev > item.rev,
             ),
         )
         .map((item) => {
