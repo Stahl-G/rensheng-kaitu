@@ -7,6 +7,7 @@ import {
   type TaskDecisionAction,
   Workspace,
   addRecord,
+  applyTaskDecision,
   localStateRoot,
   moveWorkspace,
   readCalendar,
@@ -461,6 +462,75 @@ it("CmdZ uses local submission order, opens decision history across pages, prese
     });
     expect(undo).toHaveBeenCalledWith("new");
   } finally {
+    if (app) await act(async () => app?.unmount());
+  }
+});
+
+it("a phone-origin decision's unknown Mac undo blocks a new same-task decision at the service boundary", async () => {
+  const { ws, host, action, scope } = await setup();
+  expect(applyTaskDecision(ws, action).status).toBe("applied");
+  expect((await host.taskDecisionState(ws.root)).requests).toEqual([]);
+  const write = ws.writeJson.bind(ws);
+  vi.spyOn(ws, "writeJson").mockImplementation((file, value, options) => {
+    write(file, value, options);
+    if (file === "phone/receipts.json") throw new Error("Synthetic unknown undo");
+  });
+  const undo: TaskDecisionAction = {
+    client_id: randomUUID(),
+    op: "undo_task_decision",
+    args: { consumer_id: scope.consumer_id, decision_id: action.client_id },
+  };
+  await expect(host.submitTaskDecision(scope, undo)).rejects.toThrow("unknown undo");
+  vi.restoreAllMocks();
+  const next = {
+    ...action,
+    client_id: randomUUID(),
+    args: { ...action.args, expected_rev: 3 },
+  } as TaskDecisionAction;
+  await expect(host.submitTaskDecision(scope, next)).rejects.toThrow("未确认");
+  expect(readRecords(ws, "task")[0]?.rev).toBe(3);
+  expect((await host.taskDecisionState(ws.root)).requests.map((item) => item.action)).toEqual([undo]);
+  expect(await host.retryTaskDecision(scope, undo.client_id)).toMatchObject({ status: "duplicate" });
+  expect(await host.submitTaskDecision(scope, next)).toMatchObject({ status: "applied" });
+  expect(readRecords(ws, "task")[0]?.rev).toBe(4);
+});
+it("same-root loader replacement resets only its owner and late callbacks cannot clear a newer in-flight operation", async () => {
+  const { ws, host } = await setup();
+  addRecord(ws, "task", { title: "Second synthetic suggestion" });
+  const api = services(ws, host);
+  const releases: (() => void)[] = [];
+  const submit = vi.fn(async (scope, action) => {
+    const receipt = await host.submitTaskDecision(scope, action);
+    await new Promise<void>((resolve) => releases.push(resolve));
+    return receipt;
+  });
+  const first = { ...api, submit };
+  let app: ReturnType<typeof create> | undefined;
+  const pending = async () => readHome(await readHomeSources(ws)).pending;
+  try {
+    await act(async () => {
+      app = create(createElement(TaskSuggestions, { services: first, pending: await pending() }));
+    });
+    await act(async () => button(need(app), "采纳").props.onClick());
+    expect(submit).toHaveBeenCalledTimes(1);
+    const next = { ...first, load: (root: string) => host.taskDecisionState(root) };
+    await act(async () => {
+      need(app).update(createElement(TaskSuggestions, { services: next, pending: await pending() }));
+    });
+    expect(button(need(app), "采纳").props.disabled).toBe(false);
+    await act(async () => button(need(app), "采纳").props.onClick());
+    expect(submit).toHaveBeenCalledTimes(2);
+    await act(async () => need(releases[0])());
+    // Old finally may not clear the second owner's busy flag or its double-submit guard.
+    expect(button(need(app), "采纳").props.disabled).toBe(true);
+    await act(async () => button(need(app), "采纳").props.onClick());
+    expect(submit).toHaveBeenCalledTimes(2);
+    await act(async () => need(releases[1])());
+    expect(next.changed).toHaveBeenCalledTimes(1);
+    await act(async () => button(need(app), "已处理建议").props.onClick());
+    expect(button(need(app), "撤销").props.disabled).toBe(false);
+  } finally {
+    for (const release of releases) release();
     if (app) await act(async () => app?.unmount());
   }
 });

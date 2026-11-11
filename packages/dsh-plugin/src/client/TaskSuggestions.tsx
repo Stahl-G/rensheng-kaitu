@@ -32,7 +32,7 @@ export function TaskSuggestions({
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
   const active = useRef<object>();
-  const running = useRef(false);
+  const inFlight = useRef<{ owner: object }>();
   const loadSequence = useRef(0);
   const { root, load } = services;
   const refresh = useCallback(
@@ -48,6 +48,7 @@ export function TaskSuggestions({
     const owner = { root, load };
     active.current = owner;
     setState(undefined);
+    setBusy(false);
     setError("");
     return () => {
       active.current = undefined;
@@ -65,8 +66,9 @@ export function TaskSuggestions({
   }, [services.historyRequest]);
   const run = async (operation: (scope: TaskDecisionScope) => Promise<PhoneReceipt>) => {
     const owner = active.current;
-    if (!state || !owner || running.current) return;
-    running.current = true;
+    if (!state || !owner || inFlight.current?.owner === owner) return;
+    const flight = { owner };
+    inFlight.current = flight;
     services.activity();
     setBusy(true);
     setError("");
@@ -88,8 +90,10 @@ export function TaskSuggestions({
         }
       }
     } finally {
-      running.current = false;
-      if (active.current === owner) setBusy(false);
+      if (inFlight.current === flight) {
+        inFlight.current = undefined;
+        if (active.current === owner) setBusy(false);
+      }
     }
   };
   const unknown = state?.requests.filter((item) => !item.receipt) ?? [];

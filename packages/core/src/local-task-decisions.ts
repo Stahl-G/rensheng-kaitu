@@ -110,18 +110,27 @@ export function submitLocalTaskDecision(
   if (row && !isDeepStrictEqual(row.action, action))
     throw new KaituError("请求已绑定原内容，请核对原请求", "CONFLICT");
   if (!row) {
-    const target = (request: TaskDecisionAction): string => {
+    let decisions: TaskDecision[] | undefined;
+    const target = (request: TaskDecisionAction): string | null => {
       if ("id" in request.args) return `${request.args.file}:${request.args.id}`;
       const decisionId = request.args.decision_id;
       const original = local.requests.find((item) => item.action.client_id === decisionId)?.action;
-      return original && "id" in original.args ? `${original.args.file}:${original.args.id}` : decisionId;
+      if (original && "id" in original.args) return `${original.args.file}:${original.args.id}`;
+      const decision = (decisions ??= taskDecisions(ws)).find((item) => item.decision_id === decisionId);
+      return decision ? `${decision.file}:${decision.id}` : null;
     };
+    const pending = local.requests.filter((item) => !item.receipt);
+    const requestedTarget = pending.length ? target(action) : null;
     if (
-      local.requests.some(
-        (item) =>
-          !item.receipt &&
-          (item.action.args.consumer_id !== scope.consumer_id || target(item.action) === target(action)),
-      )
+      pending.some((item) => {
+        const pendingTarget = target(item.action);
+        return (
+          item.action.args.consumer_id !== scope.consumer_id ||
+          pendingTarget === null ||
+          requestedTarget === null ||
+          pendingTarget === requestedTarget
+        );
+      })
     )
       throw new KaituError("有未确认的建议操作，请核对原请求", "CONFLICT");
     row = { action: structuredClone(action) };
