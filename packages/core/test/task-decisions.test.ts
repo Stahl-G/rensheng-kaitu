@@ -427,6 +427,19 @@ it.each(["adopted", "dismissed"] as const)(
         ? adoptTask(reloaded, original.id)
         : cancelTask(reloaded, original.id, { by: "user" });
     await expect(legacy).rejects.toMatchObject({ code: "CONFLICT" });
+    for (const args of decision === "adopted"
+      ? [{ id: original.id }]
+      : [{ id: original.id }, { id: original.id, expected_rev: 1 }]) {
+      const legacyPhone = {
+        client_id: ulid(),
+        device: "1234abcd",
+        at: new Date().toISOString(),
+        op: decision === "adopted" ? "adopt_task" : "cancel_task",
+        args,
+      };
+      await applyPhoneActions(reloaded, inboxFile(), JSON.stringify(legacyPhone));
+      expect(receipt(reloaded, legacyPhone.client_id)?.status).toBe("conflict");
+    }
     expect(current(reloaded, original.id)).toEqual(original);
     const competing = { ...action, client_id: ulid() };
     expect(applyTaskDecision(reloaded, competing).status).toBe("conflict");
