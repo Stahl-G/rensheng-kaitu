@@ -8,6 +8,7 @@ import {
   type ExplorationCommand,
   type FinanceImportOptions,
   type FinanceViewOptions,
+  type HomeResultDraft,
   type ImportSource,
   KaituError,
   type LearningCheckinInput,
@@ -132,6 +133,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resultDraft,
   resumePrompt,
   saveAvatar,
   saveHometown,
@@ -499,6 +501,13 @@ export async function productRequest(
     }
     case "capture":
       return captureNote(ws, text(0));
+    case "resultDraft":
+      return resultDraft(
+        ws,
+        text(0),
+        (args[1] ?? null) as HomeResultDraft | null,
+        (args[2] ?? null) as HomeResultDraft | null,
+      );
     case "resultAction": {
       if (text(0) !== ws.root) throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
       return applyResultAction(ws, args[1] as ResultRequest);

@@ -1,6 +1,6 @@
 import { readOverviewPage } from "./overview-page.js";
 import { readProjectsPage } from "./project-page.js";
-import { type StoredRecord, readRecordRevisions } from "./records.js";
+
 import type { ResultRow } from "./results.js";
 import { localDate } from "./time.js";
 import { type NextItem, type WorkbenchData, readWorkbench } from "./workbench.js";
@@ -27,7 +27,6 @@ export interface HomeSources {
   projects: Projects;
   statuses: readonly LearningStatus[];
   records: WorkbenchData["records"];
-  taskRevisions?: readonly StoredRecord[];
 }
 
 /** I/O boundary: build in the background, cache the result, and invalidate it on workspace changes.
@@ -42,7 +41,6 @@ export async function readHomeSources(ws: Workspace, now = new Date()): Promise<
     projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
     statuses: data.statuses,
     records: data.records,
-    taskRevisions: readRecordRevisions(ws, "task", { onError: () => {} }),
   };
 }
 

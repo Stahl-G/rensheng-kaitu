@@ -195,7 +195,7 @@ export function PlansCard({
             <textarea
               id={`goal-${editing.mode}-${goal.id}`}
               value={value}
-              disabled={busy || !!owner.operation.current}
+              disabled={busy || resultState.pending || !!owner.operation.current}
               onChange={(event) => editValue(event.target.value)}
             />
           ) : (
@@ -203,7 +203,9 @@ export function PlansCard({
               id={`goal-${editing.mode}-${goal.id}`}
               type={editing.mode === "defer" ? "date" : "text"}
               value={value}
-              disabled={busy || (editing.mode === "complete" && !!owner.operation.current)}
+              disabled={
+                busy || (editing.mode === "complete" && (resultState.pending || !!owner.operation.current))
+              }
               onChange={(event) => editValue(event.target.value)}
               onKeyDown={(event) => {
                 if (
@@ -242,7 +244,7 @@ export function PlansCard({
             <button
               type="submit"
               className={`${css.btn} ${css["btn-primary"]}`}
-              disabled={busy || (editing.mode !== "complete" && !value.trim())}
+              disabled={busy || resultState.pending || (editing.mode !== "complete" && !value.trim())}
             >
               {busy ? t("保存中…", "Saving…") : t("保存", "Save")}
             </button>

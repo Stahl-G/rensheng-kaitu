@@ -121,3 +121,15 @@ core 的 collectResults / resultActivityDays 同时给桌面 overview.results/re
 旧候选的 results DTO 仍能读取 completion_id/file/id/title/text/completed_at/can_undo。这里 completion_id 是 `data:<编码file>:<编码id>` 显示键，不是原操作 ID，can_undo 恒为 false。新客户端只用 file+id 作为数据 identity，撤销只用回执 effect 和新动作，不能把显示键交给旧 undo_next_result。旧候选若发送多行结果，得到 rejected，保留原稿；不静默丢内容。
 
 旧 main 不认识 complete_next_result/restore_task_revision/restore_next，逐行拒绝后归档原文件；保留客户端原请求与 ID，升级后才能重投。旧主线混合文件可能已经执行其中合法行，同时给整个文件 rejected，不能宣称整文件未执行。新消费者不把未知动作解释成别的动作，原文件归档保留；若曾收到终态 conflict/rejected，修改后应使用新 ID，若仅有旧版文件级拒绝且证实目标未执行，可原 ID 重投。
+
+### 桌面结果输入的本机待处理状态
+
+桌面今天与目标结果共用上述结果集合和修订操作。活动点阵与天数只计用户结果，或来源未知的显式 STATUS 结果；损坏修订历史导致来源未知的 task 仍可显示，但不计活动。这个局部活动量不等于完整产品北极星。
+
+桌面通过 `resultDraft` 在 Workspace 已有 state binding 的 `.kaitu/result-draft.json` 保存未完成草稿和唯一未确认操作的原始 ULID、完整 payload、原文及展示目标。文件沿现有本机状态目录，以 0600 临时文件加原子 rename 写入；不写 `phone/`、用户事项字段或成功操作历史。整份前值作 CAS，丢失保存响应时先确认原保存，不能用后来的草稿覆盖另一窗口。独立 App 每次使用随机本机 HTTP 端口，因此不依赖浏览器 origin 的 localStorage 跨重启保留。
+
+加载失败时不覆盖原稿、不首次发送结果。原始待处理状态落盘成功后才调用结果操作；结果响应未知时保留同一 ID、payload 和草稿，阻止新操作，重启后仅加载，不自动重放。用户重试后再回读共享投影。`duplicate` 只确认原请求已执行，不表示其旧 effect 现在仍生效，不重建完成提示或 Undo。
+
+确认 applied 后，只清除仍与本次文字相同的完成草稿。刚完成/决定的 Undo 只保留五秒内存提示；离页、切工作区或重启后不恢复，原异步响应也不能重新显示已离开的提示。Undo 使用新 ULID 与原 effect 的数据前提恢复，冲突保留后来的编辑；不接管全局 Cmd-Z。先前完成原文在这五秒内用于恢复输入，成功建议的状态文案不成为结果草稿。
+
+STATUS 的外部 ABA 限制仍适用：原结果未知期间，条目被外部改走又逐字改回，只有两个结果字段不能完整识别。正常确认完成、Undo、原 ID 重试由共享账本保证不重放。

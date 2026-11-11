@@ -215,6 +215,15 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              resultDraft: async (
+                root: string,
+                value: import("@kaitu/core").HomeResultDraft | null,
+                expected: import("@kaitu/core").HomeResultDraft | null,
+              ) => {
+                const r = await ctx.remote.kaitu.resultDraft(root, value, expected);
+                if (!r.ok) throw r.error;
+                return r.value;
+              },
               resultAction: async (root: string, request: import("@kaitu/core").ResultRequest) => {
                 const r = await ctx.remote.kaitu.resultAction(root, request);
                 if (!r.ok) throw r.error;

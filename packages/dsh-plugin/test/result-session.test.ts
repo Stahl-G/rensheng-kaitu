@@ -1,4 +1,4 @@
-import { rmSync } from "node:fs";
+import { rmSync, statSync } from "node:fs";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
@@ -14,6 +14,7 @@ import {
 import { clonedWorkspace } from "../../core/test/helpers.js";
 import { TodayBoard } from "../src/client/TodayBoard.js";
 import {
+  type DraftTransport,
   RESULT_UNDO_MS,
   type ResultTransport,
   type Step,
@@ -38,6 +39,11 @@ function service(ws: Workspace): ResultTransport {
   } as unknown as KaituOverviewService;
   return (root, request) =>
     KaituOverviewService.prototype.resultAction.call(owner, root, JSON.parse(JSON.stringify(request)));
+}
+function drafts(ws: Workspace): DraftTransport {
+  const owner = { workspace: ws } as unknown as KaituOverviewService;
+  return (root, value, expected) =>
+    KaituOverviewService.prototype.resultDraft.call(owner, root, value, expected);
 }
 const step = (id: string): Step => ({
   key: `task:${id}`,
@@ -71,21 +77,22 @@ test("real service write with lost reply survives owner and service reconstructi
       { title: "Synthetic task", status: "open", source: "me/goals.json#goal" },
       { by: "user" },
     ).record;
-    const store = storage();
-    const owner = createTodayBoardSession(ws.root, store);
+    const owner = createTodayBoardSession(ws.root, undefined, drafts(ws));
+    await owner.ready;
     const original = action(step(task.id));
     owner.set("drafts", { [original.step.key]: original.text });
     const first = service(ws);
     const lost: ResultTransport = async (root, request) => {
-      expect(JSON.parse(store.getItem(`kaitu:result-draft:${root}`) ?? "{}").operation.request).toEqual(
-        request,
-      );
+      expect(
+        ws.readJson<{ operation: { request: ResultRequest } }>(".kaitu/result-draft.json").operation.request,
+      ).toEqual(request);
       await first(root, request);
       throw new Error("Lost reply after real write");
     };
     await owner.send(lost, original);
     expect(owner.operation.current?.request).toEqual(original.request);
-    const reopened = createTodayBoardSession(ws.root, store);
+    const reopened = createTodayBoardSession(ws.root, undefined, drafts(new Workspace(ws.root)));
+    await reopened.ready;
     expect(reopened.read().drafts[original.step.key]).toBe("Result");
     const retry = vi.fn(service(new Workspace(ws.root)));
     await reopened.send(retry);
@@ -94,7 +101,8 @@ test("real service write with lost reply survives owner and service reconstructi
     expect(reopened.operation.current).toBeUndefined();
     expect(reopened.read().receipt).toBeUndefined(); // Duplicate never says the old effect is still current.
     expect(readRecords(ws, "task").find((row) => row.id === task.id)?.source).toBe(task.source);
-    const other = createTodayBoardSession(`${ws.root}-other`, store);
+    expect(statSync(ws.resolve(".kaitu/result-draft.json", { internal: true })).mode & 0o777).toBe(0o600);
+    const other = createTodayBoardSession(`${ws.root}-other`, storage());
     expect(other.operation.current).toBeUndefined();
     await expect(service(ws)(`${ws.root}-other`, original.request)).rejects.toMatchObject({
       code: "kaitu/completion-rejected",
@@ -111,9 +119,12 @@ test("blank completion, decision undo and later-edit conflicts use real generic 
     const task = addRecord(ws, "task", { title: "Blank", status: "open" }, { by: "user" }).record;
     const owner = createTodayBoardSession(ws.root, storage());
     const original = action(step(task.id), "");
+    owner.set("drafts", { [original.step.key]: original.text });
     await owner.send(service(ws), original);
+    expect(owner.read().drafts).not.toHaveProperty(original.step.key);
     await owner.undo(service(new Workspace(ws.root)));
     expect(readRecords(ws, "task").find((row) => row.id === task.id)?.status).toBe("open");
+    expect(owner.read().drafts[original.step.key]).toBe("");
     await service(new Workspace(ws.root))(ws.root, original.request);
     expect(readRecordRevisions(ws, "task").filter((row) => row.id === task.id)).toHaveLength(3);
     const proposal = addRecord(
@@ -129,6 +140,7 @@ test("blank completion, decision undo and later-edit conflicts use real generic 
     };
     await owner.send(service(ws), { step: step(proposal.id), text: "Adopted", request });
     await owner.undo(service(ws));
+    expect(owner.read().drafts).not.toHaveProperty(`task:${proposal.id}`);
     expect(readRecords(ws, "task").find((row) => row.id === proposal.id)).toMatchObject({
       status: "proposed",
       source: proposal.source,
@@ -163,7 +175,7 @@ test("owner blocks repeats and same-target follow-ups, expires undo across navig
   const first = owner.send(remote, original);
   await owner.send(remote, original);
   await owner.send(remote, action(step("one"), "Other"));
-  expect(remote).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(remote).toHaveBeenCalledTimes(1));
   // A -> B -> A uses the same A owner; late A responses cannot replace B state.
   const other = createTodayBoardSession("B", store);
   resolve({ status: "applied", effect: { file: "task", id: "one", rev: 2, prior_rev: 1 } });
@@ -209,6 +221,16 @@ test("Today preserves multiline paste and legacy display, permits blank submit, 
       resultActivityDays: 1,
     },
   };
+  data.data?.results?.push({
+    id: "unknown",
+    file: "task",
+    title: "Unknown provenance",
+    text: "Stored result",
+    completed_at: "2026-11-11T00:00:00Z",
+    at: "2026-11-11T00:00:00Z",
+    date: "2026-11-11",
+    by: "unknown",
+  });
   const remote = vi
     .fn<ResultTransport>()
     .mockResolvedValue({ status: "applied", effect: { file: "task", id: "one", rev: 2, prior_rev: 1 } });
@@ -228,6 +250,8 @@ test("Today preserves multiline paste and legacy display, permits blank submit, 
     );
   });
   try {
+    expect(app.root.findByProps({ title: "2026-11-11" }).props["data-result"]).toBe(false);
+    expect(app.root.findByType("b").children).toEqual(["1"]);
     const field = () => app.root.findByType("input");
     await act(async () => field().props.onCompositionStart());
     await act(async () => app.root.findByType("form").props.onSubmit({ preventDefault: vi.fn() }));
@@ -258,5 +282,67 @@ test("Today preserves multiline paste and legacy display, permits blank submit, 
   } finally {
     owner.expire();
     await act(async () => app.unmount());
+  }
+});
+
+test("unreadable local pending state blocks first send and preserves its bytes; stale owners cannot overwrite drafts", async () => {
+  const ws = await clonedWorkspace();
+  try {
+    const first = createTodayBoardSession(ws.root, undefined, drafts(ws));
+    const second = createTodayBoardSession(ws.root, undefined, drafts(new Workspace(ws.root)));
+    await Promise.all([first.ready, second.ready]);
+    first.set("drafts", { one: "Original unfinished draft" });
+    await vi.waitFor(() =>
+      expect(ws.readJson<{ drafts: Record<string, string> }>(".kaitu/result-draft.json").drafts.one).toBe(
+        "Original unfinished draft",
+      ),
+    );
+    second.set("drafts", { one: "Stale window" });
+    await vi.waitFor(() => expect(second.read().error).toMatch(/Draft changed|草稿已变化/));
+    expect(ws.readJson<{ drafts: Record<string, string> }>(".kaitu/result-draft.json").drafts.one).toBe(
+      "Original unfinished draft",
+    );
+    ws.writeText(".kaitu/result-draft.json", "broken original bytes", { internal: true });
+    const broken = createTodayBoardSession(ws.root, undefined, drafts(new Workspace(ws.root)));
+    await broken.ready;
+    const remote = vi.fn<ResultTransport>();
+    await broken.send(remote, action(step("one")));
+    expect(remote).not.toHaveBeenCalled();
+    expect(broken.read().error).toMatch(/Cannot keep draft|无法保留草稿/);
+    expect(ws.readText(".kaitu/result-draft.json")).toBe("broken original bytes");
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("lost pending-state response never sends early, and a fresh owner confirms the original request", async () => {
+  const ws = await clonedWorkspace();
+  try {
+    const task = addRecord(ws, "task", { title: "Synthetic", status: "open" }, { by: "user" }).record;
+    let lost = false;
+    const stateService = drafts(ws);
+    const owner = createTodayBoardSession(ws.root, undefined, async (root, value, expected) => {
+      const saved = await stateService(root, value, expected);
+      if (value?.operation && !lost) {
+        lost = true;
+        throw new Error("Lost state-save response");
+      }
+      return saved;
+    });
+    await owner.ready;
+    const transport = vi.fn(service(ws));
+    const original = action(step(task.id));
+    await owner.send(transport, original);
+    expect(transport).not.toHaveBeenCalled();
+    const fresh = createTodayBoardSession(ws.root, undefined, drafts(new Workspace(ws.root)));
+    await fresh.ready;
+    expect(transport).not.toHaveBeenCalled(); // Reading state never replays an action.
+    expect(fresh.operation.current?.request).toEqual(original.request);
+    await fresh.send(transport);
+    expect(transport.mock.calls[0]?.[1]).toEqual(original.request);
+    expect(readRecordRevisions(ws, "task").filter((row) => row.id === task.id)).toHaveLength(2);
+    fresh.expire();
+  } finally {
+    rmSync(ws.root, { recursive: true, force: true });
   }
 });

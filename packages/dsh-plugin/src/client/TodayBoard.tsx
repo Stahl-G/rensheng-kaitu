@@ -115,7 +115,7 @@ export function TodayBoard({
           result_text: result,
           ...(focus.precondition.kind === "task"
             ? { expected_rev: focus.precondition.expectedRev }
-            : { expected_next: focus.precondition.expectedNext }),
+            : { expected_next: { ...focus.precondition.expectedNext } }),
         },
       },
     });

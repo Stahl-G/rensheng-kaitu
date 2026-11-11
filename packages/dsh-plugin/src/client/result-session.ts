@@ -1,11 +1,22 @@
-import type { HomeNextTarget, ResultEffect, ResultRequest } from "@kaitu/core";
+import type {
+  HomeNextTarget,
+  HomeResultDraft,
+  HomeResultOperation,
+  ResultEffect,
+  ResultRequest,
+} from "@kaitu/core";
 
 export type Step = HomeNextTarget & { key: string; parent: string };
 export type ResultTransport = (
   root: string,
   request: ResultRequest,
 ) => Promise<{ status: "applied" | "duplicate"; effect: ResultEffect }>;
-type Operation = { request: ResultRequest; step: Step; text: string };
+export type DraftTransport = (
+  root: string,
+  value: HomeResultDraft | null,
+  expected: HomeResultDraft | null,
+) => Promise<HomeResultDraft>;
+type Operation = HomeResultOperation;
 type Receipt = Operation & { effect: ResultEffect; expires: number };
 interface State {
   selected: string | undefined;
@@ -25,7 +36,11 @@ export function resultId() {
   return prefix + Array.from(crypto.getRandomValues(new Uint8Array(16)), (n) => alphabet[n % 32]).join("");
 }
 /** Only unfinished transport + drafts persist, never successful-operation history. */
-export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getItem" | "setItem">) {
+export function createTodayBoardSession(
+  root = "",
+  storage?: Pick<Storage, "getItem" | "setItem">,
+  remote?: DraftTransport,
+) {
   let state: State = {
     selected: undefined,
     showLatest: false,
@@ -38,10 +53,9 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
   const key = `kaitu:result-draft:${root}`;
   let presentation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let store = storage;
+  const store = storage;
   let available = false;
   try {
-    store ??= typeof localStorage === "undefined" ? undefined : localStorage;
     const saved = root && store?.getItem(key);
     if (saved) {
       const value = JSON.parse(saved);
@@ -56,9 +70,28 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
   const notify = () => {
     for (const listener of listeners) listener();
   };
+  let confirmed: HomeResultDraft = { drafts: {} };
+  let unconfirmed: { value: HomeResultDraft; expected: HomeResultDraft } | undefined;
+  let tail = Promise.resolve();
   const persist = () => {
-    if (!available || !store) throw new Error("无法保留草稿，请重新打开 / Cannot keep draft; reopen the app");
-    store.setItem(key, JSON.stringify({ drafts: state.drafts, operation: operation.current }));
+    const saved = JSON.parse(
+      JSON.stringify({ drafts: state.drafts, operation: operation.current }),
+    ) as HomeResultDraft;
+    const write = async () => {
+      if (!available) throw new Error("无法保留草稿，请重新打开 / Cannot keep draft; reopen the app");
+      if (remote) {
+        if (unconfirmed) {
+          confirmed = await remote(root, unconfirmed.value, unconfirmed.expected);
+          unconfirmed = undefined;
+        }
+        unconfirmed = { value: saved, expected: confirmed };
+        confirmed = await remote(root, saved, confirmed);
+        unconfirmed = undefined;
+      } else if (store) store.setItem(key, JSON.stringify(saved));
+    };
+    const next = tail.then(write);
+    tail = next.catch(() => {});
+    return next;
   };
   const board = {
     operation,
@@ -72,11 +105,10 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
     set: <K extends keyof State>(key: K, value: State[K] | ((current: State[K]) => State[K])) => {
       state = { ...state, [key]: typeof value === "function" ? value(state[key]) : value };
       if (key === "drafts")
-        try {
-          persist();
-        } catch (error) {
+        void persist().catch((error) => {
           state = { ...state, error: String(error) };
-        }
+          notify();
+        });
       notify();
     },
     expire: () => {
@@ -90,6 +122,7 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
       if (operation.current && proposed && proposed !== operation.current) return;
       const action = operation.current ?? proposed;
       if (!action) return;
+      board.expire();
       const startedPresentation = presentation;
       board.set("pending", true);
       board.set("error", "");
@@ -97,7 +130,7 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
         if (!transport)
           throw new Error("结果保存不可用，请重新打开 / Result saving unavailable; reopen the app");
         operation.current = action;
-        persist(); // Persist original ID and full payload BEFORE the first send.
+        await persist(); // Persist original ID and full payload BEFORE the first send.
         const response = await transport(root, action.request);
         if (!response || !["applied", "duplicate"].includes(response.status) || !response.effect)
           throw new Error("保存结果未确认，请重试 / Save unconfirmed; retry");
@@ -112,7 +145,7 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
           state = { ...state, drafts };
         }
         try {
-          persist();
+          await persist();
         } catch (error) {
           operation.current = action;
           throw error;
@@ -121,7 +154,8 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
         board.expire();
         if (action.request.op.startsWith("restore_")) {
           board.set("selected", action.step.key);
-          board.set("drafts", (drafts) => ({ ...drafts, [action.step.key]: action.text }));
+          if (action.restoreDraft)
+            board.set("drafts", (drafts) => ({ ...drafts, [action.step.key]: action.text }));
         } else if (response.status === "applied" && showReceipt) {
           board.set("receipt", { ...action, effect: response.effect, expires: Date.now() + RESULT_UNDO_MS });
           timer = setTimeout(board.expire, RESULT_UNDO_MS);
@@ -135,7 +169,7 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
         if (["CONFLICT", "BAD_ARGS", "INVALID_DOCUMENT", "INVALID_RECORD"].includes(String(code))) {
           operation.current = undefined;
           try {
-            persist();
+            await persist();
           } catch {
             operation.current = action;
           }
@@ -161,9 +195,32 @@ export function createTodayBoardSession(root = "", storage?: Pick<Storage, "getI
             }
           : { client_id: resultId(), op: "restore_next", args: effect };
       board.expire();
-      await board.send(transport, { request, step: receipt.step, text: receipt.text });
+      await board.send(transport, {
+        request,
+        step: receipt.step,
+        text: receipt.text,
+        restoreDraft: receipt.request.op === "complete_next_result",
+      });
     },
   };
-  return board;
+  const ready =
+    remote && root
+      ? (async () => {
+          state = { ...state, pending: true };
+          try {
+            confirmed = await remote(root, null, null);
+            if (!confirmed.drafts || typeof confirmed.drafts !== "object")
+              throw new Error("草稿读取失败 / Cannot read draft");
+            state = { ...state, drafts: confirmed.drafts };
+            operation.current = confirmed.operation;
+            available = true;
+          } catch (error) {
+            state = { ...state, error: String(error) };
+          } finally {
+            board.set("pending", false);
+          }
+        })()
+      : Promise.resolve();
+  return { ...board, ready };
 }
 export type TodayBoardSession = ReturnType<typeof createTodayBoardSession>;

@@ -13,6 +13,7 @@ import {
   type City,
   type FinanceAccess,
   type HandoverPack,
+  type HomeResultDraft,
   type HomeState,
   type Hometown,
   type ImportSource,
@@ -140,6 +141,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resultDraft,
   resumePrompt,
   saveAvatar,
   saveHometown,
@@ -281,12 +283,30 @@ export class KaituOverviewService extends TypertRemoteService {
     }
   }
 
+  @Remote("resultDraft")
+  async resultDraft(
+    root: string,
+    value: HomeResultDraft | null = null,
+    expected: HomeResultDraft | null = null,
+  ) {
+    try {
+      return resultDraft(this.workspace, root, value, expected);
+    } catch (error) {
+      return throwHomeCompletionError(error);
+    }
+  }
+
   @Remote("resultAction")
   async resultAction(root: string, request: ResultRequest) {
-    return this.write(() => {
-      if (root !== this.workspace.root) throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
-      return applyResultAction(this.workspace, request);
-    }).catch(throwHomeCompletionError);
+    try {
+      return await this.write(() => {
+        if (root !== this.workspace.root)
+          throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+        return applyResultAction(this.workspace, request);
+      });
+    } catch (error) {
+      return throwHomeCompletionError(error);
+    }
   }
 
   @Remote("findWorkspaceFiles")

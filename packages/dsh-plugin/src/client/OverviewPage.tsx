@@ -87,6 +87,7 @@ export interface OverviewPageProps
   hosted?: boolean;
   navigation?: PanelNavigation;
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
+  resultDraft?: import("./result-session.js").DraftTransport;
   resultAction?: import("./result-session.js").ResultTransport;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
@@ -294,10 +295,12 @@ function Overview({
   const workspaceRoot = data?.root;
   const resultOwners = useRef(new Map<string, ReturnType<typeof createTodayBoardSession>>());
   const ownerRoot = workspaceRoot ?? "";
-  const resultOwner = resultOwners.current.get(ownerRoot) ?? createTodayBoardSession(ownerRoot);
+  const resultOwner =
+    resultOwners.current.get(ownerRoot) ?? createTodayBoardSession(ownerRoot, undefined, props.resultDraft);
   resultOwners.current.set(ownerRoot, resultOwner);
   const todaySession = useRef({ root: workspaceRoot, board: resultOwner });
   todaySession.current = { root: workspaceRoot, board: resultOwner };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Leaving a page expires its short undo affordance.
   useEffect(() => () => resultOwner.expire(), [resultOwner, view]);
   const [exploreFacts, setExploreFacts] = useState<{
     root: string;

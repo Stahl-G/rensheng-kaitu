@@ -105,7 +105,14 @@ function children(input: ProjectionInputs, path: string) {
       return false;
     return (
       path !== input.state ||
-      (!["cache", "secrets.json", "organizer.json", "history.git", "result-actions"].includes(entry.name) &&
+      (![
+        "cache",
+        "secrets.json",
+        "organizer.json",
+        "history.git",
+        "result-actions",
+        "result-draft.json",
+      ].includes(entry.name) &&
         !entry.name.startsWith("index.sqlite"))
     );
   });
