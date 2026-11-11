@@ -97,7 +97,6 @@ export interface UiOptions {
   systemLocale?: string;
 }
 const PRODUCT_ROOT = fileURLToPath(new URL("../../../dsh-plugin/dist/standalone/", import.meta.url));
-const LEGACY_ROOT = fileURLToPath(new URL("../../../web/dist/", import.meta.url));
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript",
@@ -168,13 +167,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   const files = dshFiles(ws);
   const options = { ...input, ask: input.ask ?? (await browserAsk(ws)) };
   const packagedWeb = resolve(assetsRoot(), "web");
-  const WEB_ROOT =
-    options.webRoot ??
-    (existsSync(`${packagedWeb}/index.html`)
-      ? packagedWeb
-      : existsSync(`${PRODUCT_ROOT}/index.html`)
-        ? PRODUCT_ROOT
-        : LEGACY_ROOT);
+  const WEB_ROOT = options.webRoot ?? (existsSync(`${packagedWeb}/index.html`) ? packagedWeb : PRODUCT_ROOT);
   const calendarPush = new CalendarPush(calendarPushStore(ws), options.calendarExecutor);
   const collectors = new CollectorService(ws, options.collectorStateRoot);
   const phones = new PhoneService(ws, phoneAnswer(options.ask));
