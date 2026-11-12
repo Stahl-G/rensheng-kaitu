@@ -575,12 +575,22 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         store(ws, { ...s, conflicts: check.conflicts, error: undefined });
         return;
       }
-      const known = new Set(phoneReceipts(ws).map((r) => `${r.kind}:${r.ref}`));
+      const known = new Map(phoneReceipts(ws).map((r) => [`${r.kind}:${r.ref}`, r]));
       const added = incoming["phone/receipts.json"]
-        ? remoteReceipts(incoming["phone/receipts.json"]).filter((r) => !known.has(`${r.kind}:${r.ref}`))
+        ? remoteReceipts(incoming["phone/receipts.json"]).filter((r) => {
+            const local = known.get(`${r.kind}:${r.ref}`);
+            // A rejected retry does not cancel a result another consumer already committed.
+            return (
+              !local ||
+              (r.kind === "action" &&
+                r.effect !== undefined &&
+                ["applied", "duplicate"].includes(r.status) &&
+                ["conflict", "rejected"].includes(local.status))
+            );
+          })
         : [];
       rememberOrganizer(ws, incoming["phone/today.json"], added, latestDaily(ws));
-      // 云端整理员写的回执，本机没有的先并进来；其余 phone 文件仍以本机为准。
+      // 合入未知回执与已确认的成功结果；其余 phone 文件仍以本机为准。
       if (added.length && writePhoneReceipts(ws, added))
         local["phone/receipts.json"] = ws.readText("phone/receipts.json");
       const merged = mergeBackup(base, withoutManifest(local), phoneFromLocal(local));
