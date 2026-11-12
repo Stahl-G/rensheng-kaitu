@@ -75,6 +75,7 @@ import {
   createProject,
   decideProposal,
   defaultRoot,
+  deferSnapshots,
   directionsPrompt,
   dismissNews,
   disposeNoteIndex,
@@ -154,7 +155,7 @@ import {
   setFinanceAccess,
   setNewsFeedback,
   setWeatherPlace,
-  snapshot,
+  snapshotNow,
   startLearning,
   syncProject,
   tryNews,
@@ -191,14 +192,31 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
+/**
+ * 宿主已经在管的东西，交进来共用，服务不再另建一份。
+ * DSH 插件不传；独立 Kaitu.app 的本机服务传入自己的首页缓存、文件索引和系统日历。
+ */
+export interface KaituServiceHost {
+  /** null：这个宿主不显示首页（命令行、测试），不建缓存。 */
+  home?: ReturnType<typeof createHomeCache> | null;
+  files?: ReturnType<typeof dshFiles>;
+  calendarPush?: CalendarPush;
+  /** 改了今天计划之后由宿主在后台同步系统日历；不传则写入时当场同步。 */
+  syncCalendar?: () => void;
+  /** 宿主自己调度版本记录（已对工作区调用 deferSnapshots）；不传则写入返回后由服务接着存。 */
+  savesVersions?: boolean;
+  /** 一次写入结束后通知宿主界面。 */
+  changed?: () => void;
+}
+
 /** 工作区页面数据、资讯与地点核对、本机头像。 */
 export class KaituOverviewService extends TypertRemoteService {
   private readonly workspace: Workspace;
   private readonly files: ReturnType<typeof dshFiles>;
-  private readonly scheduleVersion: (message: string) => void;
-  private readonly homeCache: ReturnType<typeof createHomeCache>;
+  private readonly homeCache: ReturnType<typeof createHomeCache> | null;
   private readonly homeListeners = new Set<() => void>();
   private disposed = false;
+  private slots: Promise<void> = Promise.resolve();
 
   constructor(
     ctx: Context,
@@ -206,48 +224,84 @@ export class KaituOverviewService extends TypertRemoteService {
     workspace?: Workspace,
     private readonly write: MutationQueue = (run) => run(),
     private readonly collectors?: CollectorService,
+    private readonly host: KaituServiceHost = {},
   ) {
     super(ctx, "kaitu");
     this.workspace = workspace ?? new Workspace(config.workspace ?? defaultRoot());
-    this.homeCache = createHomeCache(
-      this.workspace,
-      () => {
+    if (host.home !== undefined) this.homeCache = host.home;
+    else {
+      const home = createHomeCache(
+        this.workspace,
+        () => {
+          for (const notify of this.homeListeners) notify();
+        },
+        { write: this.write, report: (error) => ctx.logger.warn(String(error)) },
+      );
+      this.homeCache = home;
+      setImmediate(() => home.refreshDerived());
+      ctx.effect(() => async () => {
+        this.disposed = true;
         for (const notify of this.homeListeners) notify();
-      },
-      { write: this.write, report: (error) => ctx.logger.warn(String(error)) },
-    );
-    setImmediate(() => this.homeCache.refreshDerived());
-    ctx.effect(() => async () => {
-      this.disposed = true;
-      for (const notify of this.homeListeners) notify();
-      await this.homeCache.close();
-    });
-    this.files = dshFiles(this.workspace);
-    ctx.effect(() => async () => {
-      this.files.dispose();
-      await disposeNoteIndex(this.workspace);
-    });
-    this.scheduleVersion = (message) => {
-      setImmediate(() => {
-        void this.write(() => snapshot(this.workspace, message)).catch((error) =>
-          ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`),
-        );
+        await home.close();
       });
-    };
+    }
+    if (host.files) this.files = host.files;
+    else {
+      const files = dshFiles(this.workspace);
+      this.files = files;
+      ctx.effect(() => async () => {
+        files.dispose();
+        await disposeNoteIndex(this.workspace);
+      });
+    }
     const performWrite = this.write;
-    this.write = async (operation) => {
-      try {
-        return await performWrite(operation);
-      } finally {
-        this.files.invalidate();
-        this.homeCache.invalidate();
-      }
+    const invalidate = () => {
+      this.files.invalidate();
+      this.homeCache?.invalidate();
+      host.changed?.();
     };
+    // 文件写完就把结果交回界面；存版本留在同一个队列位置里接着做，后面的写入照旧排在它之后。
+    this.write = <T>(operation: () => Promise<T>) =>
+      new Promise<T>((resolve, reject) => {
+        const slot = this.slots.then(() =>
+          performWrite(async () => {
+            const messages: string[] = [];
+            const resume = host.savesVersions
+              ? () => {}
+              : deferSnapshots(this.workspace, (message) => messages.push(message));
+            try {
+              resolve(await operation());
+            } catch (error) {
+              reject(error);
+            } finally {
+              resume();
+              invalidate();
+            }
+            if (!messages.length) return;
+            // 先把响应交给调用方，再开始版本的同步扫描；等待仍属于当前槽，关闭会一起排空。
+            await new Promise<void>((resolve) => setImmediate(resolve));
+            try {
+              for (const message of messages) await snapshotNow(this.workspace, message);
+            } catch (error) {
+              ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`);
+            } finally {
+              invalidate();
+            }
+          }),
+        );
+        this.slots = slot.catch(reject);
+      });
+    ctx.effect(() => () => this.settled());
+  }
+
+  /** 已交回界面的写入，其版本记录全部做完后兑现。 */
+  settled(): Promise<void> {
+    return this.slots;
   }
 
   @Remote("home")
   async home(): Promise<HomeState> {
-    return this.homeCache.read();
+    return this.homeCache?.read() ?? { data: null, loading: true, error: null };
   }
 
   @Remote({ name: "homeUpdates", mode: "stream" })
@@ -270,7 +324,7 @@ export class KaituOverviewService extends TypertRemoteService {
         wake = undefined;
         if (this.disposed || signal?.aborted) return;
         dirty = false;
-        yield this.homeCache.read();
+        yield this.homeCache?.read() ?? { data: null, loading: true, error: null };
       }
     } finally {
       this.homeListeners.delete(notify);
@@ -476,14 +530,14 @@ export class KaituOverviewService extends TypertRemoteService {
   async learningStart(
     input: StartLearningInput,
   ): Promise<LearningTopic & { version: string | null; versionError?: string }> {
-    return this.write(() => startLearning(this.workspace, input, new Date(), this.scheduleVersion));
+    return this.write(() => startLearning(this.workspace, input));
   }
 
   @Remote("learningSave")
   async learningSave(
     input: LearningCheckinInput,
   ): Promise<LearningTopic & { version: string | null; versionError?: string; replayed?: boolean }> {
-    return this.write(() => saveLearningCheckin(this.workspace, input, new Date(), this.scheduleVersion));
+    return this.write(() => saveLearningCheckin(this.workspace, input));
   }
 
   @Remote("calendar")
@@ -533,7 +587,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("organizerSeen")
   async organizerSeen(): Promise<OrganizerStatus> {
-    return markOrganizerSeen(this.workspace);
+    return this.write(async () => markOrganizerSeen(this.workspace));
   }
 
   @Remote("exportWorkspace")
@@ -591,7 +645,14 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   private get calendarWriter() {
-    return new CalendarPush(calendarPushStore(this.workspace));
+    return this.host.calendarPush ?? new CalendarPush(calendarPushStore(this.workspace));
+  }
+
+  /** 计划改动后的系统日历状态：宿主在后台同步时先回当前状态，否则当场同步。 */
+  private async calendarAfterPlanChange(): Promise<CalendarPushSettings> {
+    if (!this.host.syncCalendar) return this.calendarWriter.sync(calendarPushEntries(this.workspace));
+    this.host.syncCalendar();
+    return this.calendarWriter.settings();
   }
 
   @Remote("calendarPush")
@@ -619,7 +680,7 @@ export class KaituOverviewService extends TypertRemoteService {
   async editCalendarBlock(id: string, start: string, end: string): Promise<CalendarPushResult> {
     return this.write(async () => {
       const result = await editCalendarBlock(this.workspace, id, start, end, this.calendarWriter.located(id));
-      return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
+      return { ...result, calendarPush: await this.calendarAfterPlanChange() };
     });
   }
 
@@ -627,7 +688,7 @@ export class KaituOverviewService extends TypertRemoteService {
   async scheduleNext(file: string, id: string, start: string, end: string): Promise<CalendarPushResult> {
     return this.write(async () => {
       const result = await scheduleNext(this.workspace, file, id, start, end);
-      return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
+      return { ...result, calendarPush: await this.calendarAfterPlanChange() };
     });
   }
 
@@ -635,7 +696,7 @@ export class KaituOverviewService extends TypertRemoteService {
   async decideProposal(id: string, decision: "confirmed" | "rejected"): Promise<CalendarPushResult> {
     return this.write(async () => {
       const result = await decideProposal(this.workspace, id, decision);
-      return { ...result, calendarPush: await this.calendarWriter.sync(calendarPushEntries(this.workspace)) };
+      return { ...result, calendarPush: await this.calendarAfterPlanChange() };
     });
   }
 
@@ -646,9 +707,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("captureOnce")
   async captureOnce(text: string, operationId: string): Promise<Awaited<ReturnType<typeof captureNoteOnce>>> {
-    return this.write(() =>
-      captureNoteOnce(this.workspace, text, operationId, { scheduleVersion: this.scheduleVersion }),
-    );
+    return this.write(() => captureNoteOnce(this.workspace, text, operationId));
   }
 
   @Remote("captureReceipt")
@@ -847,13 +906,15 @@ export class KaituOverviewService extends TypertRemoteService {
       !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)
     )
       throw new KaituError("头像数据不合法或超过 2MB", "INVALID_AVATAR");
-    saveAvatar(this.workspace, Buffer.from(base64, "base64"));
-    return readAvatar(this.workspace);
+    return this.write(async () => {
+      saveAvatar(this.workspace, Buffer.from(base64, "base64"));
+      return readAvatar(this.workspace);
+    });
   }
 
   @Remote("removeAvatar")
   async removeAvatar(): Promise<void> {
-    removeAvatar(this.workspace);
+    await this.write(async () => removeAvatar(this.workspace));
   }
 
   @Remote("projects")
@@ -878,8 +939,8 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("projectBindGithub")
   async projectBindGithub(slug: string, repo: string): Promise<ProjectDetailData> {
-    await bindGithub(this.workspace, slug, repo);
-    return readProjectPage(this.workspace, slug);
+    await bindGithub(this.workspace, slug, repo, { write: this.write });
+    return this.write(async () => readProjectPage(this.workspace, slug));
   }
 
   @Remote("projectMemoryPrompt")
@@ -921,7 +982,7 @@ export class KaituOverviewService extends TypertRemoteService {
 
   @Remote("projectSync")
   async projectSync(slug: string): Promise<void> {
-    await syncProject(this.workspace, slug);
+    await syncProject(this.workspace, slug, { write: this.write });
   }
 
   @Remote("doing")

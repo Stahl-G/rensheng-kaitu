@@ -11,7 +11,7 @@ interface Parts {
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
-function partsIn(date: Date, timeZone: string): Parts {
+function intlParts(date: Date, timeZone: string): Parts {
   let fmt = formatters.get(timeZone);
   if (!fmt) {
     fmt = new Intl.DateTimeFormat("en-CA", {
@@ -29,6 +29,43 @@ function partsIn(date: Date, timeZone: string): Parts {
   const out: Record<string, string> = {};
   for (const p of fmt.formatToParts(date)) out[p.type] = p.value;
   return out as unknown as Parts;
+}
+
+const DAY = 86400000;
+// 每个时区按 UTC 整天记一次偏移（毫秒）；这一天里有换时的记 null，照旧逐次问 Intl。
+const dayOffsets = new Map<string, Map<number, number | null>>();
+const offsetAt = (ms: number, timeZone: string) => {
+  const p = intlParts(new Date(ms), timeZone);
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - ms;
+};
+const two = (value: number) => (value < 10 ? `0${value}` : String(value));
+
+function partsIn(date: Date, timeZone: string): Parts {
+  const time = date.getTime();
+  // 记录里的时间成千上万条，逐条问 Intl 很慢；同一天偏移不变时直接换算。
+  if (!(time >= 0 && time < 4102444800000)) return intlParts(date, timeZone);
+  let days = dayOffsets.get(timeZone);
+  if (!days) {
+    days = new Map();
+    dayOffsets.set(timeZone, days);
+  }
+  const index = Math.floor(time / DAY);
+  let offset = days.get(index);
+  if (offset === undefined) {
+    const start = offsetAt(index * DAY, timeZone);
+    offset = start === offsetAt((index + 1) * DAY - 1000, timeZone) ? start : null;
+    days.set(index, offset);
+  }
+  if (offset === null) return intlParts(date, timeZone);
+  const local = new Date(Math.floor(time / 1000) * 1000 + offset);
+  return {
+    year: String(local.getUTCFullYear()),
+    month: two(local.getUTCMonth() + 1),
+    day: two(local.getUTCDate()),
+    hour: two(local.getUTCHours()),
+    minute: two(local.getUTCMinutes()),
+    second: two(local.getUTCSeconds()),
+  };
 }
 
 const validZones = new Set<string>();

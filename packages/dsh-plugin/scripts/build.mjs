@@ -117,6 +117,15 @@ await build({
   format: "esm",
   packages: "external",
 });
+await build({
+  entryPoints: [resolve(pkg, "src/service.ts")],
+  outfile: resolve(pkg, "dist/service.js"),
+  bundle: true,
+  platform: "node",
+  target: "node22",
+  format: "esm",
+  packages: "external",
+});
 const worker = await build({
   entryPoints: [resolve(pkg, "node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs")],
   bundle: true,
