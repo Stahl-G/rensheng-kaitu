@@ -73,7 +73,7 @@ export function resultActionRequest(ws: Workspace, id: string): ResultRequest | 
 /** Preserve a confirmed shared result locally so an interrupted plan cannot resume later. */
 export function acknowledgeResultAction(ws: Workspace, request: ResultRequest, effect: ResultEffect) {
   const existing = resultActionRequest(ws, request.client_id);
-  if (existing && !isDeepStrictEqual(existing, request)) throw conflict();
+  if (!existing || !isDeepStrictEqual(existing, request)) throw conflict();
   save(ws, { request, at: new Date().toISOString(), status: "applied", effect });
 }
 function save(ws: Workspace, pending: Pending) {

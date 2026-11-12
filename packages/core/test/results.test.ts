@@ -496,6 +496,10 @@ it.each([false, true])(
         expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("duplicate");
       }
     }
+    if (!pendingBytes) {
+      await send({ ...complete, args: { ...complete.args, result_text: "Different content first" } });
+      expect(ws.exists(journalPath)).toBe(false);
+    }
     await send(complete);
     const actual = {
       status: parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
@@ -503,9 +507,11 @@ it.each([false, true])(
     };
     console.log("replay-review", { pending, ...actual });
     expect(actual).toEqual({ status: "todo", receipt: "duplicate" });
-    // Keep the original ID bound even if a changed retry overwrites the shared receipt with conflict.
+    // Known local requests remain bound; shared ID-only receipts do not invent a payload binding.
     await send({ ...complete, args: { ...complete.args, result_text: "Different content" } });
-    expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("conflict");
+    expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe(
+      pending ? "conflict" : "duplicate",
+    );
     await send(complete);
     expect(
       parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
