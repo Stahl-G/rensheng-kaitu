@@ -158,13 +158,13 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
         // A successful synced receipt is final even when this consumer stopped with a pending journal.
         // A remote conflict cannot settle a local write whose outcome is still unknown.
         if (shared && (!localRequest || ["applied", "duplicate"].includes(shared.status))) {
+          if (shared.effect && ["applied", "duplicate"].includes(shared.status))
+            acknowledgeResultAction(ws, localRequest ?? request, shared.effect);
           if (localRequest && !isDeepStrictEqual(localRequest, request))
             throw new KaituError(
               "操作编号已绑定不同内容 / Action ID is bound to different content",
               "CONFLICT",
             );
-          if (shared.effect && ["applied", "duplicate"].includes(shared.status))
-            acknowledgeResultAction(ws, request, shared.effect);
           receipt.status = shared.status === "applied" ? "duplicate" : shared.status;
           if (shared.effect) receipt.effect = shared.effect;
           if (shared.target) receipt.target = shared.target;

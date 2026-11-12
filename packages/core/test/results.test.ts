@@ -466,7 +466,12 @@ it.each([false, true])(
     ).toBe("todo");
     rmSync(ws.resolve(".kaitu/result-actions", { internal: true }), { recursive: true, force: true });
     rmSync(ws.resolve(".kaitu/phone-actions.json", { internal: true }), { force: true });
-    if (pendingBytes) ws.writeText(journalPath, pendingBytes, { internal: true });
+    if (pendingBytes) {
+      ws.writeText(journalPath, pendingBytes, { internal: true });
+      // A changed retry may arrive before the original request resumes on this consumer.
+      await send({ ...complete, args: { ...complete.args, result_text: "Different content first" } });
+      expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("conflict");
+    }
     await send(complete);
     const actual = {
       status: parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
