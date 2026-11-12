@@ -148,8 +148,15 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       sharedReceipt?.effect &&
       localResultRequest &&
       ["applied", "duplicate"].includes(sharedReceipt.status)
-    )
-      acknowledgeResultAction(ws, localResultRequest, sharedReceipt.effect);
+    ) {
+      if (!acknowledgeResultAction(ws, localResultRequest, sharedReceipt.effect)) {
+        receipt.status = "conflict";
+        receipt.message =
+          "远端结果无法对应原请求，请回读资料 / Remote result cannot be matched to the original request. Refresh data.";
+        receipts.push(receipt);
+        continue;
+      }
+    }
     const durableResult =
       ["complete_next_result", "restore_task_revision", "restore_next"].includes(action.op) ||
       (["adopt_task", "cancel_task"].includes(action.op) && action.args.expected_rev !== undefined);
