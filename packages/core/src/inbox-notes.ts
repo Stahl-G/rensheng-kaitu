@@ -117,12 +117,7 @@ export function readCaptureReceipt(ws: Workspace, operationId: string): CaptureR
 }
 
 /** Local operation receipt is created before the note, so retry never silently writes a second copy. */
-export async function captureNoteOnce(
-  ws: Workspace,
-  text: string,
-  operationId: string,
-  options: { scheduleVersion?: (message: string) => void } = {},
-) {
+export async function captureNoteOnce(ws: Workspace, text: string, operationId: string) {
   if (typeof text !== "string" || !text.trim() || text.length > 100000)
     throw new KaituError("请输入要记录的内容（最多 10 万字）", "BAD_ARGS");
   const file = captureIntentPath(ws, operationId);
@@ -154,10 +149,6 @@ export async function captureNoteOnce(
     ),
   );
   try {
-    if (options.scheduleVersion) {
-      options.scheduleVersion("你保存了一条原文记录");
-      return { status: "saved" as const, path: intent.path, version: null };
-    }
     return {
       status: "saved" as const,
       path: intent.path,
