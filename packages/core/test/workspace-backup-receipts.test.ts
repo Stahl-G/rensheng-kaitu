@@ -20,7 +20,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-it.each(["none", "conflict", "rejected"] as const)(
+it.each(["none", "conflict", "rejected", "expired"] as const)(
   "shared success survives a local %s retry receipt and prevents replay after undo",
   async (localReceipt) => {
     const a = await clonedWorkspace();
@@ -69,7 +69,7 @@ it.each(["none", "conflict", "rejected"] as const)(
     });
     await expect(applyResultAction(b, request)).rejects.toThrow("Interrupted after initial journal");
     spy.mockRestore();
-    if (localReceipt === "conflict") {
+    if (localReceipt === "conflict" || localReceipt === "expired") {
       await send(b, { ...action, args: { ...request.args, result_text: "Changed payload" } });
       expect(phoneReceipts(b).find((x) => x.ref === request.client_id)?.status).toBe("conflict");
     }
@@ -98,6 +98,14 @@ it.each(["none", "conflict", "rejected"] as const)(
     // The stub carries actual artifacts produced by A; all network endpoints are mocked.
     files = { ...files, [file]: a.readText(file), "phone/receipts.json": a.readText("phone/receipts.json") };
     head = String(++count);
+    if (localReceipt === "expired") {
+      const value = JSON.parse(files["phone/receipts.json"]);
+      value.items = value.items.map((r: PhoneReceipt) => ({
+        ...r,
+        at: new Date(Date.now() - 15 * 86400000).toISOString(),
+      }));
+      files["phone/receipts.json"] = JSON.stringify(value);
+    }
     const remoteBefore = JSON.parse(files["phone/receipts.json"]).items.find(
       (x: PhoneReceipt) => x.ref === request.client_id,
     )?.status;
@@ -110,6 +118,11 @@ it.each(["none", "conflict", "rejected"] as const)(
       (x: PhoneReceipt) => x.ref === request.client_id,
     )?.status;
     expect(b.readText(file)).toBe(a.readText(file));
+    if (localReceipt === "expired") {
+      expect(afterSync).toBe("conflict");
+      expect(remoteAfter).toBe("conflict");
+      return;
+    }
     await send(b, action);
     const result = {
       remoteBefore,

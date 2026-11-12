@@ -575,9 +575,12 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         store(ws, { ...s, conflicts: check.conflicts, error: undefined });
         return;
       }
+      const receiptNow = new Date();
+      const receiptCutoff = receiptNow.getTime() - 14 * 86400000;
       const known = new Map(phoneReceipts(ws).map((r) => [`${r.kind}:${r.ref}`, r]));
       const added = incoming["phone/receipts.json"]
         ? remoteReceipts(incoming["phone/receipts.json"]).filter((r) => {
+            if (Date.parse(r.at) < receiptCutoff) return false;
             const local = known.get(`${r.kind}:${r.ref}`);
             // A rejected retry does not cancel a result another consumer already committed.
             return (
@@ -591,7 +594,7 @@ export async function syncWorkspaceBackup(ws: Workspace, remote = githubBackupRe
         : [];
       rememberOrganizer(ws, incoming["phone/today.json"], added, latestDaily(ws));
       // 合入未知回执与已确认的成功结果；其余 phone 文件仍以本机为准。
-      if (added.length && writePhoneReceipts(ws, added))
+      if (added.length && writePhoneReceipts(ws, added, receiptNow))
         local["phone/receipts.json"] = ws.readText("phone/receipts.json");
       const merged = mergeBackup(base, withoutManifest(local), phoneFromLocal(local));
       // 远端清单记的是仓库里有哪些范围：保留远端已有的范围，本机连接范围不变。
