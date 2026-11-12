@@ -59,7 +59,7 @@
 不满足返回 conflict；格式错误或未支持操作返回 rejected。
 操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重；`phone/receipts.json` 里已有的 client_id（例如云端整理员处理过的）也算处理过。
 同一个 client_id 再投递不重复执行：第一次成功的返回 duplicate，第一次 conflict 或 rejected 的照原结果再返回。
-结果操作在另一台消费者上重投时，先核同步回执。已有 applied/duplicate 回执即不再写资料，即使本机残留未完成的恢复日志；沿用原 effect 并把成功结果记入本机日志，之后同 ID 不同内容仍为 conflict。另一消费者的 conflict/rejected 回执不能替本机未知写入结案，已有本机计划仍沿原 ID 核清。回执 effect 只描述当时的操作，不证明资料当前仍为 done，客户端必须回读当前数据。
+结果操作在另一台消费者上重投时，先核同步回执。已有 applied/duplicate 回执即不再写资料，即使本机残留未完成的恢复日志；沿用原 effect；仅在已有本机原请求时把成功结果记入本机日志，之后同 ID 不同内容仍为 conflict。另一消费者的 conflict/rejected 回执不能替本机未知写入结案，已有本机计划仍沿原 ID 核清。回执 effect 只描述当时的操作，不证明资料当前仍为 done，客户端必须回读当前数据。
 
 没有本机原请求时，共享回执只证明 client_id 已处理，不证明当前重试的参数等于原参数；返回 duplicate 只表示该 ID 不再执行，不创建当前请求与旧 effect 的绑定。回执未包含完整请求或摘要，跨消费者不能完整核验同 ID 的参数一致性；若要提供该保证，需要另行扩展协议，不能从 effect 反推。
 
