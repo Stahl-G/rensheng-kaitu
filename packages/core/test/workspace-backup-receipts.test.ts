@@ -18,9 +18,10 @@ import { clonedWorkspace } from "./helpers.js";
 const roots: string[] = [];
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-it.each(["none", "conflict", "rejected", "expired"] as const)(
+it.each(["none", "conflict", "rejected", "expired", "cutoff"] as const)(
   "shared success survives a local %s retry receipt and prevents replay after undo",
   async (localReceipt) => {
     const a = await clonedWorkspace();
@@ -69,7 +70,7 @@ it.each(["none", "conflict", "rejected", "expired"] as const)(
     });
     await expect(applyResultAction(b, request)).rejects.toThrow("Interrupted after initial journal");
     spy.mockRestore();
-    if (localReceipt === "conflict" || localReceipt === "expired") {
+    if (localReceipt === "conflict" || localReceipt === "expired" || localReceipt === "cutoff") {
       await send(b, { ...action, args: { ...request.args, result_text: "Changed payload" } });
       expect(phoneReceipts(b).find((x) => x.ref === request.client_id)?.status).toBe("conflict");
     }
@@ -98,11 +99,14 @@ it.each(["none", "conflict", "rejected", "expired"] as const)(
     // The stub carries actual artifacts produced by A; all network endpoints are mocked.
     files = { ...files, [file]: a.readText(file), "phone/receipts.json": a.readText("phone/receipts.json") };
     head = String(++count);
-    if (localReceipt === "expired") {
+    if (localReceipt === "expired" || localReceipt === "cutoff") {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date());
+      const days = localReceipt === "cutoff" ? 14 : 15;
       const value = JSON.parse(files["phone/receipts.json"]);
       value.items = value.items.map((r: PhoneReceipt) => ({
         ...r,
-        at: new Date(Date.now() - 15 * 86400000).toISOString(),
+        at: new Date(Date.now() - days * 86400000).toISOString(),
       }));
       files["phone/receipts.json"] = JSON.stringify(value);
     }
