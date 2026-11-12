@@ -467,10 +467,34 @@ it.each([false, true])(
     rmSync(ws.resolve(".kaitu/result-actions", { internal: true }), { recursive: true, force: true });
     rmSync(ws.resolve(".kaitu/phone-actions.json", { internal: true }), { force: true });
     if (pendingBytes) {
-      ws.writeText(journalPath, pendingBytes, { internal: true });
-      // A changed retry may arrive before the original request resumes on this consumer.
-      await send({ ...complete, args: { ...complete.args, result_text: "Different content first" } });
-      expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("conflict");
+      const changed = { ...complete, args: { ...complete.args, result_text: "Different content first" } };
+      const line = JSON.stringify({ ...complete, device: "12345678", at: new Date().toISOString() });
+      for (const invalid of ["content", "multiple", "operation"]) {
+        ws.writeText(journalPath, pendingBytes, { internal: true });
+        writePhoneReceipts(ws, [applied]);
+        if (invalid === "content") await send(changed);
+        else if (invalid === "multiple")
+          await applyPhoneActions(ws, "mixed.actions.jsonl", `${line}\n${line}`);
+        else
+          await applyPhoneActions(
+            ws,
+            "changed.actions.jsonl",
+            JSON.stringify({
+              ...complete,
+              op: "complete_next",
+              device: "12345678",
+              at: new Date().toISOString(),
+            }),
+          );
+        expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe(
+          invalid === "multiple" ? "rejected" : "conflict",
+        );
+        await send(complete);
+        expect(
+          parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
+        ).toBe("todo");
+        expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("duplicate");
+      }
     }
     await send(complete);
     const actual = {

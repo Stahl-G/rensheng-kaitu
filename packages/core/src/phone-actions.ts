@@ -139,6 +139,17 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       status: "applied",
       at: new Date().toISOString(),
     };
+    const sharedReceipt = phoneReceipts(ws).find(
+      (item) => item.kind === "action" && item.ref === action.client_id,
+    );
+    const localResultRequest = resultActionRequest(ws, action.client_id);
+    // Preserve known success before any action-level rejection can replace its shared receipt.
+    if (
+      sharedReceipt?.effect &&
+      localResultRequest &&
+      ["applied", "duplicate"].includes(sharedReceipt.status)
+    )
+      acknowledgeResultAction(ws, localResultRequest, sharedReceipt.effect);
     const durableResult =
       ["complete_next_result", "restore_task_revision", "restore_next"].includes(action.op) ||
       (["adopt_task", "cancel_task"].includes(action.op) && action.args.expected_rev !== undefined);
@@ -151,10 +162,8 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
           op: action.op as ResultOperation,
           args: action.args as ResultArgs,
         };
-        const shared = phoneReceipts(ws).find(
-          (item) => item.kind === "action" && item.ref === action.client_id,
-        );
-        const localRequest = resultActionRequest(ws, action.client_id);
+        const shared = sharedReceipt;
+        const localRequest = localResultRequest;
         // A successful synced receipt is final even when this consumer stopped with a pending journal.
         // A remote conflict cannot settle a local write whose outcome is still unknown.
         if (shared && (!localRequest || ["applied", "duplicate"].includes(shared.status))) {
@@ -195,7 +204,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       receipts.push(receipt);
       continue;
     }
-    if (hasResultAction(ws, action.client_id)) {
+    if (hasResultAction(ws, action.client_id) || sharedReceipt?.effect) {
       receipt.status = "conflict";
       receipt.message = "操作编号已使用 / Action ID already used";
       receipts.push(receipt);
