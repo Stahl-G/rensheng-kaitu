@@ -279,3 +279,87 @@ it("requires a ready progress window before backup and cleans up on no-progress 
   expect(events.some((event) => event.phase === "copy")).toBe(true);
   expect(events.at(-1)).toEqual({ done: true });
 });
+
+it("bounds cleanup even when the progress process ignores both termination signals", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  const signals: string[] = [];
+  let detached = false;
+  let profile = "";
+  const child = Object.assign(new EventEmitter(), {
+    connected: true,
+    send() {},
+    kill(signal: string) {
+      signals.push(signal);
+    },
+    disconnect() {
+      this.connected = false;
+    },
+    unref() {
+      detached = true;
+    },
+  });
+  const pending = prepareWithProgress(state, "0.2.2-rc.1", {
+    launch: (_exe: string, _args: string[], options: { env: { KAITU_PROGRESS_PROFILE: string } }) => {
+      profile = options.env.KAITU_PROGRESS_PROFILE;
+      roots.push(profile);
+      return child;
+    },
+    timeoutMs: 5,
+    stopTimeoutMs: 5,
+  });
+  await expect(pending).rejects.toThrow("无法退出");
+  expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+  expect(detached).toBe(true);
+  expect(existsSync(profile)).toBe(true);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(false);
+});
+
+it("observes parent disconnection while the progress page is still loading", async () => {
+  const { root } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { showBackupProgress } = await import(join(root, "backup-progress.mjs"));
+  const exits: number[] = [];
+  const messages: unknown[] = [];
+  const channel = Object.assign(new EventEmitter(), {
+    env: { KAITU_PROGRESS_PROFILE: root },
+    connected: true,
+    send(message: unknown) {
+      messages.push(message);
+    },
+  });
+  let finishLoad: () => void = () => {};
+  let startedLoad: () => void = () => {};
+  const loading = new Promise<void>((resolve) => {
+    startedLoad = resolve;
+  });
+  class Window {
+    setMenu() {}
+    loadURL() {
+      startedLoad();
+      return new Promise<void>((resolve) => {
+        finishLoad = resolve;
+      });
+    }
+  }
+  const app = {
+    setPath() {},
+    whenReady: async () => {},
+    exit(code: number) {
+      exits.push(code);
+    },
+  };
+  const pending = showBackupProgress({ app, BrowserWindow: Window }, channel);
+  await loading;
+  channel.connected = false;
+  channel.emit("disconnect");
+  expect(exits).toEqual([1]);
+  finishLoad();
+  await pending;
+  expect(messages).toEqual([]);
+});

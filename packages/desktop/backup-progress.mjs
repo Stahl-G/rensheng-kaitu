@@ -5,7 +5,11 @@ import { join } from "node:path";
 import { prepareDshState } from "./kaitu-state-backup.mjs";
 
 // A separate fixed-host process keeps drawing while the preflight performs synchronous durable I/O.
-export async function prepareWithProgress(state, version, { launch = spawn, timeoutMs = 20000 } = {}) {
+export async function prepareWithProgress(
+  state,
+  version,
+  { launch = spawn, timeoutMs = 20000, stopTimeoutMs = 3000 } = {},
+) {
   if (!/^0\.2\.(?:[2-9]|\d{2,})(?:-|$)/.test(version)) return prepareDshState(state, version);
   const profile = mkdtempSync(join(tmpdir(), "kaitu-upgrade-progress-"));
   const env = { ...process.env, KAITU_BACKUP_PROGRESS: "1", KAITU_PROGRESS_PROFILE: profile };
@@ -45,24 +49,55 @@ export async function prepareWithProgress(state, version, { launch = spawn, time
     });
   } finally {
     if (child.connected) child.send({ done: true }, () => {});
-    const timer = setTimeout(() => {
-      if (!stopped) child.kill();
-    }, 3000);
-    await exited;
-    clearTimeout(timer);
+    const waitForExit = async () => {
+      let timer;
+      await Promise.race([
+        exited,
+        new Promise((resolve) => {
+          timer = setTimeout(resolve, stopTimeoutMs);
+        }),
+      ]);
+      clearTimeout(timer);
+    };
+    await waitForExit();
+    if (!stopped) {
+      child.kill("SIGTERM");
+      await waitForExit();
+    }
+    if (!stopped) {
+      child.kill("SIGKILL");
+      await waitForExit();
+    }
+    if (!stopped) {
+      // Do not delete a profile still owned by an unresponsive process or continue into DSH.
+      if (child.connected) child.disconnect();
+      child.unref();
+      // biome-ignore lint/correctness/noUnsafeFinally: Cleanup failure must prevent DSH startup even after successful backup.
+      throw new Error("备份进度进程无法退出，已停止启动，请重试");
+    }
     rmSync(profile, { recursive: true, force: true });
   }
 }
 
-export async function showBackupProgress({ app, BrowserWindow }) {
+export async function showBackupProgress({ app, BrowserWindow }, channel = process) {
   // This process never imports DSH, reads credentials or opens the normal profile.
-  const profile = process.env.KAITU_PROGRESS_PROFILE;
-  if (!profile || !process.send) {
+  const profile = channel.env.KAITU_PROGRESS_PROFILE;
+  if (!profile || !channel.send) {
+    app.exit(1);
+    return;
+  }
+  let disconnected = false;
+  channel.once("disconnect", () => {
+    disconnected = true;
+    app.exit(1);
+  });
+  if (!channel.connected) {
     app.exit(1);
     return;
   }
   for (const name of ["userData", "sessionData", "logs", "crashDumps"]) app.setPath(name, profile);
   await app.whenReady();
+  if (disconnected || !channel.connected) return;
   const window = new BrowserWindow({
     width: 440,
     height: 180,
@@ -81,6 +116,7 @@ export async function showBackupProgress({ app, BrowserWindow }) {
       '<!doctype html><html lang="zh"><meta charset="utf-8"><title>开图升级备份</title><style>body{font:18px system-ui;padding:24px;background:Canvas;color:CanvasText}progress{width:100%}</style><p id="status" role="status">正在检查升级备份</p><progress></progress></html>',
     )}`,
   );
+  if (disconnected || !channel.connected) return;
   const labels = {
     check: "正在检查升级备份",
     scan: "正在读取状态",
@@ -88,7 +124,7 @@ export async function showBackupProgress({ app, BrowserWindow }) {
     verify: "正在校验备份",
     publish: "正在保存备份",
   };
-  process.on("message", (message) => {
+  channel.on("message", (message) => {
     if (message?.done) {
       app.exit(0);
       return;
@@ -101,6 +137,5 @@ export async function showBackupProgress({ app, BrowserWindow }) {
       .executeJavaScript(`document.getElementById('status').textContent=${JSON.stringify(text)}`)
       .catch(() => {});
   });
-  process.once("disconnect", () => app.exit(1));
-  process.send({ ready: true });
+  channel.send({ ready: true });
 }
