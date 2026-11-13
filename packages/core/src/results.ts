@@ -70,6 +70,10 @@ export function hasResultAction(ws: Workspace, id: string): boolean {
 export function resultActionRequest(ws: Workspace, id: string): ResultRequest | undefined {
   return hasResultAction(ws, id) ? ws.readJson<Pending>(actionFile(id)).request : undefined;
 }
+/** Existing terminal result only; pending plans still require reconciliation. */
+export function resultActionStatus(ws: Workspace, id: string): Pending["status"] {
+  return hasResultAction(ws, id) ? ws.readJson<Pending>(actionFile(id)).status : undefined;
+}
 /** A STATUS effect includes enough content to check the original transition; task effects do not. */
 function matchesRequest(request: ResultRequest, effect: ResultEffect): boolean {
   const { op, args } = request;

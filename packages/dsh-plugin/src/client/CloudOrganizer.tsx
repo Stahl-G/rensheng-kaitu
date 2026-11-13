@@ -7,11 +7,13 @@ export function CloudOrganizer({
   copy,
   setup,
   seen,
+  selectConsumer,
 }: {
   data: SettingsData;
   copy: (text: string) => Promise<unknown>;
   setup: () => void;
   seen: () => Promise<unknown>;
+  selectConsumer?: (deviceId: string) => Promise<unknown>;
 }) {
   const t = useT();
   const status = data.organizer;
@@ -59,6 +61,40 @@ export function CloudOrganizer({
           </span>
         </span>
       </div>
+      {status.consumer?.otherDeviceId && (
+        <div className={css.sum}>
+          <b>{t("手机操作处理", "Phone action processing")}</b>
+          <p>
+            {status.consumer.paused
+              ? t("检测到另一台电脑，本机已暂停", "Another computer detected. Processing paused here.")
+              : t("本机已允许处理", "Processing enabled here")}
+          </p>
+          {selectConsumer && (
+            <>
+              <button
+                type="button"
+                className={css.btn}
+                onClick={() => void selectConsumer(status.consumer.deviceId)}
+              >
+                {t("由本机处理", "Process here")}
+              </button>
+              <button
+                type="button"
+                className={css.btn}
+                onClick={() => void selectConsumer(status.consumer.otherDeviceId as string)}
+              >
+                {t("本机暂停，让另一台处理", "Pause here; use the other computer")}
+              </button>
+            </>
+          )}
+          <p className={css.small}>
+            {t(
+              "只改变本机。另一台需单独选择。",
+              "Changes this computer only. Set the other computer separately.",
+            )}
+          </p>
+        </div>
+      )}
       {location ? (
         <details className={css.sum}>
           <summary className={css.link}>{t("交给 Agent 的说明", "Instructions for your agent")}</summary>

@@ -5,7 +5,7 @@ import { Worker } from "node:worker_threads";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
 import { historyReadInputs } from "./history.js";
-import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
+import { computerPhoneGenerator, rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
 import { phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
@@ -31,7 +31,9 @@ import type { Workspace, WorkspaceWrite } from "./workspace.js";
 export function phoneReadable(ws: Workspace) {
   return syncMode(ws.root) !== "local" || workspaceBackupEnabled(ws);
 }
-export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: string; spec: 1 };
+export type PhoneGenerator =
+  | { kind: "computer"; device_id?: string }
+  | { kind: "agent"; name: string; spec: 1 };
 
 type Published = {
   resultContract: "single-line-v1";
@@ -57,7 +59,7 @@ export function phoneSnapshotsCurrent(
       hit.value.resultContract === "single-line-v1" &&
       hit.root === input.root &&
       hit.state === input.state &&
-      hit.value.generator === JSON.stringify(generator ?? { kind: "computer" }) &&
+      hit.value.generator === JSON.stringify(generator ?? computerPhoneGenerator(ws)) &&
       hit.value.since <= now.getTime() &&
       hit.day === projectionDay(now, hit.timeZone) &&
       (hit.expires === null || now.getTime() < hit.expires) &&
@@ -103,7 +105,7 @@ export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?
   let cacheable = true;
   const prepared = Object.entries(snapshots).map(([name, build]) => {
     try {
-      const value = { ...build(), generator: generator ?? { kind: "computer" as const } };
+      const value = { ...build(), generator: generator ?? computerPhoneGenerator(ws) };
       cacheable = schemas().builtin(`phone-${name}.schema.json`)(value) && cacheable;
       return { name, value, error: undefined };
     } catch (error) {
@@ -190,7 +192,7 @@ export function publishPhoneSnapshots(
         const value: Published = {
           resultContract: "single-line-v1",
           since: now.getTime(),
-          generator: JSON.stringify(generator ?? { kind: "computer" }),
+          generator: JSON.stringify(generator ?? computerPhoneGenerator(ws)),
           outputs: [...prepared.snapshots.map((item) => item.name), "receipts"].map((name) => {
             const path = ws.resolve(`phone/${name}.json`);
             return [path, projectionFingerprint(path)];
