@@ -125,7 +125,7 @@ export function stateInventory(root) {
 }
 
 // Scan only process names and ancestry, never arguments, environment or credentials.
-export function assertHostsStopped() {
+export function assertHostsStopped(progressPid) {
   let rows;
   if (process.platform === "win32") {
     const raw = execFileSync(
@@ -159,10 +159,17 @@ export function assertHostsStopped() {
     ancestors.add(row.parent);
     pid = row.parent;
   }
+  const progressProcesses = new Set(progressPid ? [progressPid] : []);
+  for (let size = -1; size !== progressProcesses.size; ) {
+    size = progressProcesses.size;
+    for (const row of rows) if (progressProcesses.has(row.parent)) progressProcesses.add(row.pid);
+  }
   if (
     rows.some(
       (row) =>
-        !ancestors.has(row.pid) && /^(?:Kaitu|DSH|DeepSeek Harness)(?: Helper.*)?(?:\.exe)?$/.test(row.name),
+        !ancestors.has(row.pid) &&
+        !progressProcesses.has(row.pid) &&
+        /^(?:Kaitu|DSH|DeepSeek Harness)(?: Helper.*)?(?:\.exe)?$/.test(row.name),
     )
   )
     throw failure(
@@ -170,8 +177,10 @@ export function assertHostsStopped() {
     );
 }
 
-function copyInventory(source, destination, entries) {
+function copyInventory(source, destination, entries, progress = () => {}) {
+  let completed = 0;
   for (const entry of entries) {
+    progress({ phase: "copy", completed: completed++, total: entries.length });
     const target = join(destination, entry.path);
     if (entry.type === "directory") mkdirSync(target, { mode: 0o700 });
     else if (entry.type === "link")
@@ -274,7 +283,8 @@ export function backupStateRoot(state, parent) {
   return parent;
 }
 
-export function prepareDshState(state, version) {
+export function prepareDshState(state, version, { progress = () => {}, progressPid } = {}) {
+  progress({ phase: "check" });
   if (!isAbsolute(state)) throw failure("状态位置必须是绝对路径 / State path must be absolute");
   const root = present(state) ? realpathSync(state) : resolve(realpathSync(dirname(state)), basename(state));
   if (present(state)?.isSymbolicLink())
@@ -306,7 +316,7 @@ export function prepareDshState(state, version) {
     throw failure(
       "此状态已被新版写入，缺少升级前备份。请先恢复可验证的旧版备份 / This state already uses the newer format without a pre-upgrade backup. Restore a verified older backup first.",
     );
-  assertHostsStopped();
+  assertHostsStopped(progressPid);
   if (present(backups)?.isSymbolicLink())
     throw failure("备份目录不能是链接 / Backup directory cannot be a symbolic link");
   mkdirSync(backups, { recursive: true, mode: 0o700 });
@@ -322,9 +332,10 @@ export function prepareDshState(state, version) {
     writeFileSync(lock, String(process.pid));
     mkdirSync(temporary, { mode: 0o700 });
     // A second launch may have completed while this process was acquiring the lock.
-    if (present(receipt)) return prepareDshState(state, version);
+    if (present(receipt)) return prepareDshState(state, version, { progress, progressPid });
     if ([root, join(root, "ai")].some((home) => scheduleVersion(home) === 2))
       throw failure("状态在等待备份时已被新版写入 / State upgraded while waiting for the backup lock");
+    progress({ phase: "scan" });
     const entries = stateInventory(root);
     for (const entry of entries) {
       if (entry.type !== "link") continue;
@@ -342,8 +353,9 @@ export function prepareDshState(state, version) {
           "状态含外部资料链接，升级前无法完整备份 / State links to external data that cannot be fully backed up for this upgrade",
         );
     }
-    if (entries.length) copyInventory(root, join(temporary, "state"), entries);
+    if (entries.length) copyInventory(root, join(temporary, "state"), entries, progress);
     else mkdirSync(join(temporary, "state"), { mode: 0o700 });
+    progress({ phase: "verify" });
     const copied = stateInventory(join(temporary, "state"));
     const expected = entries.length
       ? entries
@@ -355,7 +367,7 @@ export function prepareDshState(state, version) {
       throw failure(
         "备份期间状态发生变化，请退出其他开图和 DSH 后重试 / State changed during backup. Quit other Kaitu and DSH processes and retry.",
       );
-    assertHostsStopped();
+    assertHostsStopped(progressPid);
     writeJson(join(temporary, "manifest.json"), {
       version: 1,
       source: root,
@@ -365,6 +377,7 @@ export function prepareDshState(state, version) {
     });
     readManifest(temporary);
     syncDirectory(temporary);
+    progress({ phase: "publish" });
     renameSync(temporary, backup);
     syncDirectory(backups);
     mkdirSync(root, { recursive: true, mode: 0o700 });

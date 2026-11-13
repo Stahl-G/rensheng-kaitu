@@ -64,6 +64,7 @@ await writePayload({
 });
 cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
 cpSync(join(directory, "state-backup.mjs"), join(resources, "kaitu-state-backup.mjs"));
+cpSync(join(directory, "backup-progress.mjs"), join(resources, "kaitu-backup-progress.mjs"));
 if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
 rmSync(join(resources, "app-update.yml"), { force: true });
 
