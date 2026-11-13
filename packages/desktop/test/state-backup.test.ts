@@ -363,3 +363,71 @@ it("observes parent disconnection while the progress page is still loading", asy
   await pending;
   expect(messages).toEqual([]);
 });
+
+it("does not treat kill errors as exit after a successful backup", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  const signals: string[] = [];
+  let profile = "";
+  const child = Object.assign(new EventEmitter(), {
+    pid: process.pid,
+    connected: true,
+    send() {},
+    kill(signal: string) {
+      signals.push(signal);
+      this.emit("error", Object.assign(new Error("kill EPERM"), { code: "EPERM" }));
+      return false;
+    },
+    disconnect() {
+      this.connected = false;
+    },
+    unref() {},
+  });
+  await expect(
+    prepareWithProgress(state, "0.2.2-rc.1", {
+      launch: (_exe: string, _args: string[], options: { env: { KAITU_PROGRESS_PROFILE: string } }) => {
+        profile = options.env.KAITU_PROGRESS_PROFILE;
+        roots.push(profile);
+        queueMicrotask(() => child.emit("message", { ready: true }));
+        return child;
+      },
+      stopTimeoutMs: 5,
+    }),
+  ).rejects.toThrow("无法退出");
+  expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+  expect(existsSync(profile)).toBe(true);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(true);
+});
+
+it("cleans a failed spawn without waiting for an exit event that cannot occur", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  let profile = "";
+  const child = Object.assign(new EventEmitter(), {
+    connected: false,
+    kill() {
+      throw new Error("must not kill an unspawned child");
+    },
+  });
+  await expect(
+    prepareWithProgress(state, "0.2.2-rc.1", {
+      launch: (_exe: string, _args: string[], options: { env: { KAITU_PROGRESS_PROFILE: string } }) => {
+        profile = options.env.KAITU_PROGRESS_PROFILE;
+        roots.push(profile);
+        queueMicrotask(() =>
+          child.emit("error", Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })),
+        );
+        return child;
+      },
+      stopTimeoutMs: 5,
+    }),
+  ).rejects.toThrow("已关闭");
+  expect(existsSync(profile)).toBe(false);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(false);
+});

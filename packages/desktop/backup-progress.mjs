@@ -22,7 +22,11 @@ export async function prepareWithProgress(
       resolve();
     };
     child.once("exit", finish);
-    child.once("error", finish);
+    // Failed spawn has no PID and no exit event. Runtime/kill errors do not prove exit.
+    // Keep listening because failed termination attempts can emit more than one error.
+    child.on("error", () => {
+      if (child.pid === undefined) finish();
+    });
   });
   try {
     await new Promise((resolve, reject) => {
