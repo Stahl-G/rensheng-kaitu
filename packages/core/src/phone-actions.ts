@@ -16,7 +16,14 @@ import {
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
-import { type ResultArgs, type ResultOperation, applyResultAction, hasResultAction } from "./results.js";
+import {
+  type ResultArgs,
+  type ResultOperation,
+  acknowledgeResultAction,
+  applyResultAction,
+  hasResultAction,
+  resultActionRequest,
+} from "./results.js";
 import { schemas } from "./schema.js";
 import { adoptTask, cancelTask, completeTask, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
@@ -132,6 +139,24 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       status: "applied",
       at: new Date().toISOString(),
     };
+    const sharedReceipt = phoneReceipts(ws).find(
+      (item) => item.kind === "action" && item.ref === action.client_id,
+    );
+    const localResultRequest = resultActionRequest(ws, action.client_id);
+    // Preserve known success before any action-level rejection can replace its shared receipt.
+    if (
+      sharedReceipt?.effect &&
+      localResultRequest &&
+      ["applied", "duplicate"].includes(sharedReceipt.status)
+    ) {
+      if (!acknowledgeResultAction(ws, localResultRequest, sharedReceipt.effect)) {
+        receipt.status = "conflict";
+        receipt.message =
+          "远端结果无法对应原请求，请回读资料 / Remote result cannot be matched to the original request. Refresh data.";
+        receipts.push(receipt);
+        continue;
+      }
+    }
     const durableResult =
       ["complete_next_result", "restore_task_revision", "restore_next"].includes(action.op) ||
       (["adopt_task", "cancel_task"].includes(action.op) && action.args.expected_rev !== undefined);
@@ -139,6 +164,30 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       try {
         if (text.split(/\r?\n/).filter((line) => line.trim()).length !== 1)
           throw new KaituError("每个操作须独立文件 / Send one action per file", "BAD_ARGS");
+        const request = {
+          client_id: action.client_id,
+          op: action.op as ResultOperation,
+          args: action.args as ResultArgs,
+        };
+        const shared = sharedReceipt;
+        const localRequest = localResultRequest;
+        // A successful synced receipt is final even when this consumer stopped with a pending journal.
+        // A remote conflict cannot settle a local write whose outcome is still unknown.
+        if (shared && (!localRequest || ["applied", "duplicate"].includes(shared.status))) {
+          // A receipt proves this ID was handled, not that this consumer's payload was the original.
+          // Without a local request, never invent a request/effect binding from the retry.
+          if (localRequest && !isDeepStrictEqual(localRequest, request))
+            throw new KaituError(
+              "操作编号已绑定不同内容 / Action ID is bound to different content",
+              "CONFLICT",
+            );
+          receipt.status = shared.status === "applied" ? "duplicate" : shared.status;
+          if (shared.effect) receipt.effect = shared.effect;
+          if (shared.target) receipt.target = shared.target;
+          if (shared.message) receipt.message = shared.message;
+          receipts.push(receipt);
+          continue;
+        }
         if (seen[action.client_id])
           throw new KaituError("操作编号已使用 / Action ID already used", "CONFLICT");
         const result = await applyResultAction(ws, {
@@ -162,7 +211,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       receipts.push(receipt);
       continue;
     }
-    if (hasResultAction(ws, action.client_id)) {
+    if (hasResultAction(ws, action.client_id) || sharedReceipt?.effect) {
       receipt.status = "conflict";
       receipt.message = "操作编号已使用 / Action ID already used";
       receipts.push(receipt);
