@@ -13,6 +13,7 @@ import {
   normalizedMemory,
   replaceMemory,
 } from "./memory.js";
+import { observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
@@ -23,6 +24,7 @@ import {
   applyResultAction,
   hasResultAction,
   resultActionRequest,
+  resultActionStatus,
 } from "./results.js";
 import { schemas } from "./schema.js";
 import { adoptTask, cancelTask, completeTask, listTasks } from "./tasks.js";
@@ -92,6 +94,12 @@ function prepareTask(ws: Workspace, action: Action): StoredRecord {
 }
 
 export async function applyPhoneActions(ws: Workspace, file: string, text: string) {
+  observePhoneConsumer(ws, ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined);
+  if (phoneConsumerStatus(ws).paused)
+    throw new KaituError(
+      "检测到另一台电脑，请选择负责人 / Another computer detected; select the responsible computer",
+      "CONSUMER_PAUSED",
+    );
   const ledgerFile = ".kaitu/phone-actions.json";
   // 账本记每个 client_id 第一次的结果；重投时成功的回 duplicate，冲突或拒绝的照原样再回一次。
   const seen: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
@@ -156,6 +164,16 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
         receipts.push(receipt);
         continue;
       }
+    }
+    const knownTerminal =
+      resultActionStatus(ws, action.client_id) !== undefined ||
+      seen[action.client_id]?.status !== undefined ||
+      (!!sharedReceipt && (!localResultRequest || ["applied", "duplicate"].includes(sharedReceipt.status)));
+    if (!knownTerminal && Date.now() - Date.parse(action.at) > 14 * 86400000) {
+      receipt.status = "rejected";
+      receipt.message = "[ACTION_EXPIRED] 已过期，请重做 / Action expired; create a new action.";
+      receipts.push(receipt);
+      continue;
     }
     const durableResult =
       ["complete_next_result", "restore_task_revision", "restore_next"].includes(action.op) ||
