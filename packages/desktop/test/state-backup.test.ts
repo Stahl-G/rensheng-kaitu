@@ -1,4 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
+import { EventEmitter } from "node:events";
 import {
   chmodSync,
   cpSync,
@@ -111,6 +112,7 @@ it("a backup write failure prevents native initialization and direct Electron ho
   for (const [from, to] of [
     ["payload-loader.mjs", "kaitu-loader.mjs"],
     ["state-backup.mjs", "kaitu-state-backup.mjs"],
+    ["backup-progress.mjs", "kaitu-backup-progress.mjs"],
     ["bootstrap.mjs", "app/bootstrap.mjs"],
     ["environment.mjs", "app/kaitu-environment.mjs"],
   ])
@@ -204,4 +206,228 @@ try { console.log(prepareDshState(${JSON.stringify(state)}, '0.2.2-rc.1')); } ca
   const complete = readdirSync(`${state}.backups`).filter((name) => !name.startsWith("."));
   expect(complete).toEqual([basename(checkpoint)]);
   expect(prepareDshState(state, "0.2.2-rc.1")).toBe(checkpoint);
+});
+
+it("reports real backup stages and repeats validation on restart without inventing copy progress", () => {
+  const { state } = fixture();
+  const events: { phase: string; completed?: number; total?: number }[] = [];
+  const backup = prepareDshState(state, "0.2.2-rc.1", { progress: (event) => events.push(event) });
+  expect(events[0].phase).toBe("check");
+  expect(events.map((event) => event.phase)).toContain("verify");
+  expect(events.at(-1)?.phase).toBe("publish");
+  const copies = events.filter((event) => event.phase === "copy");
+  expect(copies.length).toBeGreaterThan(0);
+  expect(copies.every((event, index) => event.completed === index && event.total === copies.length)).toBe(
+    true,
+  );
+  events.length = 0;
+  expect(prepareDshState(state, "0.2.2-rc.1", { progress: (event) => events.push(event) })).toBe(backup);
+  expect(events.map((event) => event.phase)).toEqual(["check"]);
+});
+
+it("a failed progress observer stops preflight and releases its lock for a safe retry", () => {
+  const { state } = fixture();
+  const before = stateInventory(state);
+  expect(() =>
+    prepareDshState(state, "0.2.2-rc.1", {
+      progress: ({ phase }) => {
+        if (phase === "copy") throw new Error("progress process lost");
+      },
+    }),
+  ).toThrow("progress process lost");
+  expect(stateInventory(state)).toEqual(before);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(false);
+  expect(existsSync(`${state}.backups/upgrade.lock`)).toBe(false);
+  expect(prepareDshState(state, "0.2.2-rc.1")).toBeTruthy();
+});
+
+it("requires a ready progress window before backup and cleans up on no-progress or failed startup", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  type Progress = { phase?: string; done?: boolean };
+  const events: Progress[] = [];
+  const launch = (ready: boolean) => () => {
+    const child = new EventEmitter() as EventEmitter & {
+      pid: number;
+      connected: boolean;
+      send: (message: Progress, callback: () => void) => void;
+      kill: () => boolean;
+    };
+    child.pid = process.pid;
+    child.connected = true;
+    child.send = (message: Progress, callback: () => void) => {
+      events.push(message);
+      callback();
+      if (message.done) {
+        child.connected = false;
+        queueMicrotask(() => child.emit("exit", 0));
+      }
+    };
+    child.kill = () => child.emit("exit", 1);
+    if (ready) queueMicrotask(() => child.emit("message", { ready: true }));
+    return child;
+  };
+  await expect(
+    prepareWithProgress(state, "0.2.2-rc.1", { launch: launch(false), timeoutMs: 10 }),
+  ).rejects.toThrow("未就绪");
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(false);
+  events.length = 0;
+  await expect(prepareWithProgress(state, "0.2.2-rc.1", { launch: launch(true) })).resolves.toBeTruthy();
+  expect(events.some((event) => event.phase === "copy")).toBe(true);
+  expect(events.at(-1)).toEqual({ done: true });
+});
+
+it("bounds cleanup even when the progress process ignores both termination signals", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  const signals: string[] = [];
+  let detached = false;
+  let profile = "";
+  const child = Object.assign(new EventEmitter(), {
+    connected: true,
+    send() {},
+    kill(signal: string) {
+      signals.push(signal);
+    },
+    disconnect() {
+      this.connected = false;
+    },
+    unref() {
+      detached = true;
+    },
+  });
+  const pending = prepareWithProgress(state, "0.2.2-rc.1", {
+    launch: (_exe: string, _args: string[], options: { env: { KAITU_PROGRESS_PROFILE: string } }) => {
+      profile = options.env.KAITU_PROGRESS_PROFILE;
+      roots.push(profile);
+      return child;
+    },
+    timeoutMs: 5,
+    stopTimeoutMs: 5,
+  });
+  await expect(pending).rejects.toThrow("无法退出");
+  expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+  expect(detached).toBe(true);
+  expect(existsSync(profile)).toBe(true);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(false);
+});
+
+it("observes parent disconnection while the progress page is still loading", async () => {
+  const { root } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { showBackupProgress } = await import(join(root, "backup-progress.mjs"));
+  const exits: number[] = [];
+  const messages: unknown[] = [];
+  const channel = Object.assign(new EventEmitter(), {
+    env: { KAITU_PROGRESS_PROFILE: root },
+    connected: true,
+    send(message: unknown) {
+      messages.push(message);
+    },
+  });
+  let finishLoad: () => void = () => {};
+  let startedLoad: () => void = () => {};
+  const loading = new Promise<void>((resolve) => {
+    startedLoad = resolve;
+  });
+  class Window {
+    setMenu() {}
+    loadURL() {
+      startedLoad();
+      return new Promise<void>((resolve) => {
+        finishLoad = resolve;
+      });
+    }
+  }
+  const app = {
+    setPath() {},
+    whenReady: async () => {},
+    exit(code: number) {
+      exits.push(code);
+    },
+  };
+  const pending = showBackupProgress({ app, BrowserWindow: Window }, channel);
+  await loading;
+  channel.connected = false;
+  channel.emit("disconnect");
+  expect(exits).toEqual([1]);
+  finishLoad();
+  await pending;
+  expect(messages).toEqual([]);
+});
+
+it("does not treat kill errors as exit after a successful backup", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  const signals: string[] = [];
+  let profile = "";
+  const child = Object.assign(new EventEmitter(), {
+    pid: process.pid,
+    connected: true,
+    send() {},
+    kill(signal: string) {
+      signals.push(signal);
+      this.emit("error", Object.assign(new Error("kill EPERM"), { code: "EPERM" }));
+      return false;
+    },
+    disconnect() {
+      this.connected = false;
+    },
+    unref() {},
+  });
+  await expect(
+    prepareWithProgress(state, "0.2.2-rc.1", {
+      launch: (_exe: string, _args: string[], options: { env: { KAITU_PROGRESS_PROFILE: string } }) => {
+        profile = options.env.KAITU_PROGRESS_PROFILE;
+        roots.push(profile);
+        queueMicrotask(() => child.emit("message", { ready: true }));
+        return child;
+      },
+      stopTimeoutMs: 5,
+    }),
+  ).rejects.toThrow("无法退出");
+  expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
+  expect(existsSync(profile)).toBe(true);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(true);
+});
+
+it("cleans a failed spawn without waiting for an exit event that cannot occur", async () => {
+  const { root, state } = fixture();
+  const source = fileURLToPath(new URL("..", import.meta.url));
+  cpSync(join(source, "state-backup.mjs"), join(root, "kaitu-state-backup.mjs"));
+  cpSync(join(source, "backup-progress.mjs"), join(root, "backup-progress.mjs"));
+  const { prepareWithProgress } = await import(join(root, "backup-progress.mjs"));
+  let profile = "";
+  const child = Object.assign(new EventEmitter(), {
+    connected: false,
+    kill() {
+      throw new Error("must not kill an unspawned child");
+    },
+  });
+  await expect(
+    prepareWithProgress(state, "0.2.2-rc.1", {
+      launch: (_exe: string, _args: string[], options: { env: { KAITU_PROGRESS_PROFILE: string } }) => {
+        profile = options.env.KAITU_PROGRESS_PROFILE;
+        roots.push(profile);
+        queueMicrotask(() =>
+          child.emit("error", Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" })),
+        );
+        return child;
+      },
+      stopTimeoutMs: 5,
+    }),
+  ).rejects.toThrow("已关闭");
+  expect(existsSync(profile)).toBe(false);
+  expect(existsSync(join(state, "dsh-upgrade.json"))).toBe(false);
 });

@@ -2,23 +2,35 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { BrowserWindow, Menu, app, dialog, shell } from "electron";
+import { prepareWithProgress, showBackupProgress } from "../kaitu-backup-progress.mjs";
 import { DSH_VERSION, rollback, selectPayload } from "../kaitu-loader.mjs";
-import { backupStateRoot, prepareDshState } from "../kaitu-state-backup.mjs";
+import { backupStateRoot } from "../kaitu-state-backup.mjs";
 import { desktopPaths } from "./kaitu-environment.mjs";
 
 // 在原主进程导入和单实例锁之前设置，包括 Electron 的 relaunch 路径。
-const { state } = desktopPaths();
+const progressOnly = process.env.KAITU_BACKUP_PROGRESS === "1";
+const { state } = progressOnly ? { state: null } : desktopPaths();
 process.env.KAITU_HOST_RESOURCES = process.resourcesPath;
 const embedded = process.env.KAITU_EMBEDDED_AI === "1";
-process.env.DSH_HOME = state;
+if (state) process.env.DSH_HOME = state;
 app.setName("人生开图");
 // Do not await Electron readiness at module top level: ready follows ESM evaluation.
-void boot();
-
-async function boot() {
+if (progressOnly) {
+  void showBackupProgress({ app, BrowserWindow });
+} else {
+  // The progress window lives in another process: waiting here cannot deadlock its ready event.
+  // Keep this host before-ready until preflight completes, including embedded DSH startup.
+  let failure;
   try {
-    prepareDshState(backupStateRoot(state, process.env.KAITU_BACKUP_ROOT), DSH_VERSION);
+    await prepareWithProgress(backupStateRoot(state, process.env.KAITU_BACKUP_ROOT), DSH_VERSION);
   } catch (error) {
+    failure = error;
+  }
+  void boot(failure);
+}
+
+async function boot(error) {
+  if (error) {
     // Never fall through to payload initialization or DSH after a failed preflight.
     await app.whenReady();
     dialog.showErrorBox("开图内核升级未完成 / Kaitu engine upgrade stopped", String(error));
