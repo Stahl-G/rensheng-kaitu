@@ -99,6 +99,7 @@ import {
   moveWorkspace,
   normalizeLocale,
   onboardingStatus,
+  organizerStatus,
   pasteDirections,
   pasteOnboardingMatter,
   previewExperienceBatch,
@@ -154,6 +155,7 @@ import {
   scheduleNext,
   searchLibraryNotes,
   selectMediaLibrary,
+  selectPhoneConsumer,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -560,6 +562,12 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("setFinanceAccess")
   async setFinanceAccess(id: AgentConnectionId, allowed: boolean): Promise<FinanceAccess> {
     return this.write(() => Promise.resolve(setFinanceAccess(this.workspace, id, allowed)));
+  }
+
+  @Remote("selectPhoneConsumer")
+  async selectPhoneConsumer(deviceId: string): Promise<OrganizerStatus> {
+    selectPhoneConsumer(this.workspace, deviceId);
+    return organizerStatus(this.workspace);
   }
 
   @Remote("organizerSeen")

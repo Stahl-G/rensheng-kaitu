@@ -16,7 +16,7 @@ import {
   updateRecord,
 } from "../src/index.js";
 import { applyPhoneActions } from "../src/phone-actions.js";
-import { phoneReceipts } from "../src/phone-receipts.js";
+import { phoneReceipts, writePhoneReceipts } from "../src/phone-receipts.js";
 import {
   type ResultRequest,
   applyResultAction,
@@ -357,6 +357,10 @@ it("recovers task writes and lost receipts with the original ID; adopts/cancels 
   });
   unavailable.mockRestore();
   expect(phoneReceipts(ws).some((row) => row.ref === unknownAction.client_id)).toBe(false);
+  // Another consumer can report a conflict while this local append is still unconfirmed.
+  writePhoneReceipts(ws, [
+    { ref: unknownAction.client_id, kind: "action", status: "conflict", at: new Date().toISOString() },
+  ]);
   expect(readRecordRevisions(ws, "task").filter((row) => row.id === uncertain.record.id)).toHaveLength(2);
   await applyPhoneActions(new Workspace(ws.root), "unknown.actions.jsonl", unknownPayload);
   expect(phoneReceipts(ws).find((row) => row.ref === unknownAction.client_id)?.status).toBe("applied");
@@ -410,3 +414,108 @@ it("recovers task writes and lost receipts with the original ID; adopts/cancels 
   ).rejects.toMatchObject({ code: "CONFLICT" });
   expect(readRecordRevisions(ws, "task").filter((row) => row.id === conflicted.record.id)).toHaveLength(3);
 });
+
+it.each([false, true])(
+  "review: synced applied receipt blocks replay after undo, local pending journal=%s",
+  async (pending) => {
+    const ws = await workspace();
+    const before = status(ws);
+    const complete = request("complete_next_result", {
+      file: statusFile,
+      id: "one",
+      expected_next: before,
+      result_text: "Done",
+    });
+    const journalPath = `.kaitu/result-actions/${complete.client_id}.json`;
+    let pendingBytes: string | undefined;
+    if (pending) {
+      const write = ws.writeJson.bind(ws);
+      const spy = vi.spyOn(ws, "writeJson").mockImplementation((path, value, options) => {
+        const result = write(path, value, options);
+        if (path === journalPath) throw new Error("synthetic process interruption after first journal save");
+        return result;
+      });
+      await expect(applyResultAction(ws, complete)).rejects.toThrow("synthetic process interruption");
+      spy.mockRestore();
+      pendingBytes = ws.readText(journalPath);
+      rmSync(ws.resolve(journalPath, { internal: true }), { force: true });
+    }
+    const send = (action: ResultRequest) =>
+      applyPhoneActions(
+        ws,
+        `ios-12345678-${action.client_id}.actions.jsonl`,
+        JSON.stringify({ ...action, device: "12345678", at: new Date().toISOString() }),
+      );
+    await send(complete);
+    const applied = phoneReceipts(ws).find((r) => r.ref === complete.client_id);
+    if (!applied?.effect) throw new Error("Expected completion receipt");
+    const effect = applied.effect as {
+      expected_next: Record<string, unknown>;
+      prior_next: Record<string, unknown>;
+    };
+    await send(
+      request("restore_next", {
+        file: statusFile,
+        id: "one",
+        expected_next: effect.expected_next,
+        prior_next: effect.prior_next,
+      }),
+    );
+    expect(
+      parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
+    ).toBe("todo");
+    rmSync(ws.resolve(".kaitu/result-actions", { internal: true }), { recursive: true, force: true });
+    rmSync(ws.resolve(".kaitu/phone-actions.json", { internal: true }), { force: true });
+    if (pendingBytes) {
+      const changed = { ...complete, args: { ...complete.args, result_text: "Different content first" } };
+      const line = JSON.stringify({ ...complete, device: "12345678", at: new Date().toISOString() });
+      for (const invalid of ["content", "multiple", "operation"]) {
+        ws.writeText(journalPath, pendingBytes, { internal: true });
+        writePhoneReceipts(ws, [applied]);
+        if (invalid === "content") await send(changed);
+        else if (invalid === "multiple")
+          await applyPhoneActions(ws, "mixed.actions.jsonl", `${line}\n${line}`);
+        else
+          await applyPhoneActions(
+            ws,
+            "changed.actions.jsonl",
+            JSON.stringify({
+              ...complete,
+              op: "complete_next",
+              device: "12345678",
+              at: new Date().toISOString(),
+            }),
+          );
+        expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe(
+          invalid === "multiple" ? "rejected" : "conflict",
+        );
+        await send(complete);
+        expect(
+          parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
+        ).toBe("todo");
+        expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("duplicate");
+      }
+    }
+    if (!pendingBytes) {
+      await send({ ...complete, args: { ...complete.args, result_text: "Different content first" } });
+      expect(ws.exists(journalPath)).toBe(false);
+    }
+    await send(complete);
+    const actual = {
+      status: parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
+      receipt: phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status,
+    };
+    console.log("replay-review", { pending, ...actual });
+    expect(actual).toEqual({ status: "todo", receipt: "duplicate" });
+    // Known local requests remain bound; shared ID-only receipts do not invent a payload binding.
+    await send({ ...complete, args: { ...complete.args, result_text: "Different content" } });
+    expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe(
+      pending ? "conflict" : "duplicate",
+    );
+    await send(complete);
+    expect(
+      parseFrontmatter<{ next: { status: string }[] }>(ws.readText(statusFile)).data.next[0].status,
+    ).toBe("todo");
+    expect(phoneReceipts(ws).find((r) => r.ref === complete.client_id)?.status).toBe("duplicate");
+  },
+);

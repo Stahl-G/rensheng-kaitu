@@ -66,6 +66,59 @@ const rev = (row: StoredRecord) => row.rev ?? 1;
 export function hasResultAction(ws: Workspace, id: string): boolean {
   return /^[0-9A-HJKMNP-TV-Z]{26}$/.test(id) && ws.exists(actionFile(id));
 }
+/** Recover the bound request so callers can honor a shared receipt without losing ID checks. */
+export function resultActionRequest(ws: Workspace, id: string): ResultRequest | undefined {
+  return hasResultAction(ws, id) ? ws.readJson<Pending>(actionFile(id)).request : undefined;
+}
+/** Existing terminal result only; pending plans still require reconciliation. */
+export function resultActionStatus(ws: Workspace, id: string): Pending["status"] {
+  return hasResultAction(ws, id) ? ws.readJson<Pending>(actionFile(id)).status : undefined;
+}
+/** A STATUS effect includes enough content to check the original transition; task effects do not. */
+function matchesRequest(request: ResultRequest, effect: ResultEffect): boolean {
+  const { op, args } = request;
+  if (!("expected_next" in effect) || effect.file !== args.file || effect.id !== args.id) return false;
+  if (!isDeepStrictEqual(effect.prior_next, args.expected_next)) return false;
+  if (op === "restore_next") return isDeepStrictEqual(effect.expected_next, args.prior_next);
+  if (op !== "complete_next_result" || !args.expected_next || args.expected_next.status !== "todo")
+    return false;
+  const completed = effect.expected_next.completed;
+  return (
+    typeof completed === "string" &&
+    Number.isFinite(Date.parse(completed)) &&
+    isDeepStrictEqual(effect.expected_next, {
+      ...args.expected_next,
+      status: "done",
+      result: args.result_text,
+      completed,
+    })
+  );
+}
+/** Never pair a remote effect with an unverified locally bound request. */
+export function acknowledgeResultAction(
+  ws: Workspace,
+  request: ResultRequest,
+  effect: ResultEffect,
+): boolean {
+  const existing = ws.readJson<Pending>(actionFile(request.client_id));
+  if (!existing || !isDeepStrictEqual(existing.request, request)) throw conflict();
+  if (existing.status === "applied") return isDeepStrictEqual(existing.effect, effect);
+  if (!matchesRequest(request, effect)) {
+    // The ID is known to have executed elsewhere. Preserve that fact without fabricating a binding.
+    save(ws, {
+      request,
+      at: new Date().toISOString(),
+      status: "conflict",
+      code: "CONFLICT",
+      message:
+        "远端已处理此编号，但无法核对原请求；请回读资料 / Remote ID handled; original request cannot be verified. Refresh data.",
+    });
+    return false;
+  }
+  save(ws, { request, at: new Date().toISOString(), status: "applied", effect });
+  return true;
+}
+
 function save(ws: Workspace, pending: Pending) {
   ws.writeJson(actionFile(pending.request.client_id), pending, { internal: true, mode: 0o600 });
 }

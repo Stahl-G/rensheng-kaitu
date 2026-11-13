@@ -83,6 +83,7 @@ import {
   moveWorkspace,
   normalizeLocale,
   onboardingStatus,
+  organizerStatus,
   pasteDirections,
   pasteOnboardingMatter,
   pick,
@@ -146,6 +147,7 @@ import {
   scheduleNext,
   searchLibraryNotes,
   selectMediaLibrary,
+  selectPhoneConsumer,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -179,6 +181,7 @@ export const productMutations = new Set([
   "learningStart",
   "learningSave",
   "organizerSeen",
+  "selectPhoneConsumer",
   "workspaceBackup",
   "askModels",
   "projectCreate",
@@ -276,6 +279,10 @@ export async function productRequest(
       by: "user",
       expected: args[2] as MemoryExpectation,
     });
+  if (method === "selectPhoneConsumer") {
+    selectPhoneConsumer(ws, text(0));
+    return organizerStatus(ws);
+  }
   if (method === "organizerSeen") return markOrganizerSeen(ws);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {

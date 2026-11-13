@@ -421,6 +421,11 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
+              selectPhoneConsumer: async (deviceId: string) => {
+                const r = await ctx.remote.kaitu.selectPhoneConsumer(deviceId);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
               organizerSeen: async () => {
                 const r = await ctx.remote.kaitu.organizerSeen();
                 if (!r.ok) throw new Error(r.error.message);
