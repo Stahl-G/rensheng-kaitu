@@ -29,7 +29,6 @@ interface OrganizerState {
   consumer?: { deviceId: string; otherDeviceId?: string; selectedDeviceId?: string };
 }
 const file = ".kaitu/organizer.json";
-const states = new WeakMap<Workspace, { root: string; value: OrganizerState }>();
 const events = new WeakMap<Workspace, EventEmitter>();
 export function subscribeOrganizer(ws: Workspace, notify: () => void) {
   let emitter = events.get(ws);
@@ -42,15 +41,13 @@ export function subscribeOrganizer(ws: Workspace, notify: () => void) {
     emitter.off("change", notify);
   };
 }
-function state(ws: Workspace) {
-  const hit = states.get(ws);
-  if (hit?.root === ws.root) return hit.value;
-  const value: OrganizerState = ws.exists(file)
-    ? ws.readJson(file)
-    : { agent: null, daily: null, visits: [] };
-  states.set(ws, { root: ws.root, value });
-  return value;
+function state(ws: Workspace): OrganizerState {
+  // Multiple services use separate Workspace instances for the same local state.
+  // Always read before a synchronous update, including non-consumer updates.
+  // This is not a cross-process lock or a sync-folder concurrency guarantee.
+  return ws.exists(file) ? ws.readJson<OrganizerState>(file) : { agent: null, daily: null, visits: [] };
 }
+
 function store(ws: Workspace, value: OrganizerState) {
   ws.writeJson(file, value, { internal: true });
   events.get(ws)?.emit("change");
@@ -78,11 +75,6 @@ const devicePattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 /** Per-workspace pseudonymous identity, not an ownership lock or action ledger. */
 export function phoneConsumerStatus(ws: Workspace) {
   const s = state(ws);
-  // The worker and settings service can hold different Workspace instances.
-  if (ws.exists(file)) {
-    const persisted = ws.readJson<OrganizerState>(file).consumer;
-    if (persisted && devicePattern.test(persisted.deviceId)) s.consumer = persisted;
-  }
   if (!s.consumer) {
     s.consumer = { deviceId: randomUUID() };
     store(ws, s);
