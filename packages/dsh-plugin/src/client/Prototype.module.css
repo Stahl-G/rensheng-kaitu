@@ -1,36 +1,36 @@
 .app {
   --bg: #f2f1ed;
   --surface: #ffffff;
-  --sunken: #eceff2;
-  --control: #e9edf2;
-  --line: #dfe4e8;
-  --line-strong: #c8cfd8;
-  --ink: #20221f;
-  --ink2: #595e56;
-  --muted: #656b60;
-  --link: #2b4c7e;
-  --link-soft: #edf1f7;
-  --link-line: rgba(43, 76, 126, 0.26);
-  --primary: #22324a;
-  --on-primary: #f7f5f0;
-  --primary-hover: #2e4263;
-  --strong: #22324a;
-  --on-strong: #f7f5f0;
+  --sunken: #ecebe5;
+  --control: #e9e8e3;
+  --line: #e2e0d9;
+  --line-strong: #cfcdc5;
+  --ink: #1a1b19;
+  --ink2: #474944;
+  --muted: #6a6c66;
+  --link: #1b3f94;
+  --link-soft: #e4eaf6;
+  --link-line: rgba(27, 63, 148, 0.28);
+  --primary: #1b3f94;
+  --on-primary: #ffffff;
+  --primary-hover: #16347c;
+  --strong: #1b3f94;
+  --on-strong: #ffffff;
   --secondary: #ffffff;
-  --secondary-line: #c8cfd8;
-  --ask: #e9edf2;
-  --ask-line: #dfe4e8;
+  --secondary-line: #cfcdc5;
+  --ask: #e9e8e3;
+  --ask-line: #e2e0d9;
   --scrim: rgba(32, 34, 31, 0.42);
   --danger: #9b3a2e;
   --ok: #2e5d4a;
-  --health: #4e7a5e;
+  --health: #3e7d57;
   --health-tint: #e8ede4;
   --health-ink: #2f5a40;
-  --doing: #4a6a8f;
-  --doing-tint: #edf1f7;
+  --doing: #1b3f94;
+  --doing-tint: #e4eaf6;
   --doing-ink: #344e6e;
   --explore: #1f3550;
-  --explore-tint: #edf1f7;
+  --explore-tint: #e4eaf6;
   --explore-ink: #1f3550;
   --news: #9a6b2f;
   --news-tint: #f1ebdd;
@@ -41,7 +41,7 @@
   --me: #9c5b73;
   --me-tint: #f3e8ec;
   --me-ink: #7a3f57;
-  --empty: #e9edf2;
+  --empty: #e9e8e3;
   --map-land: #f1eee4;
   --map-sea: #e4eae3;
   --map-grid: #d5d9ce;
@@ -51,6 +51,10 @@
   --mark-1: #2b4c7e;
   --mark-2: #e8dfcc;
   --mark-route: #ffffff;
+  --now: #d23f27;
+  --now-ink: #b8351f;
+  --mark: #ffe66b;
+  --pencil: #5b5d58;
   --sky-dim: 1;
 }
 @media (prefers-color-scheme: dark) {
@@ -107,6 +111,10 @@
     --mark-1: #5c7daa;
     --mark-2: #cfc4ad;
     --mark-route: #ece6da;
+    --now: #e8705a;
+    --now-ink: #f0907c;
+    --mark: rgba(255, 230, 107, 0.3);
+    --pencil: #a9aba4;
     --sky-dim: 0.78;
     color-scheme: dark;
   }
@@ -164,6 +172,10 @@
   --mark-1: #5c7daa;
   --mark-2: #cfc4ad;
   --mark-route: #ece6da;
+  --now: #e8705a;
+  --now-ink: #f0907c;
+  --mark: rgba(255, 230, 107, 0.3);
+  --pencil: #a9aba4;
   --sky-dim: 0.78;
   color-scheme: dark;
 }

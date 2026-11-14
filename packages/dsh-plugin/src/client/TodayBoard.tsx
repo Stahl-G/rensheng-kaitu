@@ -288,7 +288,7 @@ export function TodayBoard({
               {canAsk && (
                 <button
                   type="button"
-                  className={css.link}
+                  className={styles.askSoft}
                   onClick={() =>
                     ask(
                       t(
