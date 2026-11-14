@@ -86,7 +86,7 @@ Kaitu.app 的 `local.mjs` 与 `kaitu ui` 共用 `packages/cli/src/ui/server.ts`�
 | `*.digest.md`（frontmatter 含 `date`） | 按来源合并到 `feed/digests/<date>.md`；同一来源重交替换自己的小节 |
 | `*.records.jsonl`（每行 `{"type": "...", ...}`） | 逐条 `record add`，整批一个版本 |
 | `*.memory.json`（候选记忆数组） | `memory import`，整批一个版本 |
-| `*.proposal.json`（`title`、`start`、`end`、`module?`） | 追加到今天 NOW.md 的 proposal，等人在工作台确认 |
+| `*.proposal.json`（`title`、`start`、`end`、`module?`、`date?`） | 追加到今天 NOW.md 的 proposal，等人在工作台确认；可选 date 为工作区当地 YYYY-MM-DD，仅用于核对，不自动安排其他日期 |
 
 版本说明带来源，如「Agent（Drive 收件箱：grok-bot）写入了今天的动态简报」；来源取文件 frontmatter / 字段里的 `agent`，没有就写「云端 Agent」。不接受删除、恢复、改规则与目标。
 
@@ -158,3 +158,5 @@ Mac 端把该文件夹的绝对路径写进 `.kaitu/config.json` 的 `health_inb
 3. 在 Grok Bot / ChatGPT（Dots）里连 Google Drive，让它读 `kaitu-test/OVERVIEW.md` 并复述今天的待确认事项。
 4. 让它在 `kaitu-test/inbox/agents/` 新建一份 `*.digest.md` 和一份 `*.records.jsonl`，确认本机开图处理后：数据写入、生成带来源的版本、原件移到 `processed/`。
 5. 测完 `kaitu drive disable` 并删除 Drive 上的 `kaitu-test/`。
+
+日程建议的 `date` 或标题里的完整 ISO 日期（YYYY-MM-DD）若不是工作区的今天，或无效、互相矛盾，原文转入现有待整理笔记，不改写今天计划。标题里的日期只作为保守阻断线索，不推断具体行程；引用其他日期的背景也可能需要人工核对。完全没有日期线索的旧格式仍按今天处理，无法可靠识别其是否延迟投递。此检查只影响新导入，不修改已经存在的计划或私人资料。
