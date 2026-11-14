@@ -70,7 +70,9 @@ describe("init / doctor / validate", () => {
     });
     expect(validateWorkspace(ws)).toEqual([]);
     const { addRecord } = await import("../src/index.js");
-    expect(addRecord(ws, "book", { title: "置身事内" }).file).toBe("books/data/2026-10.jsonl");
+    expect(addRecord(ws, "book", { title: "置身事内" }, { now: new Date("2026-10-15T00:00:00Z") }).file).toBe(
+      "books/data/2026-10.jsonl",
+    );
     expect(() => addRecord(ws, "book", { author: "x" })).toThrow(/title/);
   });
 

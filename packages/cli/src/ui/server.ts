@@ -6,7 +6,7 @@ import { extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PhoneService } from "@kaitu/channels";
 import { CollectorService } from "@kaitu/channels/collectors";
-import { createHomeCache } from "@kaitu/core";
+import { createHomeCache, phoneReadable } from "@kaitu/core";
 import { startPhoneSnapshots } from "@kaitu/core";
 import {
   type CalendarExecutor,
@@ -42,6 +42,7 @@ import {
   invalidateWorkspaceBackup,
   normalizeLocale,
   onboardingStatus,
+  pauseNoteIndex,
   pick,
   processInbox,
   pullCalendarSubscriptions,
@@ -53,6 +54,7 @@ import {
   renderTeachingFrame,
   resolvePreferences,
   restore,
+  resumeNoteIndex,
   snapshotNow,
   stageUpload,
   startProjectGithubSync,
@@ -88,6 +90,7 @@ export interface UiOptions {
   openAi?: () => Promise<{ url?: string }>;
   pickDirectory?: () => Promise<string | null>;
   desktopUpdate?: (action: string) => Promise<unknown>;
+  privacyNotice?: () => Promise<unknown>;
   speech?: (action: string, locale?: string) => Promise<unknown>;
   /** 开图 App 的插件：list、install、remove、open（打开 DSH 窗口里的插件页面）。 */
   plugins?: (action: string, input?: string) => Promise<unknown>;
@@ -269,6 +272,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
   let closed = false;
   let watchError = "";
   let polling: ReturnType<typeof setTimeout> | undefined;
+  let pollPending: Promise<void> = Promise.resolve();
   let stamps = new Map<string, string>();
   let pollingAbort: AbortController | undefined;
   const versionDelay = options.versionDelayMs ?? 2000;
@@ -300,13 +304,19 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       client.write(`data: ${JSON.stringify({ changed: true, error: watchError || undefined })}\n\n`);
   };
   let stopAtlas = subscribeLifeAtlas(ws, notify);
-  const home = createHomeCache(ws, notify, { write: exclusive, report: () => reportError() });
+  // 与下面的 startPhoneSnapshots 必须紧邻、同步；其他后台写入在两者之后启动。
+  const home = createHomeCache(ws, notify, {
+    write: exclusive,
+    report: () => reportError(),
+    shareStartupChecks: phoneReadable(ws),
+  });
+  // 共享检查只限本次同步启动窗口；微任务后读数失效，后续检查重新读取原件。
+  let stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive, home.startupChecks);
   let atlasRoot = ws.root;
   const stopBackup = startWorkspaceBackup(ws, notify);
   const stopProjectSync = startProjectGithubSync(ws, notify);
   const weather = startWeatherSync(notify);
   const stopOrganizer = subscribeOrganizer(ws, notify);
-  const stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive);
   void pullCalendars().catch(() => {});
   const reportError = () => {
     watchError = "自动保存暂时失败，请检查文件夹权限或使用 Agent 手动保存版本。";
@@ -406,6 +416,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     scheduleSave(messages.length ? versionDelay : snapshotDelay);
   }
   let watcher: FSWatcher | undefined;
+  let watchingPaused = false;
   let externalWatchers: FSWatcher[] = [];
   // 备份状态可能在工作区外（同步盘模式），命令行改了它，界面也要更新。
   const backupState = ws.resolve(".kaitu/workspace-backup.json", { internal: true });
@@ -421,6 +432,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     polling = undefined;
   };
   const startPolling = () => {
+    if (closed || watchingPaused) return;
     watcher?.close();
     if (pollingAbort) return;
     // 部分受限系统不提供文件事件，保留相同的刷新和版本语义。
@@ -452,30 +464,68 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       } finally {
         // One scan at a time; a stopped watcher cannot schedule another scan.
         if (!closed && !controller.signal.aborted)
-          polling = setTimeout(() => void poll(), Math.max(delay, performance.now() - started));
+          polling = setTimeout(
+            () => {
+              pollPending = poll();
+            },
+            Math.max(delay, performance.now() - started),
+          );
       }
     }
-    void poll();
+    pollPending = poll();
   };
+  function stopWatching() {
+    watchingPaused = true;
+    watcher?.close();
+    watcher = undefined;
+    stopPolling();
+    for (const external of externalWatchers) external.close();
+    externalWatchers = [];
+  }
+  async function pauseWatching() {
+    stopWatching();
+    await stopPhone();
+    await home.pause();
+    await pauseNoteIndex(ws);
+    await pollPending;
+  }
+  async function resumeWatching() {
+    if (closed) {
+      await disposeNoteIndex(ws);
+      return;
+    }
+    if (!watchingPaused) return;
+    try {
+      startWatching();
+      changedFile("工作区", false);
+    } finally {
+      resumeNoteIndex(ws);
+      home.resume();
+      stopPhone = startPhoneSnapshots(ws, () => reportError(), exclusive);
+    }
+  }
   function startWatching() {
+    stopWatching();
+    if (closed) return;
+    watchingPaused = false;
     if (atlasRoot !== ws.root) {
       stopAtlas();
       stopAtlas = subscribeLifeAtlas(ws, notify);
       atlasRoot = ws.root;
     }
-    watcher?.close();
-    stopPolling();
     try {
-      watcher = watch(ws.root, { recursive: true }, (_event, filename) => {
+      const active = watch(ws.root, { recursive: true }, (_event, filename) => {
+        if (watchingPaused) return;
         changedFile(filename?.toString().replaceAll("\\", "/") ?? "工作区");
       });
-      watcher.on("error", startPolling);
+      watcher = active;
+      active.on("error", () => {
+        if (watcher === active) startPolling();
+      });
     } catch {
       startPolling();
     }
     // 外部健康收件箱（iCloud Drive 等）：文件事件触发一轮拉取
-    for (const external of externalWatchers) external.close();
-    externalWatchers = [];
     for (const dir of externalHealthPaths(ws)) {
       try {
         const external = watch(dir, () => scheduleInbox());
@@ -565,6 +615,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           );
         }
         if (method === "preferences" && options.systemLocale) args[0] = options.systemLocale;
+        if (method === "privacyNotice")
+          return json(res, 200, options.privacyNotice ? await options.privacyNotice() : null);
         if (method === "desktopUpdate")
           return json(
             res,
@@ -653,19 +705,19 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                       const target = opening ? (args[1] as { root?: unknown } | undefined)?.root : undefined;
                       await options.ask?.prepareRelocation(typeof target === "string" ? target : undefined);
                       await phones.stop();
-                      await home.pause();
-                      const oldRoot = ws.root;
                       try {
+                        await pauseWatching();
                         if (relocate) await options.onWorkspaceChanging?.();
                         return await productRequest(ws, method, args, options.ask, calendarPush);
                       } finally {
                         try {
-                          if (ws.root !== oldRoot) startWatching();
-                          if (relocate) await options.onWorkspaceChanged?.();
+                          await resumeWatching();
+                          if (relocate && !closed) await options.onWorkspaceChanged?.();
                         } finally {
-                          home.resume();
-                          options.ask?.relocate(ws.root);
-                          phones.start();
+                          if (!closed) {
+                            options.ask?.relocate(ws.root);
+                            phones.start();
+                          }
                           notify();
                         }
                       }
@@ -825,6 +877,7 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               await phones.stop();
               const oldRoot = ws.root;
               try {
+                await pauseWatching();
                 await options.onWorkspaceChanging?.();
                 if (!url.pathname.endsWith("enable"))
                   return await disableSync(ws, {
@@ -846,16 +899,18 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
                 });
               } finally {
                 try {
-                  startWatching();
+                  await resumeWatching();
                   if (ws.root !== oldRoot) {
                     aiChild?.kill();
                     aiChild = undefined;
                     aiReady = undefined;
                   }
-                  await options.onWorkspaceChanged?.();
+                  if (!closed) await options.onWorkspaceChanged?.();
                 } finally {
-                  options.ask?.relocate(ws.root);
-                  phones.start();
+                  if (!closed) {
+                    options.ask?.relocate(ws.root);
+                    phones.start();
+                  }
                 }
               }
             });
@@ -886,10 +941,17 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
               await options.ask?.prepareRelocation();
               await phones.stop();
               try {
+                await pauseWatching();
                 return await restore(ws, field(data, "version"));
               } finally {
-                options.ask?.relocate(ws.root);
-                phones.start();
+                try {
+                  await resumeWatching();
+                } finally {
+                  if (!closed) {
+                    options.ask?.relocate(ws.root);
+                    phones.start();
+                  }
+                }
               }
             });
           }
@@ -979,14 +1041,12 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     }
     closed = true;
     cancelGithubCliLogin();
-    watcher?.close();
+    stopWatching();
     unwatchFile(backupState, backupChanged);
-    for (const external of externalWatchers) external.close();
     clearTimeout(inboxTimer);
     clearTimeout(refreshTimer);
     clearTimeout(saveTimer);
     clearInterval(heartbeat);
-    stopPolling();
     for (const client of [...clients, ...askClients]) client.end();
     await phones.stop();
     await collectors.stop();
@@ -999,19 +1059,35 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
     clearInterval(calendarTimer);
     await options.ask?.close();
     files.dispose();
-    disposeNoteIndex(ws);
+    const errors: unknown[] = [];
+    try {
+      await disposeNoteIndex(ws);
+    } catch (error) {
+      errors.push(error);
+    }
     try {
       await exclusive(async () => {
         await calendarQueue;
         await saveExternal();
       });
-    } finally {
-      await home.close({ refresh: true });
+    } catch (error) {
+      errors.push(error);
     }
-    for (const upload of uploads.values()) discardUpload(ws, upload.file);
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    );
+    try {
+      await home.close({ refresh: true });
+      for (const upload of uploads.values()) discardUpload(ws, upload.file);
+    } catch (error) {
+      errors.push(error);
+    }
+    try {
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    } catch (error) {
+      errors.push(error);
+    }
+    if (errors.length > 1) throw new AggregateError(errors, "UI shutdown failed");
+    if (errors.length) throw errors[0];
   };
   try {
     await new Promise<void>((resolve, reject) => {

@@ -31,11 +31,13 @@ export interface PersonalServices
     FileImportServices,
     Pick<MediaServices, "loadMediaLocation" | "selectMediaLibrary"> {
   desktopUpdate?: FeatureUpdateRequest;
+  privacyNotice?: () => Promise<unknown>;
   /** 只有开图 App 有；DSH 插件版用 DSH 自己的插件管理。 */
   plugins?: PluginRequest;
   pluginOpenLabel?: readonly [string, string];
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
+  selectPhoneConsumer?: (deviceId: string) => Promise<OrganizerStatus>;
   organizerSeen?: () => Promise<OrganizerStatus>;
   workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
@@ -850,6 +852,16 @@ export function PersonalPages(
                   copy={(text) =>
                     run(() => navigator.clipboard.writeText(text), t("说明已复制", "Instructions copied"))
                   }
+                  selectConsumer={
+                    props.selectPhoneConsumer
+                      ? (deviceId) =>
+                          run(async () => {
+                            const organizer = await props.selectPhoneConsumer?.(deviceId);
+                            if (organizer)
+                              setData((current) => (current ? { ...current, organizer } : current));
+                          })
+                      : undefined
+                  }
                   seen={() =>
                     run(async () => {
                       const organizer = await props.organizerSeen?.();
@@ -1106,6 +1118,16 @@ export function PersonalPages(
               <section className={css.sec}>
                 <h2 className={css.eyebrow}>{t("关于", "About")}</h2>
                 {props.desktopUpdate && <FeatureUpdates request={props.desktopUpdate} />}
+                {props.privacyNotice && data.dshVersion && (
+                  <button
+                    type="button"
+                    className={css.link}
+                    disabled={busy}
+                    onClick={() => void run(async () => props.privacyNotice?.(), "")}
+                  >
+                    {t("隐私", "Privacy")}
+                  </button>
+                )}
                 <div className={`${css.small} ${settingsCss.buildInfo}`}>
                   <span>
                     {t("安装版本", "Installed build")} {data.version ?? t("本地工作台", "local workbench")}

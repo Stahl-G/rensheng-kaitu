@@ -239,11 +239,13 @@ it("开启同步后用原来的 {to} 关闭同步，两个关闭接口都能回�
       rmSync(back, { recursive: true, force: true });
     });
     const enabled = await post(enable, { ...body, dir: folder });
-    expect(enabled.status).toBe(200);
-    expect((await enabled.json()).mode).toBe("drive");
+    const enabledBody = await enabled.json();
+    expect(enabled.status, JSON.stringify({ route: enable, response: enabledBody })).toBe(200);
+    expect(enabledBody.mode).toBe("drive");
     const disabled = await post(disable, { to: join(back, "kaitu") });
-    expect(disabled.status).toBe(200);
-    expect((await disabled.json()).mode).toBe("local");
+    const disabledBody = await disabled.json();
+    expect(disabled.status, JSON.stringify({ route: disable, response: disabledBody })).toBe(200);
+    expect(disabledBody.mode).toBe("local");
     expect(ws.root).toBe(join(back, "kaitu"));
   }
 });

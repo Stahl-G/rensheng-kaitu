@@ -4,11 +4,13 @@ import { widgetMetaFrom } from "@kaitu/core/teaching-frame";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { OverviewData } from "../types.js";
 import { AiSettings } from "./AiSettings.js";
+import { AskEvidence } from "./AskEvidence.js";
 import css from "./AskPage.module.css";
 import { DocumentBody } from "./DocumentBody.js";
 import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
+import { askEvidence, toolFailed, toolIntent } from "./ask-evidence.js";
 import type { AskAutoSubmit, AskHandoffStatus } from "./ask-handoff.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
@@ -150,7 +152,7 @@ function Tool({
   const target = String(
     args.path ?? args.file_path ?? args.file ?? labels[name] ?? t("开图资料", "Kaitu files"),
   );
-  const reading = name in labels || /read|list|search|status|overview|get/.test(name);
+  const reading = toolIntent(name, args) === "read";
   const running = !result && !finished;
   return (
     <details className={css.tool}>
@@ -158,10 +160,13 @@ function Tool({
         <span className={`${css.dot} ${running ? css.pulse : ""}`} />
         {running
           ? t(`正在${reading ? "读" : "处理"} ${target}`, `${reading ? "Reading" : "Working on"} ${target}`)
-          : message?.isError
+          : toolFailed(result)
             ? t(`未完成 ${target}`, `Couldn’t complete ${target}`)
             : result
-              ? t(`${reading ? "读了" : "完成了"} ${target}`, `${reading ? "Read" : "Completed"} ${target}`)
+              ? t(
+                  `${reading ? "读了" : "已返回结果"} ${target}`,
+                  `${reading ? "Read" : "Returned a result for"} ${target}`,
+                )
               : t(`已中断 ${target}`, `Stopped ${target}`)}
       </summary>
       <pre>
@@ -280,7 +285,7 @@ export function AskPage({
   onConnections?: () => void;
   onToday?: () => void;
   onSettings?: (section: "ai" | "local-ai") => void;
-  onOrganize?: (source: string) => Promise<void>;
+  onOrganize?: (source: string, draft?: string) => Promise<void>;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -303,7 +308,13 @@ export function AskPage({
   useEffect(() => {
     if (!initialPrompt && !initialPromptRequest) return;
     if (initialPromptNewConversation) setSelected(null);
-    setDraft(initialPrompt);
+    setDraft((current) =>
+      initialPromptNewConversation || !current.trim()
+        ? initialPrompt
+        : current.includes(initialPrompt)
+          ? current
+          : `${current}\n\n${initialPrompt}`,
+    );
     const frame = requestAnimationFrame(() => {
       const field = input.current;
       field?.focus();
@@ -421,17 +432,27 @@ export function AskPage({
   const composing = useRef(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (active && loaded) input.current?.focus();
+  }, [active, loaded]);
   const activeSession = useRef<string | null>(null);
   const lastStatus = events.filter((event) => event.type === "session.status").at(-1);
   const busy = sending || lastStatus?.data.status === "running";
+  const draftOccupied = !!(
+    draft.trim() ||
+    attachments.length ||
+    sessionReferences.length ||
+    fileReferences.length ||
+    busy ||
+    readingFiles
+  );
   useEffect(() => {
     const guard = (event: Event) => {
-      if (draft.trim() || attachments.length || sessionReferences.length || busy || readingFiles)
-        event.preventDefault();
+      if (draftOccupied) event.preventDefault();
     };
     window.addEventListener("kaitu:before-ask-draft", guard);
     return () => window.removeEventListener("kaitu:before-ask-draft", guard);
-  }, [draft, attachments, sessionReferences, busy, readingFiles]);
+  }, [draftOccupied]);
   const referenceThreads = threads.filter(
     (thread) =>
       thread.id !== selected &&
@@ -761,10 +782,19 @@ export function AskPage({
   const handoffAttempt = useRef<string>();
   const [handoffRetry, setHandoffRetry] = useState(0);
   const [handoffState, setHandoffState] = useState<"sending" | "retry" | "uncertain" | "failed" | null>(null);
-  const organizeSaved = (source: string) => {
-    void onOrganize?.(source)
+  const organizing = useRef(false);
+  const [organizingDraft, setOrganizingDraft] = useState(false);
+  const organizeSaved = (source: string, text?: string) => {
+    if (!onOrganize || organizing.current) return;
+    organizing.current = true;
+    setOrganizingDraft(true);
+    void onOrganize(source, text)
       .then(() => setHandoffState(null))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+      .finally(() => {
+        organizing.current = false;
+        setOrganizingDraft(false);
+      });
   };
   const checkHandoff = useCallback(async () => {
     if (!autoSubmit) return;
@@ -1116,6 +1146,7 @@ export function AskPage({
     group(true);
     return { resolutions, groups };
   }, [events]);
+  const evidence = useMemo(() => askEvidence(events, busy), [events, busy]);
   const lastUser = events.findLastIndex((event) => event.type === "user/message");
   const waiting =
     busy &&
@@ -1137,7 +1168,7 @@ export function AskPage({
     );
   return (
     <div
-      className={`${css.chat} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
+      className={`${css.chat} ${evidence.length ? css.withEvidence : ""} ${loaded && !settings?.configured && !threads.length ? css.noKeyChat : ""} ${showThreads ? css.showThreads : ""}`}
     >
       <nav id="ask-threads" className={css.threads} aria-label={t("对话", "Conversations")}>
         <button
@@ -1204,11 +1235,12 @@ export function AskPage({
                   ? t("原文已保存", "Original saved")
                   : t("先接上一个 AI。", "Connect an AI first.")}
               </h1>
-              {autoSubmit && onOrganize && (
+              {(autoSubmit || draft.trim()) && onOrganize && (
                 <button
                   type="button"
                   className={css.routePrimary}
-                  onClick={() => organizeSaved(autoSubmit.capturedPath)}
+                  disabled={organizingDraft}
+                  onClick={() => organizeSaved(autoSubmit?.capturedPath ?? "", draft)}
                 >
                   {t("用其他 AI 整理", "Organize with another AI")}
                 </button>
@@ -1241,17 +1273,37 @@ export function AskPage({
                 </div>
               </section>
             </div>
-          ) : (
-            settings?.configured &&
-            !events.some((event) => event.type === "user/message") && (
-              <div className={css.welcome}>
+          ) : null}
+          {!selected && !events.some((event) => event.type === "user/message") && (
+            <div className={css.welcome}>
+              {settings?.configured && (
                 <h1>{t("从你正在推进的事聊起", "Start with what you’re working on")}</h1>
-                <div className={css.suggestions}>
-                  {questions.map((question) => (
+              )}
+              <div className={css.suggestions}>
+                <button
+                  type="button"
+                  disabled={draftOccupied}
+                  onClick={() => {
+                    if (draftOccupied) return;
+                    setDraft(
+                      t(
+                        "按 life-portrait 技能，为我生成人生开图",
+                        "Use the life-portrait skill to create my life portrait.",
+                      ),
+                    );
+                    input.current?.focus();
+                  }}
+                >
+                  {t("生成我的人生开图", "Create my life portrait")}
+                </button>
+                {settings?.configured &&
+                  questions.map((question) => (
                     <button
                       type="button"
                       key={question}
+                      disabled={draftOccupied}
                       onClick={() => {
+                        if (draftOccupied) return;
                         setDraft(question);
                         input.current?.focus();
                       }}
@@ -1259,9 +1311,8 @@ export function AskPage({
                       {question}
                     </button>
                   ))}
-                </div>
               </div>
-            )
+            </div>
           )}
           {events.map((event) => {
             const data = event.data;
@@ -1995,13 +2046,11 @@ export function AskPage({
           {settings?.configured
             ? localRuntime
               ? t("本机 Agent 按已批准的权限操作", "Local Agent uses the permissions you approve")
-              : t(
-                  "只读写允许的开图资料，不运行命令",
-                  "Reads and writes allowed Kaitu data; cannot run commands",
-                )
+              : t("资料范围：已允许的开图资料", "Data scope: allowed Kaitu files")
             : t("接上 AI 后才能发送", "Connect an AI before sending")}
         </p>
       </section>
+      <AskEvidence items={evidence} onToday={onToday} />
       <dialog
         ref={dialog}
         className={css.dialog}

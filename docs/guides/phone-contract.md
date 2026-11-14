@@ -59,12 +59,18 @@
 不满足返回 conflict；格式错误或未支持操作返回 rejected。
 操作 client_id 的处理账本留在本机状态目录，独立于十四天回执保留期，重启后仍去重；`phone/receipts.json` 里已有的 client_id（例如云端整理员处理过的）也算处理过。
 同一个 client_id 再投递不重复执行：第一次成功的返回 duplicate，第一次 conflict 或 rejected 的照原结果再返回。
-conflict 说明这一项已经在电脑上变了，不需要再到电脑上处理，所以不计入电脑今天页的「需要核对」；回执供手机撤回乐观显示并呈现原因。
+结果操作在另一台消费者上重投时，先核同步回执。已有 applied/duplicate 回执即不再写资料，即使本机残留未完成的恢复日志；没有本机原请求时沿用原 effect；已有本机请求时，只有能核对完整 STATUS 前后内容的成功结果才记入日志。可证不匹配或无法证明对应（task effect 不含结果正文或恢复目标）的 pending 请求以 conflict 结案，不绑定远端 effect，也不继续自动写入。已有本机成功记录不被不同远端 effect 改写；之后同 ID 不同内容仍为 conflict。另一消费者的 conflict/rejected 回执不能替本机未知写入结案，已有本机计划仍沿原 ID 核清。回执 effect 只描述当时的操作，不证明资料当前仍为 done，客户端必须回读当前数据。
+
+没有本机原请求时，共享回执只证明 client_id 已处理，不证明当前重试的参数等于原参数；返回 duplicate 只表示该 ID 不再执行，不创建当前请求与旧 effect 的绑定。回执未包含完整请求或摘要，跨消费者不能完整核验同 ID 的参数一致性；若要提供该保证，需要另行扩展协议，不能从 effect 反推。
+
+`.kaitu/result-actions` 仅为本机日志，不是跨设备共享账本。没有本机成功日志的新消费者只在同步回执仍保留时去重；十四天后回执已清理，以及回执尚未同步前的双消费者竞态，均不由此保证。这里没有新增所有权或分布式互斥。
+
+conflict 说明前提已变或远端结果无法对应原请求，不需要再到电脑上处理，所以不计入电脑今天页的「需要核对」；回执供手机撤回乐观显示并呈现原因。
 成功文件移到 processed，原文进入 notes；不合格记录附原因进入待整理笔记。
 
 ## GitHub 与同步文件夹
 
-GitHub 连接启用后，phone 四个 JSON 始终以本机为准上传，只有远端回执里本机没有的条目先并进本机；
+GitHub 连接启用后，phone 四个 JSON 始终以本机为准上传，远端未过期回执中本机没有的条目先并进本机；带 effect 的 applied/duplicate 可提升同 ID 的本机 conflict/rejected，反向不会降级成功。已过期远端回执不会先覆盖再清掉近期本机结果；
 agents 文本、health JSON 收件箱和 `inbox/notes/` 下的待整理原文始终双向同步，不受文字 / 结构化资料开关影响。电脑拉下新文件后，下一轮上传回执和快照；处理完的远端收件箱文件删除。
 网络期间本机文件有变化时保留本机内容，下轮重试。原有同记录冲突规则、Host / Origin 和 Agent / MCP 写入策略保留。
 
@@ -94,3 +100,53 @@ next可选source_precondition是所见目标条目原对象，complete_next.args
 
 开了饮食模块时，today 带 `nutrition: {version:1, kcal, protein_g, accounted_refs}`：kcal、protein_g 是 today 当天（按 timezone）所有饮食记录的合计；accounted_refs 是电脑已经入账的手机 `.records.jsonl` 文件名，撤回、替换过的也留着。
 手机显示时用这份合计，再加上本机确认过、但文件名不在 accounted_refs 里的饮食。没有 nutrition 或 version 不认识时，只显示本机确认的饮食。
+
+## 单行结果与短时撤销（result_contract 1）
+
+发送时同时检查新鲜 today 的 `mobile.result_contract === 1`、`mobile.actions` 包含动作，并保留客户端原有电脑快照水位检查。mobile.version 仍是 1。只看 adopt_task 名称不够：旧电脑已声明该名称却忽略 expected_rev，绝不退回无 CAS 的采纳。缺能力时保留原操作 ID、内容和草稿，等待兼容电脑，不改写为旧 complete_next/complete_task。
+
+`applyResultAction` 的 client_id 与手机一致，只接受 26 位 ULID；桌面旧 UUID 调用须改为 ULID，不会隐式转换，重试复用原 ULID。
+
+每个新操作一个独立 `.actions.jsonl` 文件，只含一行 JSON；同目标上一次未知结果未核清前不提交后续操作。重投必须沿用原 client_id 和全部原参数。不同内容重用 ID 返回 conflict。文件消失、文件级收件成功均不是动作已完成的证明。
+
+- `complete_next_result`：args `{file,id,result_text,expected_rev}`（task）或 `{file,id,result_text,expected_next}`（STATUS）。任务须 open，STATUS 须 todo，前提精确匹配才完成。结果允许空白，空白不计推进；新输入必须单行且最多 2000 字符，换行/超长显式 rejected，不截断不折叠。旧多行草稿保留待修改，用新 ID 提交修改后的操作；未知结果不得因此换 ID 重试。
+- `adopt_task`：args `{id,expected_rev}`，只把 proposed 采纳为 open；旧无 expected_rev 形式兼容既有入口，但新客户端不发送它。
+- `cancel_task`：args `{id,expected_rev}`，允许 open 或 proposed 变为 cancelled；建议的“不采用”复用此动作。
+- `restore_task_revision`：args `{id,expected_rev,prior_rev}`，仅在当前修订匹配时，把已有旧修订的内容追加为 rev+1，不重写历史。
+- `restore_next`：args `{file,id,expected_next,prior_next}`，只在当前目标条目完整等于 expected_next 时恢复 prior_next；其他条目、未知字段和正文保留。独立修改目标条目返回 conflict。
+
+成功/重复回执含 `effect`。task 为 `{file:"task",id,rev,prior_rev}`，STATUS 为 `{file,id,expected_next,prior_next}`。短时撤销提示把 effect 转成上面的恢复动作，分配新的 client_id。该回执不是永久撤销列表，mobile.results 不提供历史撤销。CLOUD_UNAVAILABLE、CORRUPT 等读取/存储故障不产生终态 conflict 回执；原文件与原 ID 保持未确认，修复后重试。I/O 结果未知保留本机持久请求与写前计划，重启重投原 ID；已写修订不再追加，已撤销操作不重放。STATUS 的前提是数据精确值，未知写入尚未沿原 ID 核清，外部工具就恢复为相同旧值的 ABA 无法从两个业务字段识别，不声称有来源所有权。
+
+例：`{"client_id":"01K00000000000000000000001","at":"2026-11-11T08:00:00Z","device":"3fa9c1d2","op":"complete_next_result","args":{"file":"task","id":"01K00000000000000000000002","expected_rev":1,"result_text":"完成初稿"}}`。
+回执 effect `{file:"task",id:"01K00000000000000000000002",rev:2,prior_rev:1}` 对应恢复 args `{id:"01K00000000000000000000002",expected_rev:2,prior_rev:1}`。
+
+任务继续用 notes 中的「完成结果：」「完成时间：」，来源链接与旧多行内容保留。STATUS 的 next 条目只增加可选 `result` 与 `completed`；completed 取名参考 [RFC 5545 §3.8.2.1 COMPLETED](https://www.rfc-editor.org/rfc/rfc5545#section-3.8.2.1)，存带时区的 ISO 8601；结果没有对应的专用 iCalendar 属性，采用普通 result。正文不增加机器块或 HTML 注释。
+
+只读总览按既有 warning 机制保留损坏任务文件里的可读行；历史不完整时不推断任务完成来源。发布 phone/today.json 仍严格核对源数据，损坏时保留上一份完整快照，不把部分数据覆盖成已同步。
+
+core 的 collectResults / resultActivityDays 同时给桌面 overview.results/resultActivityDays 和 phone.today.mobile.results/activity_days 提供数据，不依赖手机操作账本。只列当前有效非空完成结果，恢复为未完成后移出列表但历史仍在。按工作区本地时区，含今天的七个自然日去重；同日两条结果是两行、一天。task 追溯本次完成的修订来源，后续改标题/到期日不丢结果或把 Agent 完成升级成用户完成；任务旧结果缺有效带时区完成时间时保留原 notes 原文，不进入有日期的结果集合或七天日期。STATUS 显式 result+completed 计入日期，但没有作者字段，无法区分 AI 写入的显式结果，不能宣称排除了全部 AI 结果。
+
+旧候选的 results DTO 仍能读取 completion_id/file/id/title/text/completed_at/can_undo。这里 completion_id 是 `data:<编码file>:<编码id>` 显示键，不是原操作 ID，can_undo 恒为 false。新客户端只用 file+id 作为数据 identity，撤销只用回执 effect 和新动作，不能把显示键交给旧 undo_next_result。旧候选若发送多行结果，得到 rejected，保留原稿；不静默丢内容。
+
+旧 main 不认识 complete_next_result/restore_task_revision/restore_next，逐行拒绝后归档原文件；保留客户端原请求与 ID，升级后才能重投。旧主线混合文件可能已经执行其中合法行，同时给整个文件 rejected，不能宣称整文件未执行。新消费者不把未知动作解释成别的动作，原文件归档保留；若曾收到终态 conflict/rejected，修改后应使用新 ID，若仅有旧版文件级拒绝且证实目标未执行，可原 ID 重投。
+
+### 桌面结果输入的本机待处理状态
+
+桌面今天与目标结果共用上述结果集合和修订操作。活动点阵与天数只计用户结果，或来源未知的显式 STATUS 结果；损坏修订历史导致来源未知的 task 仍可显示，但不计活动。这个局部活动量不等于完整产品北极星。
+
+桌面通过 `resultDraft` 在 Workspace 已有 state binding 的 `.kaitu/result-draft.json` 保存未完成草稿和唯一未确认操作的原始 ULID、完整 payload、原文及展示目标。文件沿现有本机状态目录，以 0600 临时文件加原子 rename 写入；不写 `phone/`、用户事项字段或成功操作历史。整份前值作 CAS，丢失保存响应时先确认原保存，不能用后来的草稿覆盖另一窗口。独立 App 每次使用随机本机 HTTP 端口，因此不依赖浏览器 origin 的 localStorage 跨重启保留。
+
+加载失败时不覆盖原稿、不首次发送结果。原始待处理状态落盘成功后才调用结果操作；结果响应未知时保留同一 ID、payload 和草稿，阻止新操作，重启后仅加载，不自动重放。用户重试后再回读共享投影。`duplicate` 只确认原请求已执行，不表示其旧 effect 现在仍生效，不重建完成提示或 Undo。
+
+确认 applied 后，只清除仍与本次文字相同的完成草稿。刚完成/决定的 Undo 只保留五秒内存提示；离页、切工作区或重启后不恢复，原异步响应也不能重新显示已离开的提示。Undo 使用新 ULID 与原 effect 的数据前提恢复，冲突保留后来的编辑；不接管全局 Cmd-Z。先前完成原文在这五秒内用于恢复输入，成功建议的状态文案不成为结果草稿。
+
+STATUS 的外部 ABA 限制仍适用：原结果未知期间，条目被外部改走又逐字改回，只有两个结果字段不能完整识别。正常确认完成、Undo、原 ID 重试由共享账本保证不重放。
+## 手机操作期限与电脑检测
+
+未取得终态的手机 action 超过十四个24小时时段不再自动执行。以电脑当前UTC减请求 `at` 判断，严格大于十四天拒收，恰好十四天仍可收。电脑返回 `status:"rejected"`，`message` 以 `[ACTION_EXPIRED]` 开头；手机据此显示「已过期，请重做」，不凭本机时钟自行判定已执行与否。旧客户端可继续按 rejected 处理。已确认的本机或共享终态优先回放，不改称过期。未确认的中断写入也不再自动续写；过期只表示此次未执行，不证明以前没有部分写入，重做前须回读资料。回执清理后仍按原请求时间拒收，无新增账本。
+
+`at` 来自发送设备，不是可信服务器时间。手机慢钟会提前过期，快钟或电脑慢钟会推迟过期；当前没有新增时钟同步或设备认证。离线超过十四天的未执行操作必须回读后重新创建；旧版电脑没有此期限检查，不能把混合版本说成统一执行规则。
+
+电脑生成的 today.generator 可含 `device_id`（每工作区随机UUID，不含主机名或账号）。本机标识与检测/选择状态存在原有 `.kaitu/organizer.json`，不作为共享账本。看到不同电脑标识后，本机暂停收件箱自动处理，保留输入文件，不伪造终态回执。`organizerStatus.consumer` 暴露状态；`selectPhoneConsumer` 在本机选择自己或已检测的电脑。选另一台表示本机继续暂停；这是本机协调偏好，不是跨设备授权、租约或锁。新标识再次出现需重新选择。
+
+旧快照没有标识仍可读取，但无法据此检测旧电脑；同一机复制本机状态也可能复制标识。检测只在看到另一台快照后生效，不保证检测前并发安全：两个消费者可都通过内容检查，随后不同条目的写入仍可能相互覆盖。没有证据支持「并发不会静默覆盖」，不得作此承诺。用户应在所有参与电脑上选同一负责人；混合旧版或两个独立选择本机的场景不受互斥保证。

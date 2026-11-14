@@ -239,13 +239,21 @@ export function listProjects(
         if (list) list.push(r);
         else allMetrics.set(key, [r]);
       }
+  const metricDays = new Map<string, string>();
+  const metricDay = (row: StoredRecord): string => {
+    let value = metricDays.get(row.ts);
+    if (value === undefined) {
+      value = localDate(parseTs(row.ts), tz);
+      metricDays.set(row.ts, value);
+    }
+    return value;
+  };
   const projectFor = (slug: string) => {
     const project = projectSnapshot(ws, slug, options.partial);
     const metrics = allMetrics.get(slug) ?? [];
     const words = metrics.filter((r) => r.kind === "words");
-    const recentWords = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) >= from);
-    const baseline =
-      words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < from).at(-1) ?? recentWords[0];
+    const recentWords = words.filter((r) => metricDay(r) >= from);
+    const baseline = words.filter((r) => metricDay(r) < from).at(-1) ?? recentWords[0];
     const last = words.at(-1);
     return [
       {
@@ -297,11 +305,9 @@ export function listProjects(
         recent7: {
           daily: Array.from({ length: 7 }, (_, i) => {
             const date = new Date(Date.parse(`${from}T12:00:00Z`) + i * 86400000).toISOString().slice(0, 10);
-            const current = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) === date).at(-1);
-            const previous = words.filter((r) => localDate(parseTs(r.ts), ws.timeZone()) < date).at(-1);
-            const commits = metrics.filter(
-              (r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) === date,
-            );
+            const current = words.filter((r) => metricDay(r) === date).at(-1);
+            const previous = words.filter((r) => metricDay(r) < date).at(-1);
+            const commits = metrics.filter((r) => r.kind === "commits" && metricDay(r) === date);
             return {
               date,
               words: current && previous ? Number(current.value) - Number(previous.value) : null,
@@ -313,11 +319,9 @@ export function listProjects(
               ? Number(last.value) - Number(baseline.value)
               : null,
           commits: metrics
-            .filter((r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) >= from)
+            .filter((r) => r.kind === "commits" && metricDay(r) >= from)
             .reduce((total, r) => total + Number(r.value), 0),
-          commitsRecorded: metrics.some(
-            (r) => r.kind === "commits" && localDate(parseTs(r.ts), ws.timeZone()) >= from,
-          ),
+          commitsRecorded: metrics.some((r) => r.kind === "commits" && metricDay(r) >= from),
         },
         words: last ? Number(last.value) : null,
         body: project.body,

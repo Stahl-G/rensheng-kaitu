@@ -5,6 +5,7 @@ import { KaituMark } from "./Brand.js";
 import { CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
 import { CalendarSlotForm } from "./CalendarPush.js";
 import type { ChannelRequest } from "./ChannelSettings.js";
+import { type CommandLoadResult, CommandPalette, type KaituCommand } from "./CommandPalette.js";
 import { DirectionMap } from "./DirectionMap.js";
 import { DirectionsPage, type DirectionsPageProps } from "./DirectionsPage.js";
 import type { DoingPageProps } from "./DoingPage.js";
@@ -33,6 +34,7 @@ import { ProgressMap } from "./ProgressMap.js";
 import css from "./Prototype.module.css";
 import { WarningText } from "./ReadWarnings.js";
 import type { ResumeServices } from "./ResumeImport.js";
+import { createTodayBoardSession } from "./TodayBoard.js";
 import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
@@ -45,6 +47,7 @@ import {
   migrateLifeMapFirst,
 } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
+import { cityKey } from "./life-map-visuals.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
 import type { RecordTarget } from "./progress-map.js";
@@ -84,6 +87,8 @@ export interface OverviewPageProps
   hosted?: boolean;
   navigation?: PanelNavigation;
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
+  resultDraft?: import("./result-session.js").DraftTransport;
+  resultAction?: import("./result-session.js").ResultTransport;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
   load: () => Promise<OverviewData>;
@@ -106,7 +111,7 @@ export interface OverviewPageProps
     onSettings: (section: "ai" | "local-ai") => void,
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
-    onOrganize?: (source: string) => Promise<void>,
+    onOrganize?: (source: string, draft?: string) => Promise<void>,
   ) => ReactNode;
 }
 const modules = [
@@ -288,6 +293,15 @@ function Overview({
   }, [exploreEntries, firstExplore, pluginModules, setExplore]);
   const [data, setData] = useState<OverviewData | null>(null);
   const workspaceRoot = data?.root;
+  const resultOwners = useRef(new Map<string, ReturnType<typeof createTodayBoardSession>>());
+  const ownerRoot = workspaceRoot ?? "";
+  const resultOwner =
+    resultOwners.current.get(ownerRoot) ?? createTodayBoardSession(ownerRoot, undefined, props.resultDraft);
+  resultOwners.current.set(ownerRoot, resultOwner);
+  const todaySession = useRef({ root: workspaceRoot, board: resultOwner });
+  todaySession.current = { root: workspaceRoot, board: resultOwner };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Leaving a page expires its short undo affordance.
+  useEffect(() => () => resultOwner.expire(), [resultOwner, view]);
   const [exploreFacts, setExploreFacts] = useState<{
     root: string;
     hometown?: boolean;
@@ -407,6 +421,7 @@ function Overview({
   const [learningSource, setLearningSource] = useState<LearningSource>();
   const [libraryEntry, setLibraryEntry] = useState<InboxEntry>();
   const [libraryFile, setLibraryFile] = useState<string>();
+  const [noteContext, setNoteContext] = useState<{ title: string; prompt: string } | null>(null);
   const [libraryGoal, setLibraryGoal] = useState<string>();
   const [projectFocus, setProjectFocus] = useState<string>();
   const [directionFocus, setDirectionFocus] = useState<string>();
@@ -495,6 +510,9 @@ function Overview({
   const [error, setError] = useState("");
   const [draft, setDraft] = useState("");
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
+  const [commandCity, setCommandCity] = useState<string>();
+  const [commandCityRequest, setCommandCityRequest] = useState(0);
   const [handoverOpen, setHandoverOpen] = useState(false);
   useEffect(() => {
     if (handoverOpen) {
@@ -539,7 +557,6 @@ function Overview({
   const homeReady = !props.loadHome || !!homeState?.data || !!homeState?.error;
   const homePresentation = data ?? homeState?.presentation;
   const readWarnings = data?.warnings ?? homeState?.presentation?.warnings ?? [];
-  const [homeSubmit, setHomeSubmit] = useState<import("./ask-handoff.js").AskAutoSubmit>();
   const homeOperation = useRef<{ text: string; id: string; path?: string } | null>(null);
   const homeSaving = useRef(false);
   const homeDraftVersion = useRef(0);
@@ -549,7 +566,7 @@ function Overview({
     const timer = setTimeout(() => setHomeSaveState(null), 3000);
     return () => clearTimeout(timer);
   }, [homeSaveState, view]);
-  const saveHome = async (text: string, send: boolean) => {
+  const saveHome = async (text: string) => {
     if (!props.captureOnce || homeSaving.current || !text.trim()) return;
     homeSaving.current = true;
     const draftVersion = homeDraftVersion.current;
@@ -570,14 +587,10 @@ function Overview({
           ),
         );
       operation.path = receipt.path;
-      if (send) {
-        setHomeSubmit({ requestId: operation.id, text: content, references: [], capturedPath: receipt.path });
-        setView("ask");
-      }
       if (homeDraftVersion.current === draftVersion) setHomeAskText("");
       setHomeAskError("");
       homeOperation.current = null;
-      setHomeSaveState(send ? null : "saved");
+      setHomeSaveState("saved");
     } catch (error) {
       setHomeSaveState(null);
       setHomeAskError(error instanceof Error ? error.message : String(error));
@@ -590,6 +603,8 @@ function Overview({
   const [promptDraft, setPromptDraft] = useState(props.initialChatDraft ?? "");
   const [promptRequest, setPromptRequest] = useState(props.initialChatDraft ? 1 : 0);
   const [promptNewConversation, setPromptNewConversation] = useState(false);
+  const [askPluginOrigin, setAskPluginOrigin] = useState<string>();
+  const askPlugin = pluginModules.find((entry) => entry.id === askPluginOrigin);
   const handoffPending = useRef(false);
   // Reset after the submitted prompt has been rendered in Ask.
   // biome-ignore lint/correctness/useExhaustiveDependencies: promptRequest signals each handoff.
@@ -599,6 +614,32 @@ function Overview({
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
+  const [inlineAsk, setInlineAsk] = useState(false);
+  const askOrigin = useRef<HTMLElement | null>(null);
+  const askLauncher = useRef<HTMLButtonElement>(null);
+  const restoreAskFocus = useRef(false);
+  const openInlineAsk = () => {
+    if (!inlineAsk) askOrigin.current = document.activeElement as HTMLElement | null;
+    setAskVisited(true);
+    setInlineAsk(true);
+  };
+  useEffect(() => {
+    if (inlineAsk) {
+      const field = askPanel.current?.querySelector<HTMLTextAreaElement>("textarea");
+      (field ?? askPanel.current)?.focus();
+    } else if (restoreAskFocus.current) {
+      restoreAskFocus.current = false;
+      (askOrigin.current?.isConnected ? askOrigin.current : askLauncher.current)?.focus();
+    }
+  }, [inlineAsk]);
+  const closeInlineAsk = () => {
+    restoreAskFocus.current = true;
+    setInlineAsk(false);
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: navigation dismisses the contextual panel.
+  useEffect(() => {
+    setInlineAsk(false);
+  }, [view]);
   const [configureRequest, setConfigureRequest] = useState(0);
   const [configureBuiltin, setConfigureBuiltin] = useState(false);
   const [theme, setTheme] = useState("light");
@@ -777,18 +818,23 @@ function Overview({
     }
   };
   const prompt = (text: string, newConversation = false) => {
+    setAskPluginOrigin(undefined);
     setPromptNewConversation(newConversation);
     setPromptDraft(text);
     setPromptRequest((id) => id + 1);
-    if (props.renderAsk) setView("ask");
-    else props.onPrompt(text);
+    if (props.renderAsk) {
+      if (view !== "ask") {
+        openInlineAsk();
+      }
+    } else props.onPrompt(text);
   };
-  const handoffAsk = (text: string) => {
+  const handoffAsk = (text: string, pluginId?: string) => {
     if (handoffPending.current || !props.renderAsk) return false;
     const event = new Event("kaitu:before-ask-draft", { cancelable: true });
     if (!window.dispatchEvent(event)) return false;
     handoffPending.current = true;
     prompt(text, true);
+    setAskPluginOrigin(pluginId);
     return true;
   };
   const askNext = (item: { title: string; module: string }) =>
@@ -993,9 +1039,18 @@ function Overview({
       />
     );
   // 所有目标与结果仍可展开查看，首屏只突出当前的一步。
+  const resultAction: import("./result-session.js").ResultTransport = async (root, request) => {
+    if (!props.resultAction)
+      throw new Error(t("结果保存不可用，请重新打开", "Result saving unavailable; reopen the app"));
+    const response = await props.resultAction(root, request);
+    if (todaySession.current.root === root) void refresh();
+    return response;
+  };
   const plansCard = data?.plans && (
     <PlansCard
       plans={data.plans}
+      resultSession={todaySession.current.board}
+      resultAction={resultAction}
       goalId={view === "records" && record === "projects" ? libraryGoal : undefined}
       addGoalNext={props.addGoalNext}
       changeNext={props.changeOnboardingNext}
@@ -1003,6 +1058,196 @@ function Overview({
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
+  const currentCommandStep = () => {
+    const board = todaySession.current.board;
+    const state = board.read();
+    return (
+      state.receipt?.step ??
+      (!state.showLatest ? board.operation.current?.step : undefined) ??
+      homeState?.data?.steps?.find((step) => step.key === state.selected) ??
+      homeState?.data?.steps?.[0] ??
+      homeState?.data?.threads.find((thread) => thread.next)?.next
+    );
+  };
+  const commandCurrent = currentCommandStep();
+  const askContext = view === "records" && record === "notes" ? noteContext : null;
+  const askTitle =
+    askContext?.title ??
+    (view === "overview"
+      ? commandCurrent?.title
+      : view === "records"
+        ? (data?.plans.goals.find((goal) => goal.id === libraryGoal)?.title ??
+          homeState?.data?.threads.find((thread) => thread.kind === "project" && thread.id === projectFocus)
+            ?.title)
+        : view === "explore"
+          ? homeState?.data?.threads.find((thread) => thread.id === directionFocus)?.title
+          : undefined);
+  const commandActions: KaituCommand[] = [
+    {
+      id: "capture",
+      label: t("记一条", "Quick note"),
+      icon: "✎",
+      shortcut: "⌘N",
+      run: () => {
+        setInlineAsk(false);
+        setView("overview");
+        setGuide(null);
+        if (!props.loadHome) setCaptureOpen(true);
+        requestAnimationFrame(() => {
+          const field = document.getElementById(props.loadHome ? "today-ask" : "capture-text");
+          field?.focus();
+          field?.scrollIntoView({ block: "center" });
+        });
+      },
+    },
+    ...(props.renderAsk
+      ? [
+          {
+            id: "ask",
+            label: askTitle ? t(`问问「${askTitle}」`, `Ask about “${askTitle}”`) : t("问问", "Ask"),
+            icon: "○",
+            shortcut: "⌘J",
+            run: () => {
+              if (askContext) prompt(askContext.prompt);
+              else {
+                const title = view === "overview" ? currentCommandStep()?.title : askTitle;
+                if (title)
+                  askNext({
+                    title,
+                    module:
+                      view === "overview"
+                        ? t("今天", "Today")
+                        : view === "records"
+                          ? t("资料", "Library")
+                          : t("开图", "Explore"),
+                  });
+                else openInlineAsk();
+              }
+            },
+          },
+        ]
+      : []),
+    ...(props.resultAction &&
+    !todaySession.current.board.read().receipt &&
+    commandCurrent?.file &&
+    commandCurrent.precondition
+      ? [
+          {
+            id: "complete",
+            label: t(`完成「${commandCurrent.title}」`, `Complete “${commandCurrent.title}”`),
+            icon: "✓",
+            shortcut: "⌘↩",
+            run: () => {
+              setView("overview");
+              setGuide(null);
+              requestAnimationFrame(() => window.dispatchEvent(new Event("kaitu:complete-current")));
+            },
+          },
+        ]
+      : []),
+  ];
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.altKey ||
+        event.shiftKey
+      )
+        return;
+      const key = event.key.toLowerCase();
+      if (key === "k") {
+        event.preventDefault();
+        setCommandsOpen((open) => !open);
+        return;
+      }
+      const action = commandActions.find(
+        (item) => item.id === (key === "n" ? "capture" : key === "j" ? "ask" : ""),
+      );
+      if (action) {
+        event.preventDefault();
+        setCommandsOpen(false);
+        action.run();
+        return;
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  });
+  const loadCommands = async (): Promise<CommandLoadResult> => {
+    const values: KaituCommand[] = (homeState?.data?.threads ?? []).map((thread) => ({
+      id: thread.key,
+      label: thread.title,
+      detail:
+        thread.kind === "project"
+          ? t("项目", "Project")
+          : thread.kind === "goal"
+            ? t("方向", "Goal")
+            : t("笔记", "Note"),
+      run: () =>
+        thread.kind === "learning"
+          ? openCommandNote(thread.file)
+          : openTarget({ kind: thread.kind, id: thread.id }, "overview"),
+    }));
+    const [map, exploration, notes] = await Promise.allSettled([
+      Promise.resolve().then(() => props.loadLifeMap?.()),
+      Promise.resolve().then(() => props.loadExploration?.()),
+      Promise.resolve().then(() => props.loadLibrary({ section: "notes" })),
+    ]);
+    if (map.status === "fulfilled" && map.value) {
+      const places = new Map(
+        map.value.features.map((feature) => [cityKey(feature.properties.place), feature.properties.place]),
+      );
+      for (const [id, place] of places)
+        values.push({
+          id: `city:${id}`,
+          label: place.name,
+          detail: t("足迹", "Places"),
+          icon: "●",
+          run: () => {
+            setCommandCity(id);
+            setCommandCityRequest((request) => request + 1);
+            setExplore("footprints");
+            setView("explore");
+          },
+        });
+    }
+    if (exploration.status === "fulfilled" && exploration.value)
+      for (const item of exploration.value.directions)
+        values.push({
+          id: `direction:${item.id}`,
+          label: item.title,
+          detail: t("方向", "Direction"),
+          run: () => openTarget({ kind: "direction", id: item.id }),
+        });
+    if (notes.status === "fulfilled" && notes.value)
+      for (const item of notes.value.notes ?? [])
+        values.push({
+          id: `note:${item.file}`,
+          label: item.title,
+          detail: item.kind === "决定" ? t("决策", "Decision") : t("笔记", "Note"),
+          run: () => openCommandNote(item.file),
+        });
+    return {
+      items: values,
+      failedSources: [
+        ...(map.status === "rejected" || map.value?.warnings?.length ? [t("足迹", "Places")] : []),
+        ...(exploration.status === "rejected" || exploration.value?.warnings?.length
+          ? [t("方向", "Directions")]
+          : []),
+        ...(notes.status === "rejected" || notes.value?.warnings?.length
+          ? [t("笔记与决策", "Notes and decisions")]
+          : []),
+      ],
+    };
+  };
+  function openCommandNote(file: string) {
+    openRecord("notes");
+    setLearningTopic(file.startsWith("learning/") ? (file.split("/")[1] ?? "") : "");
+    setLibraryFile(file.startsWith("learning/") ? undefined : file);
+  }
   const selectedExplore = availableModules.find((entry) => entry.id === explore);
   const explorePages: Record<ExploreModule["id"], ReactNode> = {
     "life-map":
@@ -1032,7 +1277,12 @@ function Overview({
         }}
       />
     ),
-    footprints: <MapPage {...child} />,
+    footprints: (
+      <MapPage
+        {...child}
+        {...(commandCity ? { initialCity: commandCity, initialCityRequest: commandCityRequest } : {})}
+      />
+    ),
     news: (
       <NewsPage
         {...child}
@@ -1165,6 +1415,16 @@ function Overview({
         <div className={css.tools}>
           <button
             type="button"
+            className={todayCss.commandTrigger}
+            aria-label={t("搜索或输入动作", "Search or enter an action")}
+            onClick={() => setCommandsOpen(true)}
+          >
+            <span aria-hidden="true">⌕</span>
+            <span>{t("搜索", "Search")}</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <button
+            type="button"
             className={css.settingsButton}
             aria-label={t("设置", "Settings")}
             aria-current={view === "settings" ? "page" : undefined}
@@ -1190,6 +1450,14 @@ function Overview({
           </button>
         </div>
       </header>
+      {commandsOpen && (
+        <CommandPalette
+          key={workspaceRoot}
+          actions={commandActions}
+          load={loadCommands}
+          close={() => setCommandsOpen(false)}
+        />
+      )}
       <main
         className={`${css.content} ${view === "ask" ? css.askContent : ""} ${view === "explore" ? css.exploreContent : ""} ${view === "overview" ? `${todayCss.page} ${props.loadHome ? css.todayContent : ""}` : ""}`}
       >
@@ -1273,6 +1541,60 @@ function Overview({
             <>
               <LifeHome
                 home={homeState}
+                session={todaySession.current.board}
+                resultAction={resultAction}
+                schedule={
+                  data?.blocks.length ? (
+                    <section
+                      className={todayCss.scheduleCard}
+                      aria-label={t("今天的日程", "Today’s schedule")}
+                    >
+                      {data.blocks.map((block) => (
+                        <div key={block.id}>
+                          <time>{block.start?.slice(11, 16) || block.start}</time>
+                          <span>{block.title}</span>
+                          {block.status === "pending" && (
+                            <button
+                              type="button"
+                              className={css.btn}
+                              disabled={busy}
+                              onClick={() => void run(() => props.decideProposal(block.id, "confirmed"))}
+                            >
+                              {t("加入日历", "Add to calendar")}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  ) : undefined
+                }
+                reviewLinks={
+                  data && (data.inboxNotes > 0 || data.sync.mapNeedsReview > 0) ? (
+                    <section className={todayCss.scheduleCard}>
+                      {data.inboxNotes > 0 && (
+                        <button type="button" className={css.link} onClick={() => openRecord("inbox")}>
+                          {t(`${data.inboxNotes} 条原文`, `${data.inboxNotes} originals`)} →
+                        </button>
+                      )}
+                      {data.sync.mapNeedsReview > 0 && (
+                        <button
+                          type="button"
+                          className={css.link}
+                          onClick={() => {
+                            setExplore("footprints");
+                            setView("explore");
+                          }}
+                        >
+                          {t(
+                            `足迹待确认 ${data.sync.mapNeedsReview}`,
+                            `${data.sync.mapNeedsReview} places to review`,
+                          )}{" "}
+                          →
+                        </button>
+                      )}
+                    </section>
+                  ) : undefined
+                }
                 data={homePresentation}
                 firstVisit={!!data?.empty && !onboarding?.hasUserData}
                 writing={captureOpen}
@@ -1302,14 +1624,11 @@ function Overview({
                 save={
                   props.captureOnce
                     ? (text) => {
-                        void saveHome(text, false);
+                        void saveHome(text);
                       }
                     : undefined
                 }
-                ask={(text) => {
-                  if (props.captureOnce) void saveHome(text, true);
-                  else handoffAsk(text);
-                }}
+                ask={(text) => prompt(text)}
                 canAsk={!!props.renderAsk}
                 askError={homeAskError}
                 saveStatus={
@@ -1573,6 +1892,7 @@ function Overview({
                 draft={learningDrafts[draftKey] ?? emptyLearningDraft}
                 onDraft={(draft) => updateLearningDraft(draftKey, draft)}
                 initialFile={libraryFile}
+                onAskContext={setNoteContext}
                 data={library}
                 loadLibraryDocument={props.loadLibraryDocument}
                 loadLearning={loadLearning}
@@ -1679,32 +1999,115 @@ function Overview({
                 plugins={props.plugins}
                 onRemoved={pluginRemoved}
                 active={view === "explore" && explore === entry.id}
-                onDraft={handoffAsk}
+                onDraft={(text) => handoffAsk(text, entry.id)}
               />
             </div>
           ))}
+        {props.renderAsk && view !== "ask" && !inlineAsk && (
+          <button
+            type="button"
+            className={css.askLauncher}
+            ref={askLauncher}
+            onClick={openInlineAsk}
+            aria-label={t("就地问问", "Ask in context")}
+          >
+            {t("问问", "Ask")}
+          </button>
+        )}
         {(view === "ask" || askVisited) && props.renderAsk && (
-          <div ref={askPanel} className={css.askPanel} hidden={view !== "ask"}>
+          <div
+            ref={askPanel}
+            tabIndex={-1}
+            className={`${css.askPanel} ${inlineAsk && view !== "ask" ? css.inlineAsk : ""}`}
+            hidden={view !== "ask" && !inlineAsk}
+            role={inlineAsk ? "complementary" : undefined}
+            aria-label={inlineAsk ? t("就地问问", "Ask in context") : undefined}
+            onKeyDown={(event) => {
+              if (
+                inlineAsk &&
+                event.key === "Escape" &&
+                !event.defaultPrevented &&
+                !(event.target as HTMLElement).closest("dialog, [role=menu]")
+              ) {
+                event.preventDefault();
+                closeInlineAsk();
+              }
+            }}
+          >
+            {inlineAsk && view !== "ask" && (
+              <div className={css.inlineAskHeader}>
+                <strong>{t("问问", "Ask")}</strong>
+                <button
+                  type="button"
+                  className={css.btn}
+                  onClick={() => {
+                    setInlineAsk(false);
+                    setView("ask");
+                    askPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+                  }}
+                >
+                  {t("展开", "Expand")}
+                </button>
+                <button
+                  type="button"
+                  className={css.btn}
+                  onClick={closeInlineAsk}
+                  aria-label={t("关闭问问", "Close Ask")}
+                >
+                  ×
+                </button>
+              </div>
+            )}
+            {askPlugin && (
+              <nav aria-label={t("返回来源页", "Return to source")}>
+                <button
+                  type="button"
+                  className={css.link}
+                  onClick={() => {
+                    closeInlineAsk();
+                    setExplore(askPlugin.id);
+                    setView("explore");
+                  }}
+                >
+                  {t(`← 返回${askPlugin.title[0]}`, `← Back to ${askPlugin.title[1]}`)}
+                </button>
+              </nav>
+            )}
             {props.renderAsk(
               promptDraft,
               configureRequest,
               configureBuiltin,
               () => setView("connections"),
               promptRequest,
-              view === "ask",
+              view === "ask" || inlineAsk,
               () => {
                 setGuide(null);
                 setView("overview");
               },
               openAskSettings,
               promptNewConversation,
-              homeSubmit,
-              async (source) => {
-                const matter = await props.readOnboardingMatter(source);
+              undefined,
+              async (source, draft) => {
+                let savedSource = source;
+                if (!savedSource && props.captureOnce) {
+                  const text = draft?.trim() ?? "";
+                  if (homeOperation.current?.text !== text)
+                    homeOperation.current = { text, id: crypto.randomUUID() };
+                  const operation = homeOperation.current;
+                  const receipt = operation.path
+                    ? { status: "saved", path: operation.path }
+                    : await props.captureOnce(text, operation.id);
+                  if (receipt.status !== "saved" || !receipt.path)
+                    throw new Error(t("保存未完成，请重试", "Save incomplete. Retry."));
+                  operation.path = receipt.path;
+                  savedSource = receipt.path;
+                }
+                const matter = savedSource
+                  ? await props.readOnboardingMatter(savedSource)
+                  : await props.saveOnboardingMatter(draft ?? "");
                 openRecord("inbox");
                 setReviewClipboard(true);
                 setReviewMatter(matter);
-                setHomeSubmit(undefined);
               },
             )}
           </div>

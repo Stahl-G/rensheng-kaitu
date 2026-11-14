@@ -223,6 +223,15 @@ it("keeps empty and old workspaces honest, including missing sources and future 
     };
     const altered = {
       ...overview,
+      versions: ["agent", "cloud", "agent"].map((source, i) => ({
+        oid: `synthetic-version-${i}`,
+        short: `synthetic-${i}`,
+        message: "Synthetic system save",
+        time: "2026-10-28T11:00:00Z",
+        text: "Synthetic system save",
+        source: source as "agent" | "cloud",
+        actor: null,
+      })),
       metrics: [
         {
           ...metric,
@@ -251,6 +260,9 @@ it("keeps empty and old workspaces honest, including missing sources and future 
     const home = readHome({ overview: altered, projects: [], statuses: [], records: {} });
     expect(home.traces.map((trace) => trace.key)).toEqual(["metric:recent"]);
     expect(home.traces[0]?.sourceFiles).toEqual(["health/data/recent"]);
+    expect(
+      readHome({ overview: { ...altered, metrics: [] }, projects: [], statuses: [], records: {} }).traces,
+    ).toEqual([]);
   } finally {
     rmSync(ws.root, { recursive: true, force: true });
   }

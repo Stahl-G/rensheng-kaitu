@@ -6,6 +6,7 @@ import { freshWorkspace } from "./helpers.js";
 
 it("正常保存的学习正文可搜索并打开所属主题，后续保存和仅正文更新会刷新索引", async () => {
   const ws = await freshWorkspace();
+  const failures: unknown[] = [];
   deferSnapshots(ws, () => {});
   try {
     const topic = await startLearning(ws, { title: "合成植物学习" });
@@ -39,14 +40,23 @@ it("正常保存的学习正文可搜索并打开所属主题，后续保存和�
     const read = vi.spyOn(ws, "readText");
     expect(await searchLibraryNotes(ws, "枫树")).toHaveLength(1);
     expect(read).not.toHaveBeenCalled();
+  } catch (error) {
+    failures.push(error);
   } finally {
-    disposeNoteIndex(ws);
-    rmSync(ws.root, { recursive: true, force: true });
+    try {
+      await disposeNoteIndex(ws);
+      rmSync(ws.root, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
+    }
   }
+  if (failures.length > 1) throw new AggregateError(failures, "Note search body and cleanup failed");
+  if (failures.length) throw failures[0];
 });
 
 it("学习正文外部修改、删除和版本恢复保持一致，索引与摘要去掉密钥和本机路径", async () => {
   const ws = await freshWorkspace();
+  const failures: unknown[] = [];
   try {
     const topic = await startLearning(ws, { title: "合成版本学习" });
     const file = `learning/${topic.topic}/STATUS.md`;
@@ -78,14 +88,23 @@ it("学习正文外部修改、删除和版本恢复保持一致，索引与摘�
     await vi.waitFor(async () => expect(await searchLibraryNotes(ws, "合成恢复正文")).toEqual([]));
     await restore(ws, saved.version as string, { path: `learning/${topic.topic}` });
     expect((await searchLibraryNotes(ws, "合成恢复正文"))[0]?.file).toBe(file);
+  } catch (error) {
+    failures.push(error);
   } finally {
-    disposeNoteIndex(ws);
-    rmSync(ws.root, { recursive: true, force: true });
+    try {
+      await disposeNoteIndex(ws);
+      rmSync(ws.root, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
+    }
   }
+  if (failures.length > 1) throw new AggregateError(failures, "Note search body and cleanup failed");
+  if (failures.length) throw failures[0];
 });
 
 it("正文索引支持中英文、转义、修改、重命名和删除，热搜索不读资料文件", async () => {
   const ws = await freshWorkspace();
+  const failures: unknown[] = [];
   const file = "decisions/synthetic/STATUS.md";
   try {
     ws.writeText(file, "---\ntitle: 合成决定\n---\n\nOnly the body contains 海边散步 and 50%_value.");
@@ -105,8 +124,16 @@ it("正文索引支持中英文、转义、修改、重命名和删除，热搜�
     );
     rmSync(ws.resolve("decisions/renamed"), { recursive: true });
     await vi.waitFor(async () => expect(await searchLibraryNotes(ws, "山间")).toEqual([]));
+  } catch (error) {
+    failures.push(error);
   } finally {
-    disposeNoteIndex(ws);
-    rmSync(ws.root, { recursive: true, force: true });
+    try {
+      await disposeNoteIndex(ws);
+      rmSync(ws.root, { recursive: true, force: true });
+    } catch (error) {
+      failures.push(error);
+    }
   }
+  if (failures.length > 1) throw new AggregateError(failures, "Note search body and cleanup failed");
+  if (failures.length) throw failures[0];
 });

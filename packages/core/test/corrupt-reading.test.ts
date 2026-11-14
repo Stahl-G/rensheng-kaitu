@@ -69,7 +69,7 @@ it("a bad topic header keeps other notes searchable, reports the bad item, and r
     expect(readLibrary(ws, { section: "notes" }).notes.find((note) => note.file === file)?.status).toBeNull();
     expect(await searchLibraryNotes(ws, "Syntheticbadneedle")).toEqual([]);
   } finally {
-    disposeNoteIndex(ws);
+    await disposeNoteIndex(ws);
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

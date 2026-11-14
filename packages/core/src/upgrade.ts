@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { writeAgentsMd } from "./agents-md.js";
+import { canWritePortraitSkill, writeAgentsMd } from "./agents-md.js";
 import { templateDir } from "./assets.js";
 import { doctor } from "./doctor.js";
 import { GITIGNORE, invalidateHistoryFile, snapshot, userOwnsGitignore } from "./history.js";
@@ -32,16 +32,25 @@ function additions<T>(existing: T[] | undefined, defaults: T[], key: (value: T) 
 
 export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolean } = {}) {
   const version = templateVersion();
+  const writes = new Map<string, string | Buffer>();
+  const portrait = readFileSync(join(templateDir(), ".agents/skills/life-portrait/SKILL.md"));
+  for (const base of [".agents", ".claude"]) {
+    const path = `${base}/skills/life-portrait/SKILL.md`;
+    if (canWritePortraitSkill(ws, path) && (!ws.exists(path) || !ws.readBytes(path).equals(portrait)))
+      writes.set(path, portrait);
+  }
   if (
     !templateOutdated(ws) &&
     ws.exists("ORGANIZER.md") &&
     ws.exists("handoffs/daily") &&
     ws.exists("explore/module.json")
-  )
-    return { templateVersion: version, changes: [], version: null };
+  ) {
+    // 提示词候选迁移只写本技能，不为此重写其他内置技能或工作区元数据。
+    if (!options.dryRun) for (const [path, content] of writes) ws.writeText(path, content);
+    return { templateVersion: version, changes: [...writes.keys()], version: null };
+  }
   if (!options.dryRun) ws.assertDownloaded();
   const files = templateFiles(templateDir());
-  const writes = new Map<string, string | Buffer>();
   const deletes: string[] = [];
   for (const [file, bytes] of files) {
     if (!file.endsWith("/module.json") || file.split("/").length !== 2) continue;
@@ -85,6 +94,7 @@ export async function upgradeWorkspace(ws: Workspace, options: { dryRun?: boolea
     [...files.keys()].filter((file) => file.startsWith(skillRoot)).map((file) => file.split("/")[2]),
   );
   for (const name of builtinSkills) {
+    if (name === "life-portrait") continue; // 正文已单独处理，附带材料不覆盖、不清理。
     for (const base of [".agents", ".claude"]) {
       const directory = `${base}/skills/${name}`;
       const desired = new Set<string>();

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
@@ -8,6 +9,21 @@ import { renderRecordReference } from "./record-reference.js";
 import type { Workspace } from "./workspace.js";
 
 const USER_SECTION = "<!-- 以下内容由你自己维护，重新生成时保留 -->";
+// 改模板前保留旧官方正文的完整 SHA256 和来源；不要收录用户修改稿。
+// 保留已交付的官方正文；信任表来自应用，不读工作区清单。
+const portraitCandidates = new Set([
+  "c7ba29142055a7ef8762715b5a6e9ff64b32c95029ac8fb3e8fa9dca33e6f957", // v1 ZIP 原稿
+  "8a57eff594b3222f3b921f0c2046a85098b06ef2b6c12d03d212cc21392dd2ea", // RC5 模板适配稿
+  "128a843f26cfc6b75d95b5d6a13c3013c36cd2185f4d40969bb632f02984e5cc", // 用户认可的 v3 创作提示词（2026-11-02）
+  "b2e58271fee4477eff5842e3a4d66994ae3c8705210b992c9a7c4bf0c92b3a44", // v3 两句补充：明暗随人、事实规则留在幕后（2026-11-02）
+]);
+
+export function canWritePortraitSkill(ws: Workspace, path: string): boolean {
+  return (
+    !ws.exists(path) || portraitCandidates.has(createHash("sha256").update(ws.readBytes(path)).digest("hex"))
+  );
+}
+
 const routes = [
   {
     request: "记一顿饭",
@@ -130,9 +146,10 @@ ${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${r
 1. 只写工作区内；程序状态、版本库和密钥由程序管理。记录用专用工具写入，保留 ID 和追加修订，不直接改数据 JSONL；项目链接目录只读。
 2. 改目标/规则/长期投入、外部日历、批量导入、删除模块或超过 10 条记录、自动任务先确认。普通个人记忆的自动保存、明确纠正与单条可恢复撤销无需重复确认。AI 待办提议保持 proposed，不自行填 by/user、source、confirmed 或 status 绕过；用户在界面采纳后才进入今天。其他 AI 提议保持 suggested/pending，用户采纳才生效。批量导入先预览；项目可见性变更须用户明确选择，云端旧副本由用户清理。
 3. 日常个人事实、偏好、决定默认自动记录，不逐条确认；使用 memory_capture（DSH：kaitu_memory_capture），按 import-chatgpt-memory 技能保留来源、时间与原话。AI估算/建议标 origin 和 uncertainty，不升级为用户承诺；临时、引用、假设不作长期事实。纠正用 replaces/expected 追加关联原条；撤销在个人档案单条归档，保留历史。用户要求暂停时停止；敏感个人陈述自动标 sensitive，不进入共享资料包。健康只做记录、趋势和提醒。activity 的 source_exported_at 由健康导入器保存来源导出时间，手工记录不填写或修改。
-4. 普通文档修改后校验相关路径并保存版本；对用户说版本、历史、恢复。回执有 id/file 才确认数据已保存，有版本才确认版本已保存；自动记忆由写入工具回读；其他记录只有结果不确定或用户要求核对时才读回。云盘新建文件只说「已投递」，note 只保存原文，不能当餐食入账。
-5. 摘要可能不完整。CLOUD_UNAVAILABLE 表示未下载或暂不可读，不是文件不存在；说明缺口后停止读取。其他错误只用原工具重试一次，第二次失败就报告缺口，不换工具/别名/整目录扫描循环读取。写入结果未知时核对原回执或复用原幂等标识，不另建记录重试。
-6. ${AI_NETWORK_RULES}
+4. 新完成结果只写一行，任务沿用备注里的「完成结果：」「完成时间：」；STATUS 下一步使用可选 result/completed，不往正文写机器块。已有多行结果和其他字段原样保留，完成但未写结果不计推进。
+5. 普通文档修改后校验相关路径并保存版本；对用户说版本、历史、恢复。回执有 id/file 才确认数据已保存，有版本才确认版本已保存；自动记忆由写入工具回读；其他记录只有结果不确定或用户要求核对时才读回。云盘新建文件只说「已投递」，note 只保存原文，不能当餐食入账。
+6. 摘要可能不完整。CLOUD_UNAVAILABLE 表示未下载或暂不可读，不是文件不存在；说明缺口后停止读取。其他错误只用原工具重试一次，第二次失败就报告缺口，不换工具/别名/整目录扫描循环读取。写入结果未知时核对原回执或复用原幂等标识，不另建记录重试。
+7. ${AI_NETWORK_RULES}
 
 工作区不在默认位置时加 --dir <绝对路径> 或设置 KAITU_DIR。工具与文件的实际权限继续生效；凭据留在本机，不写进资料或日志。
 `;
@@ -161,8 +178,11 @@ export function renderAgentsMd(ws: Workspace): string {
 
 export function writeAgentsMd(ws: Workspace): void {
   for (const skill of skills()) {
-    for (const base of [".agents", ".claude"])
-      ws.writeText(`${base}/skills/${skill.name}/SKILL.md`, skill.text);
+    for (const base of [".agents", ".claude"]) {
+      const path = `${base}/skills/${skill.name}/SKILL.md`;
+      if (skill.name === "life-portrait" && !canWritePortraitSkill(ws, path)) continue;
+      ws.writeText(path, skill.text);
+    }
   }
   ws.writeText(
     "RECORDS.md",

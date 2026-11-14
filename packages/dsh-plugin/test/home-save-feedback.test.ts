@@ -1,9 +1,11 @@
 import { rmSync } from "node:fs";
-import { readCalendar, readHome, readHomeSources, readOverviewPage } from "@kaitu/core";
+import { type ReadWarning, readCalendar, readHome, readHomeSources, readOverviewPage } from "@kaitu/core";
 import { createElement } from "react";
 import { act, create } from "react-test-renderer";
 import { afterEach, expect, test, vi } from "vitest";
 import { freshWorkspace } from "../../core/test/helpers.js";
+import { AskPage } from "../src/client/AskPage.js";
+import { CommandPalette } from "../src/client/CommandPalette.js";
 import { OverviewPage, type OverviewPageProps } from "../src/client/OverviewPage.js";
 import { LifeHome } from "../src/client/TodayPage.js";
 
@@ -35,6 +37,112 @@ function browserGlobals() {
     },
   );
 }
+
+test("command search keeps working sources executable and retries incomplete reads without losing the query", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  let overview = await readOverviewPage(ws);
+  let readWarnings: ReadWarning[] = [
+    { code: "invalid_record", location: "synthetic-unreadable", message: "Synthetic unreadable record" },
+  ];
+  const loadLifeMap = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw new Error("Synthetic unreadable source");
+    })
+    .mockRejectedValueOnce(new Error("Still unavailable"))
+    .mockRejectedValueOnce(new Error("Still unavailable"))
+    .mockResolvedValueOnce({ features: [], warnings: readWarnings })
+    .mockResolvedValue({ features: [] });
+  let note = { file: "notes/synthetic.md", title: "Synthetic searchable note", kind: "笔记" };
+  const listeners = new Set<() => void>();
+  const loadLibraryDocument = vi.fn().mockResolvedValue("# Synthetic searchable note\n\nA real body.");
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: async () => overview,
+    loadCalendar: async () => readCalendar(ws),
+    loadMe: async () => ({}),
+    loadOnboarding: async () => ({ showGuide: false }),
+    loadCalendarPush: async () => ({}),
+    loadProjects: async () => [],
+    loadExploration: async () => ({ directions: [], warnings: readWarnings }),
+    loadLibrary: async () => ({ inbox: [], notes: [note], warnings: readWarnings }),
+    loadLibraryDocument,
+    loadLifeMap,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    renderAsk: () => null,
+  } as unknown as OverviewPageProps;
+  let app!: ReturnType<typeof create>;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
+    expect(app.root.findByType(LifeHome).props.data.root).toBe(ws.root);
+    const open = () => app.root.findByProps({ "aria-label": "搜索或输入动作" }).props.onClick();
+    const panel = () => app.root.findByType(CommandPalette);
+    const query = (value: string) => panel().findByType("input").props.onChange({ target: { value } });
+    const retry = () => panel().findByProps({ role: "alert" }).findByType("button");
+    await act(async () => open());
+    const failedSources = panel().findByProps({ role: "alert" }).findByType("span").children.join("");
+    for (const source of ["足迹", "方向", "笔记与决策"]) expect(failedSources).toContain(source);
+    await act(async () => query("Synthetic"));
+    expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
+    await act(async () => panel().findByProps({ role: "option" }).props.onClick());
+    expect(loadLibraryDocument).toHaveBeenCalledWith(note.file);
+    expect(app.root.findAllByType(CommandPalette)).toHaveLength(0);
+    await act(async () => open());
+    await act(async () => query("unmatched search"));
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(0);
+    await act(async () => {
+      const click = retry().props.onClick;
+      click();
+      click();
+    });
+    expect(loadLifeMap).toHaveBeenCalledTimes(3);
+    expect(panel().findAllByProps({ role: "alert" })).toHaveLength(1);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    await act(async () => retry().props.onClick());
+    expect(loadLifeMap).toHaveBeenCalledTimes(4);
+    expect(panel().findByProps({ role: "alert" }).findByType("span").children.join("")).toContain("足迹");
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(0);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    readWarnings = [];
+    await act(async () => retry().props.onClick());
+    expect(loadLifeMap).toHaveBeenCalledTimes(5);
+    expect(panel().findAllByProps({ role: "alert" })).toHaveLength(0);
+    expect(panel().findByType("input").props.value).toBe("unmatched search");
+    expect(panel().findByProps({ role: "listbox" }).findAllByType("p")).toHaveLength(1);
+    await act(async () => panel().findByType("dialog").props.onCancel({ preventDefault: vi.fn() }));
+    let finishOld!: (result: { features: [] }) => void;
+    loadLifeMap.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+    );
+    await act(async () => open());
+    await act(async () => query("old workspace query"));
+    overview = { ...overview, root: "/synthetic/next-workspace" };
+    note = { ...note, file: "notes/fresh.md", title: "Fresh workspace note" };
+    await act(async () => {
+      for (const listener of [...listeners]) listener();
+    });
+    expect(panel().findByType("input").props.value).toBe("");
+    await act(async () => query(note.title));
+    expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
+    await act(async () => finishOld({ features: [] }));
+    expect(panel().findByType("input").props.value).toBe(note.title);
+    expect(panel().findAllByProps({ role: "option" })).toHaveLength(1);
+  } finally {
+    if (app) await act(async () => app.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 test("returning home confirms the previous save and keeps text edited while it was pending", async () => {
   browserGlobals();
@@ -133,6 +241,194 @@ test("the subscribed home projection renders while unrelated page reads are stil
   } finally {
     if (app) await act(async () => app?.unmount());
     expect(unsubscribe).toHaveBeenCalledOnce();
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("home shows actual traces, hides empty traces and keeps genuine pending decisions", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  const sources = await readHomeSources(ws);
+  const home = readHome(sources);
+  const project = {
+    key: "project:synthetic:words",
+    date: home.today,
+    kind: "project-metric" as const,
+    label: "Synthetic project progress",
+    value: 600,
+    unit: "words",
+    estimated: false,
+    sourceFiles: ["projects/data/project_metric/2026-10.jsonl"],
+  };
+  const weight = {
+    ...project,
+    key: "metric:weight",
+    kind: "metric" as const,
+    label: "Synthetic body measurement",
+    value: 71,
+    unit: "kg",
+    sourceFiles: ["health/data/metric/2026-10.jsonl"],
+  };
+  const pending = [{ id: "proposal", title: "Synthetic user decision" }];
+  let update!: (state: import("@kaitu/core").HomeState) => void;
+  const state = (traces: import("@kaitu/core").HomeTrace[], decisions = pending) => ({
+    data: { ...home, traces, pending: decisions },
+    presentation: sources.overview,
+    loading: false,
+    error: null,
+  });
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: async () => sources.overview,
+    loadHome: async () => state([project, weight]),
+    subscribeHome: (listener: typeof update) => {
+      update = listener;
+      return () => {};
+    },
+    loadCalendar: async () => readCalendar(ws),
+    loadMe: async () => ({}),
+    loadOnboarding: async () => ({ showGuide: false }),
+    loadCalendarPush: async () => ({}),
+    loadProjects: async () => [],
+    loadLibrary: async () => ({ inbox: [] }),
+    renderAsk: () => null,
+  } as unknown as OverviewPageProps;
+  let app: ReturnType<typeof create> | undefined;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    const content = () => JSON.stringify(app?.toJSON());
+    expect(content()).toContain(project.label);
+    expect(content()).toContain(weight.label);
+    expect(content()).toContain(pending[0]?.title);
+    await act(async () => update(state([])));
+    expect(app?.root.findAllByType("ol")).toHaveLength(0);
+    expect(content()).toContain(pending[0]?.title);
+    await act(async () => update(state([], [])));
+    expect(app?.root.findAllByType("aside")).toHaveLength(0);
+    expect(app?.root.findAllByProps({ "aria-label": "最近的痕迹" })).toHaveLength(0);
+    expect(content()).not.toContain(pending[0]?.title);
+  } finally {
+    if (app) await act(async () => app?.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("contextual Ask keeps Today and the same conversation mounted across close and expand", async () => {
+  browserGlobals();
+  const ws = await freshWorkspace();
+  const sources = await readHomeSources(ws);
+  const requests: string[] = [];
+  vi.stubGlobal("fetch", async (url: string) => {
+    const method = url.split("/").at(-1) ?? "";
+    requests.push(method);
+    const values: Record<string, unknown> = {
+      askSettings: {
+        configured: true,
+        provider: "synthetic",
+        providerName: "Synthetic",
+        model: "fixture",
+        protocols: [],
+        providers: [],
+      },
+      askList: [
+        { id: "existing", title: "Existing conversation", created: "2026-11-10", updated: "2026-11-10" },
+      ],
+      overview: { projects: [], allNext: [], notes: [] },
+      automation: { asked: true, tasks: {} },
+    };
+    return { ok: true, json: async () => values[method] ?? {} };
+  });
+  const streams = vi.fn();
+  const closeStream = vi.fn();
+  vi.stubGlobal(
+    "EventSource",
+    class {
+      constructor() {
+        streams();
+      }
+      close = closeStream;
+    },
+  );
+  vi.stubGlobal("addEventListener", vi.fn());
+  vi.stubGlobal("removeEventListener", vi.fn());
+  vi.stubGlobal("requestAnimationFrame", () => 1);
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const renderAsk = vi.fn<NonNullable<OverviewPageProps["renderAsk"]>>(
+    (prompt, _configureRequest, _configureBuiltin, _connections, promptRequest, active) =>
+      createElement(AskPage, {
+        workspace: ws.root,
+        initialPrompt: prompt,
+        initialPromptRequest: promptRequest,
+        active,
+      }),
+  );
+  const captureOnce = vi.fn();
+  const props = {
+    hosted: true,
+    loadPreferences: async () => ({ locale: "zh-CN", followSystem: false }),
+    load: async () => sources.overview,
+    loadHome: async () => ({
+      data: readHome(sources),
+      presentation: sources.overview,
+      loading: false,
+      error: null,
+    }),
+    loadCalendar: async () => readCalendar(ws),
+    loadMe: async () => ({}),
+    loadOnboarding: async () => ({ showGuide: false }),
+    loadCalendarPush: async () => ({}),
+    loadProjects: async () => [],
+    loadLibrary: async () => ({ inbox: [] }),
+    renderAsk,
+    captureOnce,
+  } as unknown as OverviewPageProps;
+  let app!: ReturnType<typeof create>;
+  try {
+    await act(async () => {
+      app = create(createElement(OverviewPage, props));
+    });
+    await act(async () => app.root.findByType(LifeHome).props.ask("Context from Today"));
+    const panel = () => app.root.findByProps({ role: "complementary" });
+    const composer = () => app.root.findByProps({ "aria-label": "给开图发消息" });
+    expect(panel().props.hidden).toBe(false);
+    expect(app.root.findAllByType(LifeHome)).toHaveLength(1);
+    expect(renderAsk.mock.calls.at(-1)?.[0]).toBe("Context from Today");
+    expect(renderAsk.mock.calls.at(-1)?.[9]).toBeUndefined();
+    expect(captureOnce).not.toHaveBeenCalled();
+    expect(composer().props.value).toBe("Context from Today");
+    await act(async () =>
+      app.root
+        .findAllByType("button")
+        .find((button) => button.children.includes("Existing conversation"))
+        ?.props.onClick(),
+    );
+    await act(async () => composer().props.onChange({ target: { value: "unsent draft" } }));
+    await act(async () => app.root.findByProps({ "aria-label": "关闭问问" }).props.onClick());
+    await act(async () => app.root.findByProps({ "aria-label": "就地问问" }).props.onClick());
+    expect(composer().props.value).toBe("unsent draft");
+    await act(async () =>
+      panel()
+        .findAllByType("button")
+        .find((button) => button.children.includes("展开"))
+        ?.props.onClick(),
+    );
+    expect(app.root.findAllByType(LifeHome)).toHaveLength(0);
+    expect(composer().props.value).toBe("unsent draft");
+    expect(streams).toHaveBeenCalledOnce();
+    expect(closeStream).not.toHaveBeenCalled();
+    const nav = app.root.findByProps({ "aria-label": "主要导航" });
+    await act(async () => nav.findAllByType("button")[0]?.props.onClick());
+    await act(async () => app.root.findByProps({ "aria-label": "就地问问" }).props.onClick());
+    expect(composer().props.value).toBe("unsent draft");
+    expect(streams).toHaveBeenCalledOnce();
+    expect(closeStream).not.toHaveBeenCalled();
+    expect(requests).not.toContain("askCreate");
+    expect(requests).not.toContain("askSend");
+  } finally {
+    if (app) await act(async () => app.unmount());
     rmSync(ws.root, { recursive: true, force: true });
   }
 });

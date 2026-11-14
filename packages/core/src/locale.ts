@@ -7,6 +7,8 @@ export const locales = ["zh-CN", "en"] as const;
 export type Locale = (typeof locales)[number];
 export interface Preferences {
   locale: Locale | null;
+  /** Acknowledged desktop privacy notice; local app state, never workspace data. */
+  privacyNoticeVersion?: string;
   todayAdoptions?: { workspace: string; day: string; ids: string[] };
   /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
   exploreEntries?: string[];
@@ -56,6 +58,9 @@ export function readPreferences(): Preferences {
     const value = JSON.parse(readFileSync(file(), "utf8")) as Partial<Preferences>;
     return {
       locale: locales.includes(value.locale as Locale) ? (value.locale as Locale) : null,
+      ...(typeof value.privacyNoticeVersion === "string"
+        ? { privacyNoticeVersion: value.privacyNoticeVersion }
+        : {}),
       ...(adoptionList(value.todayAdoptions) ? { todayAdoptions: value.todayAdoptions } : {}),
       ...(entryList(value.exploreEntries) ? { exploreEntries: value.exploreEntries } : {}),
       ...(typeof value.lifeMapFirstMigrated === "boolean"
@@ -76,11 +81,14 @@ export function savePreferences(input: Partial<Preferences>): Preferences {
     Object.keys(input).some(
       (key) =>
         key !== "locale" &&
+        key !== "privacyNoticeVersion" &&
         key !== "exploreEntries" &&
         key !== "explorePlugins" &&
         key !== "todayAdoptions" &&
         key !== "lifeMapFirstMigrated",
     ) ||
+    (input.privacyNoticeVersion !== undefined &&
+      (typeof input.privacyNoticeVersion !== "string" || input.privacyNoticeVersion.length > 80)) ||
     (input.todayAdoptions !== undefined && !adoptionList(input.todayAdoptions)) ||
     (input.exploreEntries !== undefined && !entryList(input.exploreEntries)) ||
     (input.lifeMapFirstMigrated !== undefined && typeof input.lifeMapFirstMigrated !== "boolean") ||

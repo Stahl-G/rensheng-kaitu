@@ -1,4 +1,3 @@
-import type { Context } from "@deepseek-ai/cordis";
 import type {
   ISessions,
   SessionReference,
@@ -7,10 +6,12 @@ import type {
 import type {
   ConversationSnapshot,
   ConversationViewsProps,
+  IConversation,
 } from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useT } from "./i18n.js";
 import type { PluginAskSession } from "./plugin-ask-session.js";
 
 declare module "@deepseek-ai/dsh-api-session-controller/client" {
@@ -27,7 +28,7 @@ declare module "@deepseek-ai/dsh-client-ui-slots" {
 export interface PluginAskServices {
   sessions: Pick<ISessions, "create" | "retain" | "scope">;
   workspaces: { create(input: { path: string }): Promise<{ workspaceId: string }> };
-  conversation: { input: { for(scope: Context): { setDraft(text: string): void } } };
+  conversation: { input: Pick<IConversation["input"], "requestDraftInitialization"> };
   workspacePath: () => Promise<string>;
 }
 
@@ -66,6 +67,9 @@ export function PluginAsk({
   prompt: string;
   promptRequest?: number;
 } & PropsRenderSlots<"kaitu.ask.chat">) {
+  const t = useT();
+  const [pendingPrompts, setPendingPrompts] = useState(session.pendingPrompts);
+  const lastRequest = useRef<{ binding: SessionReference["binding"]; prompt: string; request: number }>();
   const [reference, setReference] = useState<SessionReference | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -84,14 +88,58 @@ export function PluginAsk({
   }, [session]);
   useEffect(() => {
     if (!reference || (!prompt && !promptRequest)) return;
-    const scope = services.sessions.scope(reference.sessionId);
-    if (scope) services.conversation.input.for(scope).setDraft(prompt);
-  }, [reference, prompt, promptRequest, services]);
+    const previous = lastRequest.current;
+    if (
+      previous?.binding === reference.binding &&
+      previous.prompt === prompt &&
+      previous.request === promptRequest
+    )
+      return;
+    lastRequest.current = { binding: reference.binding, prompt, request: promptRequest };
+    const result = services.conversation.input.requestDraftInitialization(reference.binding, {
+      prompt,
+      whenDraftExists: "append",
+    });
+    const current = session.pendingPrompts;
+    session.pendingPrompts =
+      result === "applied"
+        ? current.filter((item) => item !== prompt)
+        : current.includes(prompt)
+          ? current
+          : [...current, prompt];
+    setPendingPrompts(session.pendingPrompts);
+  }, [reference, prompt, promptRequest, services, session]);
+  const pendingPrompt = pendingPrompts.join("\n\n");
   if (error) return <p role="alert">{error}</p>;
   if (!reference) return null;
   return (
-    <SessionProvider key={reference.sessionId} session={reference}>
-      {renderSlot("kaitu.ask.chat", {})}
-    </SessionProvider>
+    <>
+      {pendingPrompt && (
+        <details open>
+          <summary>{t("待加入问问", "Pending context")}</summary>
+          <p>{pendingPrompt}</p>
+          <button
+            type="button"
+            onClick={() => {
+              const result = services.conversation.input.requestDraftInitialization(reference.binding, {
+                prompt: pendingPrompt,
+                whenDraftExists: "append",
+              });
+              if (result === "applied") {
+                session.pendingPrompts = session.pendingPrompts.filter(
+                  (item) => !pendingPrompts.includes(item),
+                );
+                setPendingPrompts(session.pendingPrompts);
+              }
+            }}
+          >
+            {t("加入草稿", "Add to draft")}
+          </button>
+        </details>
+      )}
+      <SessionProvider key={reference.sessionId} session={reference}>
+        {renderSlot("kaitu.ask.chat", {})}
+      </SessionProvider>
+    </>
   );
 }

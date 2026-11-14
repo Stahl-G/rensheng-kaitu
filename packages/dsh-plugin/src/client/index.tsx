@@ -210,6 +210,29 @@ export async function apply(ctx: Context) {
                 if (!result.ok) throw new Error(result.error.message);
                 return result.value;
               },
+              captureOnce: async (text: string, operationId: string) => {
+                const r = await ctx.remote.kaitu.captureOnce(text, operationId);
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              resultDraft: async (
+                root: string,
+                value: import("@kaitu/core").HomeResultDraft | null,
+                expected: import("@kaitu/core").HomeResultDraft | null,
+              ) => {
+                const r = await ctx.remote.kaitu.resultDraft(
+                  root,
+                  JSON.stringify(value),
+                  JSON.stringify(expected),
+                );
+                if (!r.ok) throw r.error;
+                return JSON.parse(r.value);
+              },
+              resultAction: async (root: string, request: import("@kaitu/core").ResultRequest) => {
+                const r = await ctx.remote.kaitu.resultAction(root, JSON.stringify(request));
+                if (!r.ok) throw r.error;
+                return JSON.parse(r.value);
+              },
               loadHome: async () => {
                 const result = await ctx.remote.kaitu.home();
                 if (!result.ok) throw new Error(result.error.message);
@@ -395,6 +418,11 @@ export async function apply(ctx: Context) {
               },
               loadSettings: async () => {
                 const r = await ctx.remote.kaitu.settings();
+                if (!r.ok) throw new Error(r.error.message);
+                return r.value;
+              },
+              selectPhoneConsumer: async (deviceId: string) => {
+                const r = await ctx.remote.kaitu.selectPhoneConsumer(deviceId);
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },

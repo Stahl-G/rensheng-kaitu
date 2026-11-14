@@ -26,7 +26,8 @@ export function openIndex(ws: Workspace): DatabaseSync {
   const path = ws.resolve(INDEX_FILE, { internal: true });
   mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
-  db.exec(`
+  try {
+    db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS chats USING fts5(
       file UNINDEXED, id UNINDEXED, title, date UNINDEXED, text, tokenize='trigram'
     );
@@ -34,7 +35,15 @@ export function openIndex(ws: Workspace): DatabaseSync {
       file TEXT PRIMARY KEY, mtime REAL NOT NULL, ctime REAL NOT NULL, size INTEGER NOT NULL
     );
   `);
-  return db;
+    return db;
+  } catch (error) {
+    try {
+      db.close();
+    } catch (closeError) {
+      throw new AggregateError([error, closeError], "Index initialization and close failed");
+    }
+    throw error;
+  }
 }
 
 function transaction(db: DatabaseSync, write: () => void): void {

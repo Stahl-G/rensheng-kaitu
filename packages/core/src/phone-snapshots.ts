@@ -5,12 +5,13 @@ import { Worker } from "node:worker_threads";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
 import { historyReadInputs } from "./history.js";
-import { rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
+import { computerPhoneGenerator, rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
 import { phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { lifeMap } from "./places.js";
 import {
+  type ProjectionChecks,
   type ProjectionManifest,
   projectionDay,
   projectionExpiry,
@@ -24,33 +25,46 @@ import {
 import { schemas } from "./schema.js";
 import { syncMode } from "./sync-location.js";
 import { ignoredWorkspaceChange, readWorkbench } from "./workbench.js";
-import { subscribeWorkspaceBackup, workspaceBackupStatus } from "./workspace-backup.js";
+import { subscribeWorkspaceBackup, workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace, WorkspaceWrite } from "./workspace.js";
 
 export function phoneReadable(ws: Workspace) {
-  return syncMode(ws.root) !== "local" || workspaceBackupStatus(ws).connection?.enabled === true;
+  return syncMode(ws.root) !== "local" || workspaceBackupEnabled(ws);
 }
-export type PhoneGenerator = { kind: "computer" } | { kind: "agent"; name: string; spec: 1 };
+export type PhoneGenerator =
+  | { kind: "computer"; device_id?: string }
+  | { kind: "agent"; name: string; spec: 1 };
 
-type Published = { since: number; generator: string; outputs: ProjectionManifest };
+type Published = {
+  resultContract: "single-line-v1";
+  since: number;
+  generator: string;
+  outputs: ProjectionManifest;
+};
 type PublishedCache = NonNullable<ReturnType<typeof readProjection<Published>>>;
 const published = new WeakMap<Workspace, PublishedCache>();
 
-export function phoneSnapshotsCurrent(ws: Workspace, now: Date, generator?: PhoneGenerator): boolean {
+export function phoneSnapshotsCurrent(
+  ws: Workspace,
+  now: Date,
+  generator?: PhoneGenerator,
+  checks?: ProjectionChecks,
+): boolean {
   const input = { root: ws.root, state: dirname(ws.resolve(".kaitu/cache", { internal: true })) };
   try {
     const memory = published.get(ws);
-    const hit = memory ?? readProjection<Published>(input, "phone", now);
+    const hit = memory ?? readProjection<Published>(input, "phone", now, checks);
     if (
       hit &&
+      hit.value.resultContract === "single-line-v1" &&
       hit.root === input.root &&
       hit.state === input.state &&
-      hit.value.generator === JSON.stringify(generator ?? { kind: "computer" }) &&
+      hit.value.generator === JSON.stringify(generator ?? computerPhoneGenerator(ws)) &&
       hit.value.since <= now.getTime() &&
       hit.day === projectionDay(now, hit.timeZone) &&
       (hit.expires === null || now.getTime() < hit.expires) &&
-      (!memory || projectionUnchanged(input, hit.manifest)) &&
-      projectionUnchanged(input, hit.value.outputs)
+      (!memory || projectionUnchanged(input, hit.manifest, checks)) &&
+      projectionUnchanged(input, hit.value.outputs, checks)
     ) {
       published.set(ws, hit);
       return true;
@@ -75,7 +89,8 @@ export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?
   const data = await readOverviewPage(ws, now, sources);
   const at = now.toISOString();
   const snapshots = {
-    today: () => buildPhoneToday(data, at, ws),
+    // Keep the last good published today when a source is damaged; direct UI reads remain partial.
+    today: () => buildPhoneToday(data, at, ws, { strict: true }),
     week: () => buildPhoneWeek(data, at),
     map: () => {
       const map = lifeMap(ws, now);
@@ -90,7 +105,7 @@ export async function preparePhoneSnapshots(ws: Workspace, now: Date, generator?
   let cacheable = true;
   const prepared = Object.entries(snapshots).map(([name, build]) => {
     try {
-      const value = { ...build(), generator: generator ?? { kind: "computer" as const } };
+      const value = { ...build(), generator: generator ?? computerPhoneGenerator(ws) };
       cacheable = schemas().builtin(`phone-${name}.schema.json`)(value) && cacheable;
       return { name, value, error: undefined };
     } catch (error) {
@@ -175,8 +190,9 @@ export function publishPhoneSnapshots(
           ...phoneReceipts(ws).map((receipt) => Date.parse(receipt.at) + 14 * 86400000 + 1),
         );
         const value: Published = {
+          resultContract: "single-line-v1",
           since: now.getTime(),
-          generator: JSON.stringify(generator ?? { kind: "computer" }),
+          generator: JSON.stringify(generator ?? computerPhoneGenerator(ws)),
           outputs: [...prepared.snapshots.map((item) => item.name), "receipts"].map((name) => {
             const path = ws.resolve(`phone/${name}.json`);
             return [path, projectionFingerprint(path)];
@@ -218,6 +234,7 @@ export function startPhoneSnapshots(
   ws: Workspace,
   report: (error: unknown) => void = () => {},
   write: WorkspaceWrite = (operation) => operation(),
+  startupChecks?: ProjectionChecks,
 ) {
   let timer: NodeJS.Timeout | undefined;
   let running = false;
@@ -360,9 +377,16 @@ export function startPhoneSnapshots(
   const off = subscribeWorkspaceBackup(ws, schedule);
   const interval = setInterval(schedule, 60000);
   interval.unref();
-  // The initial view has no edit burst to debounce.
-  timer = setTimeout(() => void run(), 0);
-  timer.unref();
+  // The owner has just checked the same originals for home. Reuse that startup
+  // observation and verify phone outputs instead of starting a worker for a no-op.
+  if (
+    !startupChecks ||
+    !phoneReadable(ws) ||
+    !phoneSnapshotsCurrent(ws, new Date(), undefined, startupChecks)
+  ) {
+    timer = setTimeout(() => void run(), 0);
+    timer.unref();
+  }
   return async () => {
     closed = true;
     clearTimeout(timer);

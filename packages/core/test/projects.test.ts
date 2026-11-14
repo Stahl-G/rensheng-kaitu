@@ -6,6 +6,7 @@ import { strToU8, zipSync } from "fflate";
 import git from "isomorphic-git";
 import { expect, it, vi } from "vitest";
 import {
+  addRecord,
   createProject,
   listProjects,
   readProject,
@@ -14,6 +15,50 @@ import {
   syncProject,
 } from "../src/index.js";
 import { freshWorkspace, tmp } from "./helpers.js";
+
+it("项目七日指标在后续读取换时区和跨午夜时重新按当地日期汇总", async () => {
+  const ws = await freshWorkspace("UTC");
+  try {
+    ws.writeText("projects/synthetic/STATUS.md", "---\ntitle: 合成项目\n---\n");
+    const first = addRecord(ws, "project_metric", {
+      project: "synthetic",
+      kind: "words",
+      value: 100,
+      ts: "2026-10-30T23:30:00Z",
+    });
+    for (const [kind, value, ts] of [
+      ["words", 150, "2026-10-31T00:30:00Z"],
+      ["commits", 2, "2026-10-31T00:30:00Z"],
+      ["words", 170, "2026-11-01T00:30:00Z"],
+    ] as const)
+      addRecord(ws, "project_metric", { project: "synthetic", kind, value, ts });
+    const original = ws.readText(first.file);
+    const now = new Date("2026-10-31T23:59:00Z");
+    const recent = (at = now) => listProjects(ws, { now: at })[0]?.recent7;
+    const utc = recent();
+    expect(utc?.daily.at(-1)).toEqual({ date: "2026-10-31", words: 50, commits: 2 });
+    expect(utc?.words).toBe(50);
+
+    ws.writeText("me/rules.md", "---\ntimezone: Pacific/Kiritimati\n---\n");
+    const shifted = recent();
+    expect(shifted?.daily.at(-1)?.date).toBe("2026-11-01");
+    expect(shifted?.daily.find((day) => day.date === "2026-10-31")).toEqual({
+      date: "2026-10-31",
+      words: null,
+      commits: 2,
+    });
+    ws.writeText("me/rules.md", "---\ntimezone: UTC\n---\n");
+    expect(recent()).toEqual(utc);
+    expect(recent(new Date("2026-11-01T00:31:00Z"))?.daily.at(-1)).toEqual({
+      date: "2026-11-01",
+      words: 20,
+      commits: null,
+    });
+    expect(ws.readText(first.file)).toBe(original);
+  } finally {
+    fs.rmSync(ws.root, { recursive: true, force: true });
+  }
+});
 
 it("正文 glob、Markdown 和 docx 混合计数，重复同步修订当天记录与日志", async () => {
   const root = tmp();

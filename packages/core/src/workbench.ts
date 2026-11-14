@@ -45,6 +45,8 @@ export interface NextItem {
   status: "todo" | "proposed" | "done" | "skipped";
   priority?: "high" | "normal" | "low";
   due?: string | null;
+  result?: string;
+  completed?: string;
   estimate?: string | null;
   when?: string | null;
 }
@@ -162,13 +164,19 @@ export function readWorkbench(
     }
   }
   const modules = listModules(ws);
+  const recordTypes = listRecordTypes(ws);
   const records = Object.fromEntries(
-    listRecordTypes(ws).map(({ type }) => [
+    recordTypes.map(({ type }) => [
       type,
       read(
         type,
         () => {
-          const rows = readRecords(ws, type, { onError: (error) => warnings.push(readWarning(error)) });
+          const rows = readRecords(
+            ws,
+            type,
+            { onError: (error) => warnings.push(readWarning(error)) },
+            recordTypes,
+          );
           return connection ? publicRecords(ws, type, rows, connection) : rows;
         },
 
@@ -376,6 +384,7 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file === "phone" ||
     file.startsWith("phone/") ||
     file === ".kaitu/inbox-state.json" ||
+    file === ".kaitu/result-draft.json" ||
     file === ".kaitu/organizer.json" ||
     file === ".kaitu/feishu.json" ||
     file === ".kaitu/channels" ||
@@ -385,6 +394,8 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file.split(/[\\/]/).includes(".git") ||
     file === ".kaitu/history.git" ||
     file.startsWith(".kaitu/history.git/") ||
+    file === ".kaitu/result-actions" ||
+    file.startsWith(".kaitu/result-actions/") ||
     file === ".kaitu/cache" ||
     file.startsWith(".kaitu/cache/") ||
     file.startsWith(".kaitu/index.sqlite") ||

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { latestDaily } from "./overview.js";
 import { type PhoneReceipt, phoneReceipts } from "./phone-receipts.js";
 import { schemas } from "./schema.js";
@@ -25,9 +26,9 @@ interface OrganizerState {
   daily: Daily | null;
   computerAt?: string;
   visits: Visit[];
+  consumer?: { deviceId: string; otherDeviceId?: string; selectedDeviceId?: string };
 }
 const file = ".kaitu/organizer.json";
-const states = new WeakMap<Workspace, { root: string; value: OrganizerState }>();
 const events = new WeakMap<Workspace, EventEmitter>();
 export function subscribeOrganizer(ws: Workspace, notify: () => void) {
   let emitter = events.get(ws);
@@ -40,15 +41,13 @@ export function subscribeOrganizer(ws: Workspace, notify: () => void) {
     emitter.off("change", notify);
   };
 }
-function state(ws: Workspace) {
-  const hit = states.get(ws);
-  if (hit?.root === ws.root) return hit.value;
-  const value: OrganizerState = ws.exists(file)
-    ? ws.readJson(file)
-    : { agent: null, daily: null, visits: [] };
-  states.set(ws, { root: ws.root, value });
-  return value;
+function state(ws: Workspace): OrganizerState {
+  // Multiple services use separate Workspace instances for the same local state.
+  // Always read before a synchronous update, including non-consumer updates.
+  // This is not a cross-process lock or a sync-folder concurrency guarantee.
+  return ws.exists(file) ? ws.readJson<OrganizerState>(file) : { agent: null, daily: null, visits: [] };
 }
+
 function store(ws: Workspace, value: OrganizerState) {
   ws.writeJson(file, value, { internal: true });
   events.get(ws)?.emit("change");
@@ -58,11 +57,60 @@ export interface OrganizerStatus {
   daily: Daily | null;
   away: Visit | null;
   unread: boolean;
+  consumer: ReturnType<typeof phoneConsumerStatus>;
 }
 export function organizerStatus(ws: Workspace): OrganizerStatus {
   const s = state(ws);
   const away = s.visits.at(-1) ?? null;
-  return { agent: s.agent, daily: s.daily, away, unread: !!away && !away.seen };
+  return {
+    agent: s.agent,
+    daily: s.daily,
+    away,
+    unread: !!away && !away.seen,
+    consumer: phoneConsumerStatus(ws),
+  };
+}
+
+const devicePattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Per-workspace pseudonymous identity, not an ownership lock or action ledger. */
+export function phoneConsumerStatus(ws: Workspace) {
+  const s = state(ws);
+  if (!s.consumer) {
+    s.consumer = { deviceId: randomUUID() };
+    store(ws, s);
+  }
+  const c = s.consumer;
+  return { ...c, paused: c.selectedDeviceId ? c.selectedDeviceId !== c.deviceId : !!c.otherDeviceId };
+}
+export function selectPhoneConsumer(ws: Workspace, deviceId: string) {
+  const c = phoneConsumerStatus(ws);
+  if (deviceId !== c.deviceId && deviceId !== c.otherDeviceId) throw new Error("Unknown computer");
+  const s = state(ws);
+  s.consumer = { deviceId: c.deviceId, otherDeviceId: c.otherDeviceId, selectedDeviceId: deviceId };
+  store(ws, s);
+  return phoneConsumerStatus(ws);
+}
+export function observePhoneConsumer(ws: Workspace, today?: string) {
+  if (!today) return;
+  let value: { generator?: { kind?: string; device_id?: string } };
+  try {
+    value = JSON.parse(today);
+  } catch {
+    return;
+  }
+  if (!schemas().builtin("phone-today.schema.json")(value)) return;
+  const generator = (value as { generator?: { kind?: string; device_id?: string } }).generator;
+  if (generator?.kind !== "computer") return;
+  const id = generator.device_id;
+  if (typeof id !== "string" || !devicePattern.test(id)) return;
+  const c = phoneConsumerStatus(ws);
+  if (id === c.deviceId || id === c.otherDeviceId) return;
+  const s = state(ws);
+  s.consumer = { deviceId: c.deviceId, otherDeviceId: id };
+  store(ws, s);
+}
+export function computerPhoneGenerator(ws: Workspace) {
+  return { kind: "computer" as const, device_id: phoneConsumerStatus(ws).deviceId };
 }
 
 /** 只在外部输入处校验；先保存来源和回执摘要，随后电脑才可覆盖快照。 */
@@ -73,6 +121,7 @@ export function rememberOrganizer(
   daily: ReturnType<typeof latestDaily>,
   now = new Date(),
 ) {
+  observePhoneConsumer(ws, today);
   let incoming: AgentUpdate | undefined;
   if (today) {
     try {
