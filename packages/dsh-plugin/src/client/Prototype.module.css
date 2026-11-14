@@ -1751,3 +1751,9 @@
   color: var(--on-primary);
   box-shadow: 0 4px 16px var(--link-line);
 }
+/* Leave room so the floating Ask button never sits on the last row of a page. */
+.content:not(.askContent)::after {
+  content: "";
+  display: block;
+  height: 56px;
+}

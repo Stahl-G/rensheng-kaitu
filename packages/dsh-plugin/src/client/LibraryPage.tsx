@@ -21,6 +21,7 @@ import { MediaPreview, type MediaServices } from "./MediaPreview.js";
 import css from "./Prototype.module.css";
 import { ReadWarnings } from "./ReadWarnings.js";
 import { useLocale, useT, versionText } from "./i18n.js";
+import { plainStamp } from "./next-presentation.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
 const icon = (paths: ReactNode) => (
@@ -301,7 +302,7 @@ export function LibraryPage({
               `电脑不在时，云端整理员整理了 ${away.actions} 条`,
               `While your computer was off, the cloud organizer sorted ${away.actions} items`,
             )}{" "}
-            · {away.returnedAt.slice(0, 16).replace("T", " ")}
+            · {plainStamp(away.returnedAt, locale)}
           </p>
         )}
         {items.slice(0, 3).map((item) => (
@@ -454,7 +455,7 @@ export function LibraryPage({
           {overview.versions.slice(0, 3).map((version) => (
             <div className={styles.row} key={version.oid}>
               <span>{versionText(version.text, locale)}</span>
-              <time className={styles.meta}>{version.time.slice(0, 16).replace("T", " ")}</time>
+              <time className={styles.meta}>{plainStamp(version.time, locale)}</time>
             </div>
           ))}
         </section>
@@ -489,6 +490,7 @@ export function InboxPage({
   >;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [channels, setChannels] = useState<ChannelState>();
   useEffect(() => {
     void channelSettings?.("list")
@@ -680,7 +682,7 @@ export function InboxPage({
                     </span>
                   )}
                   <time className={inboxStyles.meta}>
-                    {row.date?.slice(0, 16).replace("T", " ") ?? t("时间未记录", "Time not recorded")}
+                    {row.date ? plainStamp(row.date, locale) : t("时间未记录", "Time not recorded")}
                   </time>
                   <span className={inboxStyles.meta}>
                     {sourceLabel(row.source)} ·{" "}
@@ -724,7 +726,7 @@ export function InboxPage({
                   </p>
                 )}
                 <p className={inboxStyles.meta}>
-                  {t("原文", "Original")} · {selectedEntry.date?.slice(0, 16).replace("T", " ")}
+                  {t("原文", "Original")} · {plainStamp(selectedEntry.date, locale)}
                 </p>
                 <blockquote className={inboxStyles.original}>{selectedEntry.text}</blockquote>
                 <MediaPreview

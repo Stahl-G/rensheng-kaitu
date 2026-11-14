@@ -97,6 +97,26 @@ export function todaySourceGroups(
   }));
 }
 
+/** A stored date or timestamp as people say it: 今天 09:12, 昨天, 11月8日. Never the raw ISO string. */
+export function plainStamp(value: string | null | undefined, locale: Locale, now = new Date()) {
+  if (!value) return "";
+  const stamp = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T12:00:00`) : new Date(value);
+  if (!Number.isFinite(stamp.getTime())) return value;
+  const day = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const days = Math.round((day(now) - day(stamp)) / 86400000);
+  const time =
+    value.length > 10
+      ? ` ${String(stamp.getHours()).padStart(2, "0")}:${String(stamp.getMinutes()).padStart(2, "0")}`
+      : "";
+  if (days === 0) return (locale === "en" ? "Today" : "今天") + time;
+  if (days === 1) return (locale === "en" ? "Yesterday" : "昨天") + time;
+  return new Intl.DateTimeFormat(locale, {
+    month: locale === "en" ? "short" : "long",
+    day: "numeric",
+    ...(stamp.getFullYear() === now.getFullYear() ? {} : { year: "numeric" as const }),
+  }).format(stamp);
+}
+
 export function todayProjectDate(day: string, today: string, locale: Locale) {
   const days = (Date.parse(`${today}T12:00:00Z`) - Date.parse(`${day}T12:00:00Z`)) / 86400000;
   if (days === 0) return locale === "en" ? "today" : "今天";
