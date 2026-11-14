@@ -988,6 +988,10 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       notify();
       json(res, 200, result);
     } catch (error) {
+      // Temporary diagnostic branch: only Vitest's synthetic workspaces may log.
+      // Do not ship or merge this instrumentation into the release candidate.
+      if (process.env.NODE_ENV === "test" && /^\/api\/(sync|drive)\/(enable|disable)$/.test(req.url ?? ""))
+        console.error("[synthetic-sync-diagnostic]", req.url, { root: ws.root }, error);
       const locale =
         resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ?? "zh-CN";
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
