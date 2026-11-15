@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExperienceBatchPreview, ExperienceImportsData } from "../types.js";
 import css from "./MapPage.module.css";
-import { useT } from "./i18n.js";
+import { useLocale, useT } from "./i18n.js";
+import { plainStamp } from "./next-presentation.js";
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -61,6 +62,7 @@ export function ExperienceImportControls(
   },
 ) {
   const t = useT();
+  const locale = useLocale();
   const sourceName = (locator: string) => (locator === "apple-photos" ? t("照片", "Photos") : locator);
   // 来源和导入记录是管理用的，默认收起；有待处理的只在按钮上标数量，不自动展开挡住地图。
   const [open, setOpen] = useState(false);
@@ -342,8 +344,7 @@ export function ExperienceImportControls(
                     .map((batch) => (
                       <article key={batch.id} className={css.reviewItem}>
                         <strong>
-                          {batch.sources.map(sourceName).join(t("、", ", "))} ·{" "}
-                          {batch.ts.slice(0, 16).replace("T", " ")}
+                          {batch.sources.map(sourceName).join(t("、", ", "))} · {plainStamp(batch.ts, locale)}
                         </strong>
                         <p className={css.secondary}>
                           {t(
@@ -423,7 +424,7 @@ export function ExperienceImportControls(
                   aria-label={t(`导入 ${batch.id}`, `Import ${batch.id}`)}
                 >
                   <strong>
-                    {batch.ts.slice(0, 16).replace("T", " ")} ·{" "}
+                    {plainStamp(batch.ts, locale)} ·{" "}
                     {t(`${batch.added} 段经历`, `${count(batch.added, "place", "places")}`)}
                   </strong>
                   <p className={css.secondary}>

@@ -421,7 +421,9 @@ export function LibraryPage({
                     {section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
                   </span>
                 ) : null}
-                {section.latest && <time className={styles.meta}>{section.latest.slice(0, 10)}</time>}
+                {section.latest && (
+                  <time className={styles.meta}>{plainStamp(section.latest.slice(0, 10), locale)}</time>
+                )}
               </article>
             ))}
           {onAdd && (
@@ -446,7 +448,7 @@ export function LibraryPage({
             {overview.daily && (
               <details>
                 <summary>
-                  {t("近期回顾", "Recent review")} · {overview.daily.date}
+                  {t("近期回顾", "Recent review")} · {plainStamp(overview.daily.date, locale)}
                 </summary>
                 <div className={css.detailBody}>{overview.daily.body}</div>
               </details>
