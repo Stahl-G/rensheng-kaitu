@@ -10,10 +10,23 @@ export function SourceEvidence({
 }: { id: string; label?: string; load: (id: string) => Promise<ExperienceSource> }) {
   const t = useT();
   const focus = useRef<HTMLElement>(null);
+  const request = useRef(0);
+  const sourceId = useRef(id);
   const [source, setSource] = useState<ExperienceSource | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    sourceId.current = id;
+    request.current++;
+    setOpen(false);
+    setBusy(false);
+    setSource(null);
+    setError(null);
+    return () => {
+      request.current++;
+    };
+  }, [id]);
   const attachment = useMemo(() => {
     if (source?.kind !== "attachment") return null;
     const bytes = Uint8Array.from(atob(source.data), (value) => value.charCodeAt(0));
@@ -35,34 +48,35 @@ export function SourceEvidence({
       <button
         type="button"
         className={css.link}
-        disabled={busy}
+        aria-busy={busy}
         aria-expanded={open}
         onClick={async () => {
           if (open) {
+            request.current++;
+            setBusy(false);
             setOpen(false);
             return;
           }
+          const seq = ++request.current;
           setOpen(true);
           setBusy(true);
           setError(null);
           setSource(null);
           try {
-            setSource(await load(id));
+            const result = await load(id);
+            if (request.current === seq && sourceId.current === id) setSource(result);
           } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
+            if (request.current === seq) setError(err instanceof Error ? err.message : String(err));
           } finally {
-            setBusy(false);
+            if (request.current === seq) setBusy(false);
           }
         }}
       >
-        {busy
-          ? t("正在读取原文…", "Loading source…")
-          : open
-            ? t("收起原文", "Hide source")
-            : (label ?? t("查看原文", "View source"))}
+        {open ? t("收起原文", "Hide source") : (label ?? t("查看原文", "View source"))}
       </button>
       {open && (
         <div aria-label={t("来源原文", "Source text")}>
+          {busy && <output>{t("正在读取原文…", "Loading source…")}</output>}
           {error && <p role="alert">{error}</p>}
           {source?.kind === "attachment" && attachment && (
             <>

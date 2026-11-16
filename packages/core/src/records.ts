@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { readIssue } from "./errors.js";
 import { KaituError } from "./errors.js";
 import { deepFreeze } from "./frozen.js";
@@ -238,6 +239,8 @@ export function updateRecord(
   ws.assertDownloaded(recordFilePattern(ref).dir);
   const current = latestById(ws, ref).get(id);
   if (!current || current.deleted) throw new KaituError(`找不到「${type}」记录 ${id}`, "NOT_FOUND");
+  if (opts.expected_revision !== undefined && (current.rev ?? 1) !== opts.expected_revision)
+    throw new KaituError("记录已更新，请刷新 / Record changed; refresh", "CONFLICT");
   // 修改只补时区，不补字段、不丢空值。
   const normalized = normalizeRecordInput(validatorFor(ws, ref).schema, patch, ws.timeZone(), new Date(), {
     patch: true,
@@ -438,4 +441,43 @@ export function appendPreparedRecords(
     files.set(file, lines);
   }
   for (const [file, lines] of files) ws.appendLine(file, lines.join("\n"));
+}
+
+/** Restore a prior stored revision by appending, never rewriting history. No transport-specific state. */
+export function prepareRecordRestoration(
+  ws: Workspace,
+  type: string,
+  id: string,
+  expectedRevision: number,
+  priorRevision: number,
+  by: By = "agent",
+): StoredRecord {
+  const rows = readRecordRevisions(ws, type).filter((row) => row.id === id);
+  const revisions = new Map<number, StoredRecord>();
+  for (const row of rows) {
+    const duplicate = revisions.get(row.rev ?? 1);
+    if (duplicate && !isDeepStrictEqual(duplicate, row))
+      throw new KaituError(
+        "同一修订有不同内容，请先核对 / Conflicting contents at the same revision",
+        "CONFLICT",
+      );
+    revisions.set(row.rev ?? 1, row);
+  }
+  const current = rows.reduce<StoredRecord | undefined>(
+    (latest, row) => (!latest || (row.rev ?? 1) >= (latest.rev ?? 1) ? row : latest),
+    undefined,
+  );
+  const prior = rows.find((row) => (row.rev ?? 1) === priorRevision);
+  if (
+    !current ||
+    current.deleted ||
+    (current.rev ?? 1) !== expectedRevision ||
+    !prior ||
+    prior.deleted ||
+    priorRevision >= expectedRevision
+  )
+    throw new KaituError("记录已更新或原修订不存在 / Record changed or revision missing", "CONFLICT");
+  const restored = { ...prior, by, rev: expectedRevision + 1 };
+  validatePreparedRecords(ws, [{ type, record: restored }]);
+  return restored;
 }

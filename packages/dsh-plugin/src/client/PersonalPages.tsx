@@ -37,6 +37,7 @@ export interface PersonalServices
   pluginOpenLabel?: readonly [string, string];
   phoneChannels?: boolean;
   loadSettings: () => Promise<SettingsData>;
+  selectPhoneConsumer?: (deviceId: string) => Promise<OrganizerStatus>;
   organizerSeen?: () => Promise<OrganizerStatus>;
   workspaceBackup?: WorkspaceBackupRequest;
   configureAutomation: (
@@ -850,6 +851,16 @@ export function PersonalPages(
                   data={data}
                   copy={(text) =>
                     run(() => navigator.clipboard.writeText(text), t("说明已复制", "Instructions copied"))
+                  }
+                  selectConsumer={
+                    props.selectPhoneConsumer
+                      ? (deviceId) =>
+                          run(async () => {
+                            const organizer = await props.selectPhoneConsumer?.(deviceId);
+                            if (organizer)
+                              setData((current) => (current ? { ...current, organizer } : current));
+                          })
+                      : undefined
                   }
                   seen={() =>
                     run(async () => {

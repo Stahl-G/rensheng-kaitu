@@ -248,8 +248,9 @@ test.each(["library", "today"])(
         await act(async () => {
           app.root
             .findByType(LifeHome)
-            .findByType("form")
-            .props.onSubmit({ preventDefault() {} });
+            .findAllByType("button")
+            .find((button) => button.children.includes("问问 →"))
+            ?.props.onClick();
           await pending;
         });
         expect(source).toBe("");

@@ -809,7 +809,10 @@ it("同目录 Agent 快照覆盖前保存来源与离线回执，已读记录在
   );
   ws.writeJson(".kaitu/phone-actions.json", { "computer-action": { status: "applied" } }, { internal: true });
   await writePhoneSnapshots(ws, new Date(now.getTime() + 3000), { force: true });
-  expect(ws.readJson<{ generator: unknown }>("phone/today.json").generator).toEqual({ kind: "computer" });
+  expect(ws.readJson<{ generator: unknown }>("phone/today.json").generator).toMatchObject({
+    kind: "computer",
+    device_id: expect.any(String),
+  });
   expect(organizerStatus(ws)).toMatchObject({
     agent: { name: "Dot", generatedAt },
     unread: true,
@@ -845,7 +848,10 @@ it("GitHub 在回写电脑快照之前记住远端整理员和新回执，重复
   receipts.items.push({ ref: ulid(), kind: "action", status: "rejected", at: new Date().toISOString() });
   m.deliver("phone/receipts.json", JSON.stringify(receipts));
   await syncWorkspaceBackup(ws, m.remote);
-  expect(JSON.parse(m.files()["phone/today.json"] as string).generator).toEqual({ kind: "computer" });
+  expect(JSON.parse(m.files()["phone/today.json"] as string).generator).toMatchObject({
+    kind: "computer",
+    device_id: expect.any(String),
+  });
   expect(organizerStatus(ws)).toMatchObject({
     agent: { name: "Dot" },
     unread: true,

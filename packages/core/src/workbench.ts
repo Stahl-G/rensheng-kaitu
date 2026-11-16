@@ -45,6 +45,8 @@ export interface NextItem {
   status: "todo" | "proposed" | "done" | "skipped";
   priority?: "high" | "normal" | "low";
   due?: string | null;
+  result?: string;
+  completed?: string;
   estimate?: string | null;
   when?: string | null;
 }
@@ -382,6 +384,7 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file === "phone" ||
     file.startsWith("phone/") ||
     file === ".kaitu/inbox-state.json" ||
+    file === ".kaitu/result-draft.json" ||
     file === ".kaitu/organizer.json" ||
     file === ".kaitu/feishu.json" ||
     file === ".kaitu/channels" ||
@@ -391,6 +394,8 @@ export function ignoredWorkspaceChange(file: string): boolean {
     file.split(/[\\/]/).includes(".git") ||
     file === ".kaitu/history.git" ||
     file.startsWith(".kaitu/history.git/") ||
+    file === ".kaitu/result-actions" ||
+    file.startsWith(".kaitu/result-actions/") ||
     file === ".kaitu/cache" ||
     file.startsWith(".kaitu/cache/") ||
     file.startsWith(".kaitu/index.sqlite") ||

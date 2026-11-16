@@ -13,9 +13,19 @@ import {
   normalizedMemory,
   replaceMemory,
 } from "./memory.js";
+import { observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
+import {
+  type ResultArgs,
+  type ResultOperation,
+  acknowledgeResultAction,
+  applyResultAction,
+  hasResultAction,
+  resultActionRequest,
+  resultActionStatus,
+} from "./results.js";
 import { schemas } from "./schema.js";
 import { adoptTask, cancelTask, completeTask, listTasks } from "./tasks.js";
 import { localDate } from "./time.js";
@@ -33,6 +43,9 @@ interface Action {
     file: string;
     decision: "confirmed" | "rejected";
     expected_rev?: number;
+    prior_rev?: number;
+    prior_next?: Record<string, unknown>;
+    result_text?: string;
     expected_next?: object;
     title?: string;
     due?: string | null;
@@ -44,6 +57,7 @@ interface Action {
 
 // 待办先记进操作账本再追加；中途失败时重投复用同一条记录，不会重复追加。
 type LedgerEntry = Partial<Pick<PhoneReceipt, "status" | "message" | "target">> & {
+  request?: Action;
   task?: StoredRecord;
   memory?: { file: string; candidate: MemoryInput | null; expected: MemoryExpectation; at: string };
   capture?: ReturnType<typeof memoryCaptureSchema.parse>;
@@ -80,6 +94,12 @@ function prepareTask(ws: Workspace, action: Action): StoredRecord {
 }
 
 export async function applyPhoneActions(ws: Workspace, file: string, text: string) {
+  observePhoneConsumer(ws, ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined);
+  if (phoneConsumerStatus(ws).paused)
+    throw new KaituError(
+      "检测到另一台电脑，请选择负责人 / Another computer detected; select the responsible computer",
+      "CONSUMER_PAUSED",
+    );
   const ledgerFile = ".kaitu/phone-actions.json";
   // 账本记每个 client_id 第一次的结果；重投时成功的回 duplicate，冲突或拒绝的照原样再回一次。
   const seen: Record<string, LedgerEntry> = ws.exists(ledgerFile) ? ws.readJson(ledgerFile) : {};
@@ -87,6 +107,8 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
   for (const r of phoneReceipts(ws))
     if (
       r.kind === "action" &&
+      !r.effect &&
+      !hasResultAction(ws, r.ref) &&
       !seen[r.ref]?.status &&
       !seen[r.ref]?.memory &&
       !seen[r.ref]?.task &&
@@ -125,7 +147,101 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       status: "applied",
       at: new Date().toISOString(),
     };
+    const sharedReceipt = phoneReceipts(ws).find(
+      (item) => item.kind === "action" && item.ref === action.client_id,
+    );
+    const localResultRequest = resultActionRequest(ws, action.client_id);
+    // Preserve known success before any action-level rejection can replace its shared receipt.
+    if (
+      sharedReceipt?.effect &&
+      localResultRequest &&
+      ["applied", "duplicate"].includes(sharedReceipt.status)
+    ) {
+      if (!acknowledgeResultAction(ws, localResultRequest, sharedReceipt.effect)) {
+        receipt.status = "conflict";
+        receipt.message =
+          "远端结果无法对应原请求，请回读资料 / Remote result cannot be matched to the original request. Refresh data.";
+        receipts.push(receipt);
+        continue;
+      }
+    }
+    const knownTerminal =
+      resultActionStatus(ws, action.client_id) !== undefined ||
+      seen[action.client_id]?.status !== undefined ||
+      (!!sharedReceipt && (!localResultRequest || ["applied", "duplicate"].includes(sharedReceipt.status)));
+    if (!knownTerminal && Date.now() - Date.parse(action.at) > 14 * 86400000) {
+      receipt.status = "rejected";
+      receipt.message = "[ACTION_EXPIRED] 已过期，请重做 / Action expired; create a new action.";
+      receipts.push(receipt);
+      continue;
+    }
+    const durableResult =
+      ["complete_next_result", "restore_task_revision", "restore_next"].includes(action.op) ||
+      (["adopt_task", "cancel_task"].includes(action.op) && action.args.expected_rev !== undefined);
+    if (durableResult) {
+      try {
+        if (text.split(/\r?\n/).filter((line) => line.trim()).length !== 1)
+          throw new KaituError("每个操作须独立文件 / Send one action per file", "BAD_ARGS");
+        const request = {
+          client_id: action.client_id,
+          op: action.op as ResultOperation,
+          args: action.args as ResultArgs,
+        };
+        const shared = sharedReceipt;
+        const localRequest = localResultRequest;
+        // A successful synced receipt is final even when this consumer stopped with a pending journal.
+        // A remote conflict cannot settle a local write whose outcome is still unknown.
+        if (shared && (!localRequest || ["applied", "duplicate"].includes(shared.status))) {
+          // A receipt proves this ID was handled, not that this consumer's payload was the original.
+          // Without a local request, never invent a request/effect binding from the retry.
+          if (localRequest && !isDeepStrictEqual(localRequest, request))
+            throw new KaituError(
+              "操作编号已绑定不同内容 / Action ID is bound to different content",
+              "CONFLICT",
+            );
+          receipt.status = shared.status === "applied" ? "duplicate" : shared.status;
+          if (shared.effect) receipt.effect = shared.effect;
+          if (shared.target) receipt.target = shared.target;
+          if (shared.message) receipt.message = shared.message;
+          receipts.push(receipt);
+          continue;
+        }
+        if (seen[action.client_id])
+          throw new KaituError("操作编号已使用 / Action ID already used", "CONFLICT");
+        const result = await applyResultAction(ws, {
+          client_id: action.client_id,
+          op: action.op as ResultOperation,
+          args: action.args as ResultArgs,
+        });
+        receipt.status = result.status;
+        receipt.effect = result.effect;
+        if ("rev" in result.effect) receipt.target = { id: result.effect.id, rev: result.effect.rev };
+      } catch (error) {
+        // I/O/read failures can happen after the append. Keep the original request unconfirmed.
+        if (
+          !(error instanceof KaituError) ||
+          !["CONFLICT", "BAD_ARGS", "INVALID_RECORD", "INVALID_DOCUMENT"].includes(error.code)
+        )
+          throw error;
+        receipt.status = error.code === "BAD_ARGS" ? "rejected" : "conflict";
+        receipt.message = error.message;
+      }
+      receipts.push(receipt);
+      continue;
+    }
+    if (hasResultAction(ws, action.client_id) || sharedReceipt?.effect) {
+      receipt.status = "conflict";
+      receipt.message = "操作编号已使用 / Action ID already used";
+      receipts.push(receipt);
+      continue;
+    }
     const first = seen[action.client_id];
+    if (first?.request && !isDeepStrictEqual(first.request, action)) {
+      receipt.status = "conflict";
+      receipt.message = "操作编号已绑定不同内容 / Action ID is bound to different content";
+      receipts.push(receipt);
+      continue;
+    }
     if (
       first?.capture &&
       (action.op !== "capture_memory" || !isDeepStrictEqual(first.capture, action.args))
@@ -269,7 +385,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
             if (action.args.expected_rev !== undefined) {
               const record = first?.task ?? prepareTask(ws, action);
               if (!first?.task) {
-                seen[action.client_id] = { task: record };
+                seen[action.client_id] = { request: action, task: record };
                 ws.writeJson(ledgerFile, seen, { internal: true });
               }
               await commitRecordTransaction(ws, [{ type: "task", record }], `手机更新待办：${record.title}`);
@@ -295,6 +411,7 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
       }
       const capture = seen[action.client_id]?.capture;
       seen[action.client_id] = {
+        request: action,
         ...(capture ? { capture } : {}),
         status: receipt.status,
         ...(receipt.message ? { message: receipt.message } : {}),

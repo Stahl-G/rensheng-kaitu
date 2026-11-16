@@ -80,6 +80,9 @@ test("without a city or footprint, visual weather waits for an explicit city cho
     await act(async () => {
       root = create(createElement(TodayWeather, { load: async () => state, setPlace, loadLifeMap }));
     });
+    // The header stays quiet until the person asks to set a city.
+    expect(root?.root.findAllByType("form")).toHaveLength(0);
+    await act(async () => root?.root.findByType("button").props.onClick());
     expect(root?.root.findAllByType("form")).toHaveLength(1);
     expect(setPlace).not.toHaveBeenCalled();
     await act(async () => root?.root.findByType("input").props.onChange({ target: { value: "杭州" } }));

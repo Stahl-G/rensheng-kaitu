@@ -25,6 +25,7 @@ import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories, memoryInput, memoryType, normalizedMemory } from "./memory.js";
+import { observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
 import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
@@ -429,6 +430,8 @@ function pullExternalHealthInbox(ws: Workspace) {
 
 export async function processInbox(ws: Workspace, options: { stableMs?: number } = {}) {
   const result = { processed: [] as string[], notes: [] as string[], pending: [] as string[] };
+  observePhoneConsumer(ws, ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined);
+  if (phoneConsumerStatus(ws).paused) return result;
   pullExternalHealthInbox(ws);
   if (!["inbox/agents", "inbox/health", "inbox/rejected"].some((dir) => ws.exists(dir))) return result;
   const lock = ws.resolve(".kaitu/cache/inbox.lock", { internal: true });

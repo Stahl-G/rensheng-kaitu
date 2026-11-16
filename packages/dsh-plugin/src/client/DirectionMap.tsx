@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import css from "./DirectionMap.module.css";
 import { ReadWarnings } from "./ReadWarnings.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
+import { plainStamp } from "./next-presentation.js";
 
 // 目标的颜色按顺序取模块色；颜色只用来分组，不代表含义。
 const tones = ["--doing", "--me", "--health", "--news", "--finance"] as const;
@@ -158,14 +159,6 @@ export function DirectionMap({
     <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
       {header}
       <ReadWarnings warnings={input?.warnings} />
-      {!map && (
-        <p className={css.intro}>
-          {t(
-            "下面是你现在的目标、项目和下一步。点「让开图看一看」，开图会读最近的日志，说说这些事正在把你带向哪里。看法不写进你的资料。",
-            "Below are your current goals, projects and next steps. Choose “Ask Kaitu to look” and Kaitu reads your recent logs to say where they are taking you. Nothing is written into your notes.",
-          )}
-        </p>
-      )}
       {state.stale && (
         <output className={css.stale}>
           {t(
@@ -253,7 +246,7 @@ export function DirectionMap({
                     <p>
                       {t("最近：", "Latest: ")}
                       {recent.text.split("\n")[0]?.replace(/^[-*]\s+/, "")}
-                      <span className={css.meta}> · {recent.date}</span>
+                      <span className={css.meta}> · {plainStamp(recent.date, locale)}</span>
                     </p>
                   ) : (
                     <p className={css.meta}>{t("最近 30 天没有记录", "No log in the last 30 days")}</p>

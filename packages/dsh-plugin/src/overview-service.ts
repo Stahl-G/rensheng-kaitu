@@ -56,6 +56,7 @@ import {
   addGoalNext,
   adoptOnboardingMatter,
   adoptTask,
+  applyResultAction,
   archiveMemory,
   bindGithub,
   calendarPushEntries,
@@ -74,6 +75,8 @@ import {
   createHomeCache,
   createProject,
   decideProposal,
+  decodeHomeResultDraft,
+  decodeHomeResultRequest,
   defaultRoot,
   directionsPrompt,
   dismissNews,
@@ -96,6 +99,7 @@ import {
   moveWorkspace,
   normalizeLocale,
   onboardingStatus,
+  organizerStatus,
   pasteDirections,
   pasteOnboardingMatter,
   previewExperienceBatch,
@@ -138,6 +142,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resultDraft,
   resumePrompt,
   saveAvatar,
   saveHometown,
@@ -150,6 +155,7 @@ import {
   scheduleNext,
   searchLibraryNotes,
   selectMediaLibrary,
+  selectPhoneConsumer,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
@@ -164,6 +170,7 @@ import {
   writeExploration,
 } from "@kaitu/core";
 import type { MutationQueue } from "./dsh.js";
+import { throwHomeCompletionError } from "./home-completion-error.js";
 import { readMe } from "./me-data.js";
 import type { Config } from "./tools.js";
 import type {
@@ -217,31 +224,49 @@ export class KaituOverviewService extends TypertRemoteService {
       { write: this.write, report: (error) => ctx.logger.warn(String(error)) },
     );
     setImmediate(() => this.homeCache.refreshDerived());
+    const activeWrites = new Set<Promise<unknown>>();
+    const versions = new Set<Promise<unknown>>();
+    const versionErrors: unknown[] = [];
+    const performWrite = this.write;
     ctx.effect(() => async () => {
       this.disposed = true;
       for (const notify of this.homeListeners) notify();
-      await this.homeCache.close();
+      // Existing writes may still register a deferred version while draining.
+      try {
+        await Promise.allSettled(activeWrites);
+        while (versions.size) await Promise.allSettled(versions);
+        if (versionErrors.length) throw new AggregateError(versionErrors, "后台版本记录未完成");
+      } finally {
+        this.files.dispose();
+        await Promise.all([this.homeCache.close(), disposeNoteIndex(this.workspace)]);
+      }
     });
     this.files = dshFiles(this.workspace);
-    ctx.effect(() => async () => {
-      this.files.dispose();
-      await disposeNoteIndex(this.workspace);
-    });
     this.scheduleVersion = (message) => {
-      setImmediate(() => {
-        void this.write(() => snapshot(this.workspace, message)).catch((error) =>
-          ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`),
-        );
-      });
+      // Register before yielding, so disposal cannot miss the next-turn snapshot.
+      const pending = new Promise<void>((resolve) => setImmediate(resolve))
+        .then(() => performWrite(() => snapshot(this.workspace, message)))
+        .then(() => {
+          if (!this.disposed) this.homeCache.invalidate();
+        })
+        .catch((error) => {
+          versionErrors.push(error);
+          ctx.logger.warn(`资料已保存，后台版本记录未完成：${String(error)}`);
+        })
+        .finally(() => versions.delete(pending));
+      versions.add(pending);
     };
-    const performWrite = this.write;
-    this.write = async (operation) => {
-      try {
-        return await performWrite(operation);
-      } finally {
-        this.files.invalidate();
-        this.homeCache.invalidate();
-      }
+    this.write = (operation) => {
+      if (this.disposed) return Promise.reject(new Error("工作区服务已关闭"));
+      const pending = Promise.resolve()
+        .then(() => performWrite(operation))
+        .finally(() => {
+          activeWrites.delete(pending);
+          this.files.invalidate();
+          this.homeCache.invalidate();
+        });
+      activeWrites.add(pending);
+      return pending;
     };
   }
 
@@ -275,6 +300,32 @@ export class KaituOverviewService extends TypertRemoteService {
     } finally {
       this.homeListeners.delete(notify);
       signal?.removeEventListener("abort", notify);
+    }
+  }
+
+  @Remote("resultDraft")
+  async resultDraft(root: string, value: string, expected: string): Promise<string> {
+    try {
+      return JSON.stringify(
+        resultDraft(this.workspace, root, decodeHomeResultDraft(value), decodeHomeResultDraft(expected)),
+      );
+    } catch (error) {
+      return throwHomeCompletionError(error);
+    }
+  }
+
+  @Remote("resultAction")
+  async resultAction(root: string, payload: string): Promise<string> {
+    try {
+      return JSON.stringify(
+        await this.write(() => {
+          if (root !== this.workspace.root)
+            throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+          return applyResultAction(this.workspace, decodeHomeResultRequest(payload));
+        }),
+      );
+    } catch (error) {
+      return throwHomeCompletionError(error);
     }
   }
 
@@ -529,6 +580,12 @@ export class KaituOverviewService extends TypertRemoteService {
   @Remote("setFinanceAccess")
   async setFinanceAccess(id: AgentConnectionId, allowed: boolean): Promise<FinanceAccess> {
     return this.write(() => Promise.resolve(setFinanceAccess(this.workspace, id, allowed)));
+  }
+
+  @Remote("selectPhoneConsumer")
+  async selectPhoneConsumer(deviceId: string): Promise<OrganizerStatus> {
+    selectPhoneConsumer(this.workspace, deviceId);
+    return organizerStatus(this.workspace);
   }
 
   @Remote("organizerSeen")

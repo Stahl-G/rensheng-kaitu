@@ -220,3 +220,230 @@ button.row {
   font-weight: 600;
   cursor: pointer;
 }
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  grid-column: 1 / -1;
+}
+.searchBar h1,
+.noteList h1 {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+.searchBar input {
+  flex: 1;
+  max-width: 600px;
+}
+.page {
+  grid-template-columns: 230px minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+.inbox,
+.searchResults,
+.recent {
+  grid-column: 2;
+}
+.sections {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+}
+.sections > summary {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.categories {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.category {
+  min-height: 0;
+  padding: 14px;
+  gap: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+.category:hover {
+  background: var(--surface);
+  box-shadow: none;
+  transform: none;
+}
+.categoryOpen {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.title {
+  gap: 8px;
+  font-size: 14px;
+}
+.icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--tint, var(--control));
+}
+.count,
+.count.meta {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink2);
+  letter-spacing: 0;
+}
+.category > .meta,
+.category > time,
+.category > button + button {
+  margin-left: 36px;
+}
+.add {
+  border: 1px dashed var(--line-strong);
+}
+.inbox,
+.recent {
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.notebook {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.65fr) minmax(0, 1fr);
+  gap: 0;
+  min-height: 580px;
+  container-type: inline-size;
+}
+.noteList {
+  min-width: 0;
+  padding-right: 22px;
+  border-right: 1px solid var(--line);
+}
+.noteList h1 {
+  font-size: 23px;
+}
+.noteFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 18px 0 14px;
+}
+.noteFilters button,
+.askDocument {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.noteFilters button[aria-pressed="true"],
+.askDocument {
+  color: var(--link);
+  border-color: var(--link-line);
+  background: var(--link-soft);
+}
+.noteItem {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  padding: 18px 12px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-bottom-color: var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.noteItem strong {
+  font-size: 16px;
+  line-height: 1.5;
+}
+.noteItem > span {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.noteItem[aria-pressed="true"] {
+  border-color: var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.noteDetail {
+  min-width: 0;
+  padding-left: 32px;
+  overflow-wrap: anywhere;
+}
+.documentActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.document h2 {
+  margin: 12px 0 30px;
+  font-size: 30px;
+  letter-spacing: -0.03em;
+}
+.document p,
+.document li {
+  font-size: 17px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+}
+.document > .meta {
+  font-size: 12px;
+}
+.notebook :focus-visible {
+  outline: 3px solid var(--link-line);
+  outline-offset: 3px;
+}
+@container (max-width: 800px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .inbox,
+  .sections,
+  .searchResults,
+  .recent {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .notebook {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .noteList {
+    border-right: 0;
+    padding: 0 0 20px;
+  }
+  .noteDetail {
+    padding: 24px 0 0;
+    border-top: 1px solid var(--line);
+  }
+  .searchBar {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .searchBar input {
+    min-width: 0;
+    flex-basis: 100%;
+  }
+}
