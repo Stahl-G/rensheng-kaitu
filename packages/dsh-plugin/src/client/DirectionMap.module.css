@@ -35,10 +35,6 @@
 .primary:disabled {
   opacity: 0.6;
 }
-.intro {
-  margin: 0;
-  color: var(--ink2);
-}
 .error {
   margin: 0;
   color: var(--danger);
@@ -80,9 +76,14 @@
   border-radius: 16px;
   background: var(--surface);
 }
-.goal {
-  border-left: 4px solid var(--tone);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 10%, var(--surface)), var(--surface) 75%);
+.goal strong::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--tone);
 }
 .goal strong,
 .card strong {

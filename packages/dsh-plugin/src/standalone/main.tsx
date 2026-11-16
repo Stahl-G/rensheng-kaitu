@@ -99,6 +99,7 @@ const props: OverviewPageProps = {
     return data;
   },
   loadSettings: () => call("settings"),
+  selectPhoneConsumer: (deviceId) => call("selectPhoneConsumer", deviceId),
   organizerSeen: () => call("organizerSeen"),
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),
@@ -163,6 +164,8 @@ const props: OverviewPageProps = {
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadHome: () => call("home"),
+  resultDraft: (root, value, expected) => call("resultDraft", root, value, expected),
+  resultAction: (root, request) => call("resultAction", root, request),
   captureOnce: (text, operationId) => call("captureOnce", text, operationId),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>

@@ -32,6 +32,7 @@ import {
   addGoalNext,
   adoptOnboardingMatter,
   adoptTask,
+  applyResultAction,
   archiveMemory,
   bankNotificationCandidates,
   bindGithub,
@@ -52,6 +53,8 @@ import {
   confirmOnboardingSetup,
   createProject,
   decideProposal,
+  decodeHomeResultDraft,
+  decodeHomeResultRequest,
   directionsPrompt,
   discardFinanceImport,
   dismissDirectionLink,
@@ -80,6 +83,7 @@ import {
   moveWorkspace,
   normalizeLocale,
   onboardingStatus,
+  organizerStatus,
   pasteDirections,
   pasteOnboardingMatter,
   pick,
@@ -130,6 +134,7 @@ import {
   resolvePlace,
   resolvePreferences,
   restore,
+  resultDraft,
   resumePrompt,
   saveAvatar,
   saveHometown,
@@ -142,10 +147,12 @@ import {
   scheduleNext,
   searchLibraryNotes,
   selectMediaLibrary,
+  selectPhoneConsumer,
   setExperienceSource,
   setFinanceAccess,
   setNewsFeedback,
   setWeatherPlace,
+  snapshot,
   stageFinanceUpload,
   startLearning,
   syncProject,
@@ -174,6 +181,7 @@ export const productMutations = new Set([
   "learningStart",
   "learningSave",
   "organizerSeen",
+  "selectPhoneConsumer",
   "workspaceBackup",
   "askModels",
   "projectCreate",
@@ -190,6 +198,7 @@ export const productMutations = new Set([
   "moveStorage",
   "addCalendarSubscription",
   "completeNext",
+  "resultAction",
   "adoptTask",
   "cancelTask",
   "proposeTask",
@@ -270,6 +279,10 @@ export async function productRequest(
       by: "user",
       expected: args[2] as MemoryExpectation,
     });
+  if (method === "selectPhoneConsumer") {
+    selectPhoneConsumer(ws, text(0));
+    return organizerStatus(ws);
+  }
   if (method === "organizerSeen") return markOrganizerSeen(ws);
   if (method === "directionGeneration") return directionGeneration(ws, args[0] === true, ask);
   if (method.startsWith("ask")) {
@@ -495,8 +508,23 @@ export async function productRequest(
     }
     case "capture":
       return captureNote(ws, text(0));
+    case "resultDraft":
+      return resultDraft(
+        ws,
+        text(0),
+        decodeHomeResultDraft(JSON.stringify(args[1] ?? null)),
+        decodeHomeResultDraft(JSON.stringify(args[2] ?? null)),
+      );
+    case "resultAction": {
+      if (text(0) !== ws.root) throw new KaituError("工作区已切换 / Workspace changed", "CONFLICT");
+      return applyResultAction(ws, decodeHomeResultRequest(JSON.stringify(args[1])));
+    }
     case "captureOnce":
-      return captureNoteOnce(ws, text(0), text(1));
+      return captureNoteOnce(ws, text(0), text(1), {
+        scheduleVersion: (message) => {
+          setImmediate(() => void snapshot(ws, message).catch(() => {}));
+        },
+      });
     case "captureReceipt":
       return readCaptureReceipt(ws, text(0));
     case "me":

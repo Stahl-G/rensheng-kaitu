@@ -19,6 +19,32 @@
           "kind": { "enum": ["file", "action"] },
           "status": { "enum": ["applied", "duplicate", "conflict", "rejected"] },
           "message": { "type": "string", "description": "conflict 和 rejected 时写明原因，给用户看" },
+          "effect": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["file", "id", "rev", "prior_rev"],
+                "additionalProperties": false,
+                "properties": {
+                  "file": { "const": "task" },
+                  "id": { "type": "string", "minLength": 1 },
+                  "rev": { "type": "integer", "minimum": 1 },
+                  "prior_rev": { "type": "integer", "minimum": 1 }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["file", "id", "expected_next", "prior_next"],
+                "additionalProperties": false,
+                "properties": {
+                  "file": { "type": "string", "minLength": 1 },
+                  "id": { "type": "string", "minLength": 1 },
+                  "expected_next": { "type": "object" },
+                  "prior_next": { "type": "object" }
+                }
+              }
+            ]
+          },
           "target": {
             "type": "object",
             "required": ["id", "rev"],

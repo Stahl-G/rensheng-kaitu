@@ -63,7 +63,8 @@ it("DSH Remote 沿用相同主题并通过生成契约返回，保存资料不�
   const { TYPERT } = await import("../lib/typert.host.js");
   const ws = await freshWorkspace();
   let pending: Promise<unknown> = Promise.resolve();
-  const service = new KaituOverviewService(new Context(), {}, ws, (run) => {
+  const ctx = new Context();
+  const service = new KaituOverviewService(ctx, {}, ws, (run) => {
     const result = pending.then(run);
     pending = result.catch(() => {});
     return result;
@@ -96,7 +97,7 @@ it("DSH Remote 沿用相同主题并通过生成契约返回，保存资料不�
     });
     expect(await service.learningList()).toHaveLength(1);
   } finally {
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await ctx.fiber.dispose();
     await pending;
     rmSync(ws.root, { recursive: true, force: true });
   }
