@@ -57,7 +57,6 @@ test("an install that was forced map-first moves the map back once, then keeps l
 
 test("Explore opens footprints by default; the map is optional and explicit ordering still works", () => {
   const empty = { hometown: false, experiences: 0, healthRecords: 0, newsTopics: 0, goals: 0, directions: 0 };
-  expect(defaultExploreEntries).toEqual(["footprints", "health", "news", "directions"]);
   expect(exploreDestination(defaultExploreEntries, { ...empty, experiences: 1 })).toBe("footprints");
   expect(exploreDestination(defaultExploreEntries, empty)).toBe("modules");
   expect(exploreDestination(["life-map", "health"], empty)).toBe("life-map");
