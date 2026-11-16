@@ -164,8 +164,17 @@ function clearInvalidated(ws: Workspace, checked: ReadonlyMap<string, symbol>): 
   }
 }
 
+// `*.tmp` 本来就在版本历史的 .gitignore 里，但 isomorphic-git 先 lstat 每个条目再看忽略规则；
+// 原子写入的临时文件在列目录之后被改名，lstat 扑空会中断整次存版本，所以列目录时就不交出它们。
+const promisesWithoutTemp = {
+  ...fs.promises,
+  // isomorphic-git 只按名字列目录。
+  readdir: async (path: string) => (await fs.promises.readdir(path)).filter((name) => !name.endsWith(".tmp")),
+};
+const plainHistoryFs = { ...fs, promises: promisesWithoutTemp };
+
 function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map()) {
-  if (!ws.isICloud && !changed.size) return fs;
+  if (!ws.isICloud && !changed.size) return plainHistoryFs;
   const gitdir = historyDirectory(ws);
   const readFile = (async (...[path, options]: Parameters<typeof fs.promises.readFile>) => {
     if (typeof path === "string") {
@@ -199,7 +208,7 @@ function historyFs(ws: Workspace, changed: ReadonlyMap<string, symbol> = new Map
     }
     return stat;
   }) as typeof fs.promises.lstat;
-  return { ...fs, promises: { ...fs.promises, ...(ws.isICloud ? { readFile } : {}), lstat } };
+  return { ...fs, promises: { ...promisesWithoutTemp, ...(ws.isICloud ? { readFile } : {}), lstat } };
 }
 
 function snapshotFile(ws: Workspace, file: string): boolean {
