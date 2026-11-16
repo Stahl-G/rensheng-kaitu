@@ -876,7 +876,9 @@
 .savepointHome .dateWeather > p {
   order: 0;
   flex: none;
-  font-size: 15px;
+  font: 600 15px / 1.4 var(--sans, sans-serif);
+  letter-spacing: 0;
+  color: var(--ink);
   margin: 0;
 }
 .savepointHome .weatherSlot {
@@ -915,10 +917,11 @@
   font: inherit;
 }
 .resultWeek i {
-  width: 11px;
-  height: 11px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
   border-radius: 50%;
-  border: 1.5px solid var(--muted);
+  border: 1.5px solid var(--line-strong);
   background: transparent;
 }
 .resultWeek i[data-result="true"] {
@@ -926,8 +929,12 @@
   border-color: var(--link);
 }
 .resultWeek i[data-today="true"] {
-  outline: 2px solid var(--accent, #c44f34);
-  outline-offset: 2px;
+  width: 16px;
+  height: 16px;
+  border: 2.5px solid var(--now);
+}
+.resultWeek i[data-today="true"][data-result="true"] {
+  background: var(--now);
 }
 .resultWeek b {
   color: var(--ink);
@@ -957,13 +964,17 @@
   font-weight: 600;
 }
 .actionCard h2 {
-  font: 650 clamp(24px, 2.6vw, 34px) / 1.5 var(--sans, sans-serif);
-  margin: 16px 0 22px;
+  font: 700 clamp(26px, 2.8vw, 36px) / 1.4 var(--sans, sans-serif);
+  margin: 14px 0 22px;
   overflow-wrap: anywhere;
 }
 .actionCard mark {
   color: inherit;
-  background: linear-gradient(transparent 65%, #f3d96c80 65%);
+  padding: 0 4px;
+  margin: 0 -4px;
+  background: linear-gradient(transparent 56%, var(--mark) 56%, var(--mark) 92%, transparent 92%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 .actionCard[data-done="true"] mark {
   background: transparent;
@@ -978,16 +989,36 @@
 .resultForm input {
   flex: 1;
   min-width: 0;
-  border: 1.5px solid var(--link);
-  border-radius: 9px;
-  padding: 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 11px 12px;
   color: var(--ink);
   background: var(--surface);
   font: inherit;
 }
 .resultForm input:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 2px;
+  border-color: var(--link);
+  outline: 2px solid var(--link-line);
+  outline-offset: 0;
+}
+.askSoft {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--link-soft);
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.askSoft:hover {
+  background: var(--link-line);
+}
+.stepRow > span.stepTitle,
+.stepRow > span[aria-hidden="true"] {
+  color: var(--pencil);
 }
 .resultForm button {
   flex: none;
@@ -1051,7 +1082,8 @@ button.stepTitle {
   font-size: 12px;
 }
 .stepRow time[data-overdue="true"] {
-  color: var(--error, #b4412e);
+  color: var(--now-ink);
+  font-weight: 600;
 }
 .threadLinks,
 .traceCards {
@@ -1183,6 +1215,23 @@ button.stepTitle {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.scheduleCard > div:has(button) > time,
+.scheduleCard > div:has(button) > span {
+  color: var(--pencil);
+}
+.scheduleCard button {
+  flex: none;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--link-line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--link);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 .commandTrigger {
   display: flex;

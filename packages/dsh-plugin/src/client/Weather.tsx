@@ -204,6 +204,12 @@ export function TodayWeather({
         </button>
       </div>
     ) : null;
+  if (!state.place && !asking)
+    return (
+      <button type="button" className={css.setCity} onClick={() => setAsking(true)}>
+        {t("设置城市", "Set city")}
+      </button>
+    );
   if (!state.place || asking)
     return (
       <form

@@ -1533,10 +1533,7 @@ export function AskPage({
             placeholder={
               settings?.configured
                 ? t("问问开图，或者让它帮你记一件事", "Ask Kaitu or tell it something to remember")
-                : t(
-                    "接上 AI 之后就能问，比如“我这周在忙什么”",
-                    "Once connected, ask something like “What am I working on this week?”",
-                  )
+                : t("问问", "Ask")
             }
             onChange={(event) => {
               setDraft(event.target.value);
@@ -2042,13 +2039,13 @@ export function AskPage({
             )}
           </div>
         </form>
-        <p className={css.scope}>
-          {settings?.configured
-            ? localRuntime
+        {settings?.configured && (
+          <p className={css.scope}>
+            {localRuntime
               ? t("本机 Agent 按已批准的权限操作", "Local Agent uses the permissions you approve")
-              : t("资料范围：已允许的开图资料", "Data scope: allowed Kaitu files")
-            : t("接上 AI 后才能发送", "Connect an AI before sending")}
-        </p>
+              : t("资料范围：已允许的开图资料", "Data scope: allowed Kaitu files")}
+          </p>
+        )}
       </section>
       <AskEvidence items={evidence} onToday={onToday} />
       <dialog
