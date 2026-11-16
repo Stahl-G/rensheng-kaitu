@@ -663,36 +663,38 @@ export function PaperMap({
   return (
     <section className={css.mapPane} aria-label={t("足迹地图", "Footprint map")}>
       <div ref={container} className={css.map} />
-      <div className={css.stateCaption}>
-        <h1>
-          {mode === "now"
-            ? t("我在这里。", "I am here.")
-            : mode === "history"
-              ? t("这些经历组成了我。", "These places shaped me.")
-              : t("还有许多生活等待探索。", "There is more life to explore.")}
-        </h1>
-        <p>
-          {t(
-            `住过 ${data.lived.length} 个城市 · 去过 ${data.travelled.length} 个`,
-            `Lived in ${data.lived.length} cities · Visited ${data.travelled.length}`,
-          )}
-        </p>
-        {showAllPlaces && <p>{t("已叠加全部城市", "All city records overlaid")}</p>}
-        {mode === "now" && data.me && (
-          <p>
-            {t(cityNames[String(data.me.geonameid)] ?? data.me.name, data.me.name)} ·{" "}
-            {t("最近的居住记录", "Latest residence record")}
-          </p>
-        )}
-        {mode === "history" && data.undated > 0 && (
+      {!empty && (
+        <div className={css.stateCaption}>
+          <h1>
+            {mode === "now"
+              ? t("我在这里。", "I am here.")
+              : mode === "history"
+                ? t("这些经历组成了我。", "These places shaped me.")
+                : t("还有许多生活等待探索。", "There is more life to explore.")}
+          </h1>
           <p>
             {t(
-              `另有 ${data.undated} 段居住记录未注明时间`,
-              `${data.undated} residences with unspecified dates`,
+              `住过 ${data.lived.length} 个城市 · 去过 ${data.travelled.length} 个`,
+              `Lived in ${data.lived.length} cities · Visited ${data.travelled.length}`,
             )}
           </p>
-        )}
-      </div>
+          {showAllPlaces && <p>{t("已叠加全部城市", "All city records overlaid")}</p>}
+          {mode === "now" && data.me && (
+            <p>
+              {t(cityNames[String(data.me.geonameid)] ?? data.me.name, data.me.name)} ·{" "}
+              {t("最近的居住记录", "Latest residence record")}
+            </p>
+          )}
+          {mode === "history" && data.undated > 0 && (
+            <p>
+              {t(
+                `另有 ${data.undated} 段居住记录未注明时间`,
+                `${data.undated} residences with unspecified dates`,
+              )}
+            </p>
+          )}
+        </div>
+      )}
       {(empty || failure) && (
         <div className={css.stateEmpty}>
           <p>
@@ -791,13 +793,15 @@ export function PaperMap({
           {t("城市与工具", "Cities and tools")}
         </button>
       </fieldset>
-      <span className={css.routeKey}>
-        {mode === "now"
-          ? t("城市级位置 · 现居记录", "City-level record · Current residence")
-          : mode === "possible"
-            ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
-            : t("居住来路 · 连线表示居住经历顺序", "Residence history · Lines follow residence records")}
-      </span>
+      {!empty && (
+        <span className={css.routeKey}>
+          {mode === "now"
+            ? t("城市级位置 · 现居记录", "City-level record · Current residence")
+            : mode === "possible"
+              ? t("虚线 计划 · 点线 AI 建议", "Dashed: planned · Dotted: AI suggestions")
+              : t("居住来路 · 连线表示居住经历顺序", "Residence history · Lines follow residence records")}
+        </span>
+      )}
     </section>
   );
 }

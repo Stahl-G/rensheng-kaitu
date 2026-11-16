@@ -846,7 +846,14 @@ export function MapPage({
               </button>
             </div>
           )}
-          <div className={css.layout} data-view={view} data-selected={!!city}>
+          <div
+            className={css.layout}
+            data-view={view}
+            data-selected={!!city}
+            data-empty={
+              (!data.review.length && !listedCities.length && !timeline.length && !home) || undefined
+            }
+          >
             <PaperMap
               options={mapOptions}
               cities={cities}
@@ -958,20 +965,22 @@ export function MapPage({
                   ))}
                 </details>
               )}
-              <dl className={css.journeyStats}>
-                <div>
-                  <dt>{t("座城市", "cities")}</dt>
-                  <dd>{recordedCities.length}</dd>
-                </div>
-                <div>
-                  <dt>{t("个国家", "countries")}</dt>
-                  <dd>{recordedCountries || "—"}</dd>
-                </div>
-                <div>
-                  <dt>{t("处到访", "visited")}</dt>
-                  <dd>{travelCities}</dd>
-                </div>
-              </dl>
+              {recordedCities.length > 0 && (
+                <dl className={css.journeyStats}>
+                  <div>
+                    <dt>{t("座城市", "cities")}</dt>
+                    <dd>{recordedCities.length}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("个国家", "countries")}</dt>
+                    <dd>{recordedCountries || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("处到访", "visited")}</dt>
+                    <dd>{travelCities}</dd>
+                  </div>
+                </dl>
+              )}
               {(timeline.length > 0 || home) && (
                 <section className={css.timeline} aria-label={label("经历时间轴")}>
                   <h2>{label("生活的章节")}</h2>
@@ -1023,64 +1032,65 @@ export function MapPage({
               )}
 
               {!compact && details}
-              <details className={css.cityDirectory} open={!city}>
-                <summary>
-                  {label("我的城市")} <span>{listedCities.length}</span>
-                </summary>
-                {!listedCities.length && <p className={css.empty}>{t("暂无城市记录", "No city records")}</p>}
-                {listedCities.map((item) => (
+              {listedCities.length > 0 && (
+                <details className={css.cityDirectory} open={!city}>
+                  <summary>
+                    {label("我的城市")} <span>{listedCities.length}</span>
+                  </summary>
+                  {listedCities.map((item) => (
+                    <button
+                      type="button"
+                      className={css.city}
+                      data-current={anchor ? cityId(anchor) === item.id : false}
+                      key={item.id}
+                      aria-expanded={city?.id === item.id}
+                      aria-controls={city?.id === item.id ? "city-details" : undefined}
+                      onClick={() => setSelected(item.id)}
+                    >
+                      <span>
+                        <strong>
+                          {item.place.name}
+                          {anchor && cityId(anchor) === item.id ? t(" · 现居", " · Current residence") : ""}
+                        </strong>
+                        <span className={css.secondary}>
+                          {item.home
+                            ? label("⌂ 家乡 · 起点")
+                            : t(
+                                `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`,
+                                `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "place" : "places"}`,
+                              )}
+                        </span>
+                      </span>
+                      <span className={css.cityShapes}>
+                        {item.layers.map((id) => (
+                          <span
+                            key={id}
+                            className={css.shape}
+                            data-layer={id}
+                            role="img"
+                            aria-label={label(layers.find((l) => l.id === id)?.name ?? "")}
+                          />
+                        ))}
+                        <span aria-hidden="true">›</span>
+                      </span>
+                    </button>
+                  ))}
                   <button
                     type="button"
-                    className={css.city}
-                    data-current={anchor ? cityId(anchor) === item.id : false}
-                    key={item.id}
-                    aria-expanded={city?.id === item.id}
-                    aria-controls={city?.id === item.id ? "city-details" : undefined}
-                    onClick={() => setSelected(item.id)}
+                    className={css.control}
+                    onClick={() =>
+                      ask(
+                        t(
+                          "我想加一个城市经历，请先问我城市和发生的时间，区分住过、去过与计划。",
+                          "Help me add a city experience. Ask for the city and dates, and distinguish residence, travel and plans.",
+                        ),
+                      )
+                    }
                   >
-                    <span>
-                      <strong>
-                        {item.place.name}
-                        {anchor && cityId(anchor) === item.id ? t(" · 现居", " · Current residence") : ""}
-                      </strong>
-                      <span className={css.secondary}>
-                        {item.home
-                          ? label("⌂ 家乡 · 起点")
-                          : t(
-                              `${item.place.country || "暂无记录"} · ${item.experiences.length} 段经历`,
-                              `${item.place.country || "Unknown country"} · ${item.experiences.length} ${item.experiences.length === 1 ? "place" : "places"}`,
-                            )}
-                      </span>
-                    </span>
-                    <span className={css.cityShapes}>
-                      {item.layers.map((id) => (
-                        <span
-                          key={id}
-                          className={css.shape}
-                          data-layer={id}
-                          role="img"
-                          aria-label={label(layers.find((l) => l.id === id)?.name ?? "")}
-                        />
-                      ))}
-                      <span aria-hidden="true">›</span>
-                    </span>
+                    {t("加一个城市", "Add a city")}
                   </button>
-                ))}
-                <button
-                  type="button"
-                  className={css.control}
-                  onClick={() =>
-                    ask(
-                      t(
-                        "我想加一个城市经历，请先问我城市和发生的时间，区分住过、去过与计划。",
-                        "Help me add a city experience. Ask for the city and dates, and distinguish residence, travel and plans.",
-                      ),
-                    )
-                  }
-                >
-                  {t("加一个城市", "Add a city")}
-                </button>
-              </details>
+                </details>
+              )}
             </section>
           </div>
 

@@ -1166,3 +1166,11 @@
   inset: 0;
   background: rgb(0 0 0 / 35%);
 }
+
+/* 还没有任何城市时，地图占满整行，入口只在地图上。 */
+.layout[data-empty] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.layout[data-empty] .listPane {
+  display: none;
+}
