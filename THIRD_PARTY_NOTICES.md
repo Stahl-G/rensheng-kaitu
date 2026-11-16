@@ -14,10 +14,6 @@
 | isomorphic-git | MIT | https://github.com/isomorphic-git/isomorphic-git |
 | ajv | MIT | https://github.com/ajv-validator/ajv |
 | yaml | ISC | https://github.com/eemeli/yaml |
-| Preact | MIT | https://github.com/preactjs/preact |
-| ECharts | Apache-2.0 | https://github.com/apache/echarts |
-| markdown-it | MIT | https://github.com/markdown-it/markdown-it |
-| Vite（仅构建） | MIT | https://github.com/vitejs/vite |
 | @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | MIT | https://github.com/colinhacks/zod |
 | DeepSeek Harness Node 引擎与 SDK 0.2.1-rc.3（随 CLI/Web 安装） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness |

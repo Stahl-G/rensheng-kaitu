@@ -101,6 +101,7 @@ it("Agent 工具只能提出待办，桌面用户采纳才进入今天，重复�
     expect(adopted).toMatchObject({ status: "open", by: "user", rev: 2 });
     await productRequest(ws, "adoptTask", [plugin.id]);
     expect(readRecords(ws, "task").find((task) => task.id === plugin.id)).toEqual(adopted);
+    await service.settled();
     expect(await history(ws)).toHaveLength(before.length + 1);
     today = await service.overview();
     expect(today.allNext.filter((task) => task.id === plugin.id)).toHaveLength(1);
