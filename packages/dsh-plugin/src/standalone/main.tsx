@@ -164,8 +164,11 @@ const props: OverviewPageProps = {
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadHome: () => call("home"),
-  resultDraft: (root, value, expected) => call("resultDraft", root, value, expected),
-  resultAction: (root, request) => call("resultAction", root, request),
+  // 服务端签名和插件一样收发 JSON 字符串。
+  resultDraft: async (root, value, expected) =>
+    JSON.parse(await call<string>("resultDraft", root, JSON.stringify(value), JSON.stringify(expected))),
+  resultAction: async (root, request) =>
+    JSON.parse(await call<string>("resultAction", root, JSON.stringify(request))),
   captureOnce: (text, operationId) => call("captureOnce", text, operationId),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>

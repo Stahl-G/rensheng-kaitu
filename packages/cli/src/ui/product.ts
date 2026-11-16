@@ -72,7 +72,15 @@ async function invokeRemote(services: ProductServices, method: string, args: unk
   // 持续推送的方法（首页更新流）在独立版走 /api/events，不经这里。
   if (result && typeof (result as AsyncIterable<unknown>)[Symbol.asyncIterator] === "function")
     throw new KaituError("接口不存在", "NOT_FOUND");
-  return (await result) ?? null;
+  try {
+    return (await result) ?? null;
+  } catch (error) {
+    // 插件服务把可重试的业务拒绝包成 Typert 的 RemoteError；独立版按原来的开图错误回给界面。
+    const failure = error as { code?: string; details?: { code?: string }; message?: string };
+    if (failure?.code === "kaitu/completion-rejected" && failure.details?.code)
+      throw new KaituError(failure.message ?? "", failure.details.code as KaituError["code"]);
+    throw error;
+  }
 }
 
 const standalone = new WeakMap<Workspace, ProductServices>();
