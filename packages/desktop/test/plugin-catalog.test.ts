@@ -117,7 +117,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       );
       return (await online.list(true)).find((entry: { name: string }) => entry.name === novel);
     };
-    expect(await refreshNovel(template.versions)).toMatchObject({ title: "Online", version: "0.3.3-rc.1" });
+    expect(await refreshNovel(template.versions)).toMatchObject({ title: "Online", version: "0.3.3-rc.2" });
     expect(
       await refreshNovel([
         {
@@ -126,12 +126,12 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
         },
       ]),
     ).toMatchObject({
-      version: "0.3.3-rc.1",
-      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#59b5ed8a911cd6f2a5feccd8ec569a57856bcde2",
+      version: "0.3.3-rc.2",
+      spec: "git+https://github.com/Stahl-G/dsh-novel-workspace.git#df4e7281b6899c3d388e9428aa32b64b4580ce77",
     });
     const future = (version: string, dsh: string) => ({ ...template.versions[0], version, engines: { dsh } });
-    expect(await refreshNovel([future("0.4.0", ">=0.2.1-rc.4 <0.3.0")])).toMatchObject({
-      version: "0.3.3-rc.1",
+    expect(await refreshNovel([future("0.4.0", ">=0.2.3-rc.1 <0.3.0")])).toMatchObject({
+      version: "0.3.3-rc.2",
     });
     const available = [future("9.0.0", ">=0.3.0"), future("0.4.0", ">=0.2.0 <0.3.0"), ...template.versions];
     expect(await refreshNovel(available)).toMatchObject({ title: "Online", version: "0.4.0" });
@@ -141,12 +141,12 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       join(profile, "node_modules", novel, "package.json"),
       JSON.stringify({ name: novel, version: "0.1.2" }),
     );
-    expect(await refreshNovel([future("0.4.0", "0.2.1-rc.3")])).toMatchObject({
+    expect(await refreshNovel([future("0.4.0", "0.2.2-rc.1")])).toMatchObject({
       version: "0.4.0",
       installedVersion: "0.1.2",
       updateAvailable: true,
     });
-    for (const version of ["0.3.3-rc.1", "0.4.0", "9.0.0"]) {
+    for (const version of ["0.3.3-rc.2", "0.4.0", "9.0.0"]) {
       writeFileSync(join(profile, "package.json"), JSON.stringify({ dependencies: { [novel]: version } }));
       writeFileSync(
         join(profile, "node_modules", novel, "package.json"),
@@ -155,7 +155,7 @@ test("目录区分实际版本与可更新版本，卸载状态仍保留重装�
       expect(await refreshNovel(available)).toMatchObject({
         installedVersion: version,
         version: "0.4.0",
-        updateAvailable: version === "0.3.3-rc.1",
+        updateAvailable: version === "0.3.3-rc.2",
       });
     }
   } finally {

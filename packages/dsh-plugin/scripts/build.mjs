@@ -13,7 +13,7 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WorkspaceTypertGenerator } from "@deepseek-ai/dsh-typert-generator";
 import { build } from "esbuild";
@@ -33,9 +33,9 @@ function linkNodeModules(from, to) {
       symlinkSync(realpathSync(source), resolve(to, entry.name), "junction");
   }
 }
-// 0.2.1-rc.2 recognizes protocol and registry symbols inside its workspace inventory. Give the
+// Typert recognizes merged protocol declarations inside its workspace inventory. Give the
 // published declarations a temporary workspace identity, without importing DSH source.
-const analysis = mkdtempSync(join(tmpdir(), "kaitu-typert-"));
+const analysis = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-typert-")));
 try {
   const analyzedPkg = resolve(analysis, "packages/dsh-plugin");
   const protocol = resolve(analysis, "packages/protocol");
@@ -68,9 +68,32 @@ try {
     "@deepseek-ai/dsh-typert-protocol": [resolve(protocol, "src/index.d.ts")],
     "@deepseek-ai/dsh-typert-registry": [resolve(registry, "src/index.d.ts")],
   };
+  const projects = [analyzedPkg, protocol, registry];
+  const scheduleRequire = createRequire(
+    realpathSync(resolve(pkg, "node_modules/@deepseek-ai/dsh-schedule/package.json")),
+  );
+  for (const [name, subpath] of [
+    ["session", "types"],
+    ["workspace", "types"],
+    ["schedule", "client"],
+  ]) {
+    const packageName = `@deepseek-ai/dsh-${name}`;
+    const source = dirname(scheduleRequire.resolve(`${packageName}/package.json`));
+    const directory = resolve(analysis, `packages/${name}`);
+    const declaration = resolve(directory, "src/types.d.ts");
+    mkdirSync(dirname(declaration), { recursive: true });
+    cpSync(resolve(source, "lib/types/types.d.ts"), declaration);
+    writeFileSync(
+      resolve(directory, "package.json"),
+      JSON.stringify({ name: packageName, exports: { [`./${subpath}`]: "./src/types.d.ts" } }),
+    );
+    linkNodeModules(resolve(source, "../.."), resolve(directory, "node_modules"));
+    options.compilerOptions.paths[`${packageName}/${subpath}`] = [declaration];
+    projects.push(directory);
+  }
   writeFileSync(resolve(analysis, "tsconfig.base.json"), JSON.stringify(options));
   symlinkSync(resolve(root, "node_modules"), resolve(analysis, "node_modules"), "junction");
-  for (const dir of [analyzedPkg, protocol, registry]) {
+  for (const dir of projects) {
     writeFileSync(
       resolve(dir, "tsconfig.json"),
       JSON.stringify({
@@ -85,11 +108,7 @@ try {
     JSON.stringify({
       extends: "./tsconfig.base.json",
       files: [],
-      references: [
-        { path: "packages/dsh-plugin" },
-        { path: "packages/protocol" },
-        { path: "packages/registry" },
-      ],
+      references: projects.map((path) => ({ path })),
     }),
   );
   const generator = new WorkspaceTypertGenerator(analysis);

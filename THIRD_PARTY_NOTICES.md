@@ -5,7 +5,7 @@
 
 | 名称 | 许可证 | 仓库 |
 |---|---|---|
-| DSH ChatGPT SIWC 0.9.4（固定源码 e7a3e450ed7aab5e44179cd0039ef200c1050b0b） | MIT | https://github.com/Fanch-hui/dsh-plugin-chatgpt-siwc |
+| DSH ChatGPT SIWC 0.9.7（固定 npm 版本，完整性摘要见 pnpm-lock.yaml） | MIT | https://github.com/Fanch-hui/dsh-plugin-chatgpt-siwc |
 | DeepSeek Harness 官方 Badge（原始 PNG，固定素材 commit 22ddee3792402c3e70ec5f86a63c3e3e895a2f60） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness/blob/22ddee3792402c3e70ec5f86a63c3e3e895a2f60/packages/experimental/skill-badge/assets/dsh-badge.png |
 | unpdf 1.9.1（本机简历 PDF 文字提取；内含 Mozilla PDF.js） | MIT / PDF.js Apache-2.0 | https://github.com/unjs/unpdf |
 | fflate | MIT | https://github.com/101arrowz/fflate |
@@ -20,7 +20,7 @@
 | Vite（仅构建） | MIT | https://github.com/vitejs/vite |
 | @modelcontextprotocol/sdk | MIT | https://github.com/modelcontextprotocol/typescript-sdk |
 | zod | MIT | https://github.com/colinhacks/zod |
-| DeepSeek Harness Node 引擎与 SDK 0.2.1-rc.3（随 CLI/Web 安装） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness |
+| DeepSeek Harness Node 引擎与 SDK 0.2.2-rc.1（随 CLI/Web 安装） | MIT，Copyright (c) 2026 DeepSeek | https://github.com/deepseek-ai/deepseek-harness |
 | @slack/web-api | MIT | https://github.com/slackapi/node-slack-sdk |
 | imapflow | MIT | https://github.com/postalsys/imapflow |
 | mailauth | MIT | https://github.com/postalsys/mailauth |
@@ -291,10 +291,10 @@ yahoo-finance2 4.0.3（MIT）：https://github.com/gadicc/yahoo-finance2 。仅�
 - License: MIT, Copyright (c) Adam Shaw. License texts are included in the installed npm packages.
 - Only standard calendar views are used. No premium scheduler dependency.
 
-## DSH 网络搜索提供方 0.2.1-rc.3
+## DSH 网络搜索提供方 0.2.2-rc.1
 
 - @deepseek-ai/dsh-web-search-exa、@deepseek-ai/dsh-web-search-perplexity，MIT。
-- 来源：https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.3/packages/web
+- 来源：https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.2-rc.1/packages/web
 - 复用发布包的提供方实现，Key 在开图适配层通过本机凭据服务读取，不写入提供方配置。
 - 完整许可证随 npm 依赖及桌面载荷的 `licenses/` 目录保留。
 
