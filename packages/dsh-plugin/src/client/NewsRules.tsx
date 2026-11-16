@@ -8,6 +8,7 @@ export interface NewsRulesProps {
   suggest?: () => Promise<string[]>;
   onPrompt: (text: string) => void;
   onSaved: (keywords: string[]) => void;
+  onClose: () => void;
 }
 export function NewsRules(props: NewsRulesProps) {
   const t = useT();
@@ -43,7 +44,12 @@ export function NewsRules(props: NewsRulesProps) {
   };
   return (
     <section className={css.rules} aria-label={t("关注话题", "Interests")}>
-      <h3>{t("关注话题", "Interests")}</h3>
+      <div className={css.heading}>
+        <h3>{t("关注话题", "Interests")}</h3>
+        <button type="button" className={css.link} onClick={props.onClose}>
+          {t("收起", "Close")}
+        </button>
+      </div>
       <label className={css.editor}>
         <textarea
           aria-label={t("关注话题，每行一个", "Interests, one per line")}
