@@ -29,6 +29,8 @@ const hasHealthRecords = (data: HealthData) => {
       data.nutrition.meals.length ||
       data.photos.length ||
       hasTrainingData(data.training) ||
+      data.steps.some((p) => p.value !== null) ||
+      data.sleep.some((p) => p.value !== null) ||
       [todaySteps, today?.exerciseMin, today?.activeKcal, today?.distanceKm, today?.flightsClimbed].some(
         (value) => typeof value === "number",
       ) ||
