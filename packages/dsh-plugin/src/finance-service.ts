@@ -100,6 +100,8 @@ export class KaituFinanceService extends TypertRemoteService {
     options: FinanceRemoteCommitOptions,
   ): Promise<FinanceImportCommitData> {
     this.assertUpload(file);
+    // 暂存文件被换成指向工作区外的链接时，在这里拒绝。
+    this.workspace.resolve(file, { internal: true });
     return this.write(() => commitFinanceImport(this.workspace, file, options));
   }
   @Remote("financeImportDiscard")
