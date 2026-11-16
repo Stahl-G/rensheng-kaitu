@@ -12,7 +12,7 @@ export interface Preferences {
   todayAdoptions?: { workspace: string; day: string; ids: string[] };
   /** Ordered visible Explore entry IDs; absent uses defaults, [] deliberately hides all entries. */
   exploreEntries?: string[];
-  /** One-time migration of older Explore layouts to put the life map first. */
+  /** true: an older build forced the life map first; the client moves it back once and stores false. */
   lifeMapFirstMigrated?: boolean;
   /** Installed plugin IDs already offered, including entries the user subsequently hid. */
   explorePlugins?: string[];

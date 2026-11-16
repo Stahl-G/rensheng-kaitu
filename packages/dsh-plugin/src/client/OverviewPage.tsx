@@ -44,7 +44,7 @@ import {
   defaultExploreEntries,
   exploreDestination,
   exploreModules,
-  migrateLifeMapFirst,
+  undoLifeMapFirst,
 } from "./explore-modules.js";
 import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
@@ -142,7 +142,7 @@ export function OverviewPage(props: OverviewPageProps) {
       setPluginModules(modules);
       const value = await props.loadPreferences(browserLocale());
       const fresh = modules.filter(({ id }) => !value.explorePlugins?.includes(id)).map(({ id }) => id);
-      const migration = props.loadLifeAtlas ? migrateLifeMapFirst(value) : null;
+      const migration = undoLifeMapFirst(value);
       if (!active) return value;
       if (!fresh.length && !migration) return value;
       const saved = await props.savePreferences({
@@ -151,7 +151,7 @@ export function OverviewPage(props: OverviewPageProps) {
           ...(migration?.exploreEntries ?? value.exploreEntries ?? defaultExploreEntries),
           ...fresh,
         ],
-        ...(migration ? { lifeMapFirstMigrated: true } : {}),
+        ...(migration ? { lifeMapFirstMigrated: false } : {}),
         explorePlugins: [...(value.explorePlugins ?? []), ...fresh],
       });
       return { ...saved, followSystem: value.followSystem };
