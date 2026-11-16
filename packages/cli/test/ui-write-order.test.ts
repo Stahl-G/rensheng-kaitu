@@ -195,10 +195,12 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
     started.resolve();
     return fetched.promise;
   });
+  // Inside the importer's window, so "not applied" is a real check rather than an out-of-range skip.
+  const day = new Date(Date.now() + 86400000).toISOString().slice(0, 10).replaceAll("-", "");
   const release = () =>
     fetched.resolve(
       Buffer.from(
-        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:old-fetch\r\nDTSTART:20261023T120000Z\r\nDTEND:20261023T130000Z\r\nSUMMARY:Synthetic\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:old-fetch\r\nDTSTART:${day}T120000Z\r\nDTEND:${day}T130000Z\r\nSUMMARY:Synthetic\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
       ),
     );
   beforeClose.push(release);
