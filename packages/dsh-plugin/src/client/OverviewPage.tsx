@@ -1941,24 +1941,45 @@ function Overview({
                   open={setExplore}
                   empty={exploreEmpty}
                   summaries={
+                    // 只数有的；一样都没有时显示模块本身的一句话，不铺一排 0。
                     exploreContent
                       ? {
-                          footprints: t(
-                            `${exploreContent.hometown ? "已有家乡 · " : ""}${exploreContent.experiences} 段经历`,
-                            `${exploreContent.hometown ? "Hometown recorded · " : ""}${exploreContent.experiences} experiences`,
-                          ),
-                          health: t(
-                            `${exploreContent.healthRecords} 条记录`,
-                            `${exploreContent.healthRecords} records`,
-                          ),
-                          news: t(
-                            `${exploreContent.newsTopics} 个关键词`,
-                            `${exploreContent.newsTopics} keywords`,
-                          ),
-                          directions: t(
-                            `${exploreContent.goals} 个目标 · ${exploreContent.directions} 个方向`,
-                            `${exploreContent.goals} goals · ${exploreContent.directions} directions`,
-                          ),
+                          footprints: [
+                            exploreContent.hometown ? t("已有家乡", "Hometown recorded") : "",
+                            exploreContent.experiences
+                              ? t(
+                                  `${exploreContent.experiences} 段经历`,
+                                  `${exploreContent.experiences} experiences`,
+                                )
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" · "),
+                          health: exploreContent.healthRecords
+                            ? t(
+                                `${exploreContent.healthRecords} 条记录`,
+                                `${exploreContent.healthRecords} records`,
+                              )
+                            : "",
+                          news: exploreContent.newsTopics
+                            ? t(
+                                `${exploreContent.newsTopics} 个关注话题`,
+                                `${exploreContent.newsTopics} interests`,
+                              )
+                            : "",
+                          directions: [
+                            exploreContent.goals
+                              ? t(`${exploreContent.goals} 个目标`, `${exploreContent.goals} goals`)
+                              : "",
+                            exploreContent.directions
+                              ? t(
+                                  `${exploreContent.directions} 个方向`,
+                                  `${exploreContent.directions} directions`,
+                                )
+                              : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" · "),
                         }
                       : {}
                   }

@@ -19,6 +19,28 @@ export interface HealthPageProps {
 const tabs = ["训练", "饮食", "睡眠与活动", "身体数据", "体态照片"];
 const hasTrainingData = (training: HealthData["training"]) =>
   training.recent.length > 0 || training.heatmap.some((day) => day.sessions !== null);
+/** 都没有时只留「暂无健康记录」，不铺空分类。 */
+const hasHealthRecords = (data: HealthData) => {
+  const dash = data.dashboard;
+  const today = dash?.activity.find((d) => d.date === data.today);
+  const todaySteps = today ? today.steps : data.steps.find((d) => d.date === data.today)?.value;
+  return Boolean(
+    (dash ? dash.metrics.some((m) => m.latest) : data.metrics.some((m) => m.points.length)) ||
+      data.nutrition.meals.length ||
+      data.photos.length ||
+      hasTrainingData(data.training) ||
+      [todaySteps, today?.exerciseMin, today?.activeKcal, today?.distanceKm, today?.flightsClimbed].some(
+        (value) => typeof value === "number",
+      ) ||
+      (dash
+        ? dash.heartNotifications.length ||
+          dash.activity.some((d) => d.steps !== null) ||
+          dash.sleep.length ||
+          dash.mood.some((m) => m.valence !== null) ||
+          dash.symptoms.length
+        : data.steps.slice(-7).some((p) => p.value !== null) || data.sleep.some((p) => p.value !== null)),
+  );
+};
 const number = (value: number) => new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 }).format(value);
 const sessions = (n: number) => `${n} ${n === 1 ? "session" : "sessions"}`;
 const reps = (n: number) => `${n} ${n === 1 ? "rep" : "reps"}`;
@@ -28,14 +50,9 @@ const makeAmount =
     value === null
       ? t("暂无记录", "No records yet")
       : `${estimated ? t("约 ", "about ") : ""}${number(estimated && /^(?:克|g)(?:\s|$)/.test(unit) ? Math.round(value) : value)} ${unit}`;
-function Empty({ children }: { children: ReactNode }) {
+function Empty() {
   const t = useT();
-  return (
-    <p className={css.empty}>
-      {t("暂无记录。", "No records yet. ")}
-      {children}
-    </p>
-  );
+  return <p className={css.empty}>{t("暂无记录", "No records yet")}</p>;
 }
 function Section({ title, children, note }: { title: string; children: ReactNode; note?: string }) {
   return (
@@ -83,7 +100,7 @@ function Trend({
       }
     >
       {!values.length ? (
-        <Empty>{t("导入或记下数据后，就能看到趋势。", "Import or log data to see the trend.")}</Empty>
+        <Empty />
       ) : (
         <>
           <div className={css.scale}>
@@ -248,9 +265,7 @@ function Photos({
         {t("记一次体态照片", "Log a progress photo")}
       </button>
       {!dates.length ? (
-        <Empty>
-          {t("把体态照片交给开图，之后可以按日期对比。", "Add progress photos to compare them by date.")}
-        </Empty>
+        <Empty />
       ) : (
         <>
           {dates.length < 2 && (
@@ -561,19 +576,7 @@ function HealthDashboard({ data }: { data: HealthData }) {
   };
   const hasMood = dash?.mood.some((m) => m.valence !== null);
   const symptoms = dash?.symptoms ?? [];
-  const hasAny =
-    groups.some((m) => m.latest) ||
-    data.nutrition.meals.length ||
-    data.photos.length ||
-    dash?.heartNotifications.length ||
-    body.length ||
-    cardio.length ||
-    activityValues.length ||
-    steps.some((p) => p.value !== null) ||
-    latestSleep ||
-    hasTraining ||
-    hasMood ||
-    symptoms.length;
+  const hasAny = hasHealthRecords(data);
   const others = [
     ["heart_rate_daily", t("每日心率", "Daily heart rate")],
     ["blood_oxygen", t("血氧", "Blood oxygen")],
@@ -583,6 +586,11 @@ function HealthDashboard({ data }: { data: HealthData }) {
     ["glucose", t("血糖", "Blood glucose")],
     ["bp", t("血压", "Blood pressure")],
   ];
+  const otherMetrics = others.flatMap(([kind, title]) => {
+    const metric = groups.find((m) => m.kind === kind);
+    return metric?.latest ? [{ kind, title, unit: metric.unit, latest: metric.latest }] : [];
+  });
+  const heartNotification = dash?.heartNotifications.at(-1)?.kind ?? null;
   return (
     <>
       {!hasAny && <p className={css.empty}>{t("暂无健康记录", "No health records")}</p>}
@@ -795,27 +803,24 @@ function HealthDashboard({ data }: { data: HealthData }) {
           </Section>
         )}
       </div>
-      <section className={css.otherMetrics} aria-label={t("其他指标", "Other metrics")}>
-        <h2>{t("其他指标", "Other metrics")}</h2>
-        {others.map(([kind, title]) => {
-          const metric = groups.find((m) => m.kind === kind);
-          const latest = metric?.latest;
-          return (
-            <span key={kind} title={latest?.date}>
+      {(otherMetrics.length > 0 || heartNotification) && (
+        <section className={css.otherMetrics} aria-label={t("其他指标", "Other metrics")}>
+          <h2>{t("其他指标", "Other metrics")}</h2>
+          {otherMetrics.map(({ kind, title, unit, latest }) => (
+            <span key={kind} title={latest.date}>
               {title}{" "}
               <strong>
-                {latest
-                  ? `${latest.estimated ? "≈" : ""}${typeof latest.value === "number" ? number(latest.value) : latest.value} ${metric?.unit}`
-                  : t("无记录", "No records")}
+                {`${latest.estimated ? "≈" : ""}${typeof latest.value === "number" ? number(latest.value) : latest.value} ${unit}`}
               </strong>
             </span>
-          );
-        })}
-        <span>
-          {t("心率通知", "Heart notifications")}{" "}
-          <strong>{name(dash?.heartNotifications.at(-1)?.kind ?? null) || t("无记录", "No records")}</strong>
-        </span>
-      </section>
+          ))}
+          {heartNotification && (
+            <span>
+              {t("心率通知", "Heart notifications")} <strong>{name(heartNotification)}</strong>
+            </span>
+          )}
+        </section>
+      )}
     </>
   );
 }
@@ -975,14 +980,14 @@ export function HealthPage({
       ts: session.ts,
       kind: t("训练", "Workout"),
       title: session.exercises.map((exercise) => exercise.name).join(t("、", ", ")),
-      value: amount(session.duration, t("分钟", "min")),
+      value: session.duration === null ? "" : amount(session.duration, t("分钟", "min")),
     })),
     ...(data?.nutrition.meals ?? []).map((meal) => ({
       id: `meal-${meal.id}`,
       ts: meal.ts,
       kind: t("饮食", "Meal"),
       title: `${label(meal.meal)} · ${meal.items}`,
-      value: amount(meal.kcal, "kcal", meal.estimated),
+      value: meal.kcal === null ? "" : amount(meal.kcal, "kcal", meal.estimated),
     })),
     ...(data?.metrics ?? []).flatMap((metric) =>
       metric.points.map((point) => ({
@@ -1101,432 +1106,409 @@ export function HealthPage({
                     {t("新建目标", "New goal")}
                   </button>
                 </div>
-                {!data.goals.length ? (
-                  <Empty>
-                    {t("和开图聊聊你想达到的健康目标。", "Tell Kaitu about a health goal you want to reach.")}
-                  </Empty>
-                ) : (
-                  data.goals.map((goal: MeGoal) => (
-                    <article className={`${css.card} ${css.goal}`} key={goal.id}>
-                      <h3>
-                        {t("目标", "Goal")} · {goal.title}
-                      </h3>
-                      {(goal.metric || goal.target) && (
-                        <p>{[goal.metric, goal.target].filter(Boolean).join(" · ")}</p>
-                      )}
-                      {goal.approach && (
-                        <p>
-                          <span>{t("现在的做法", "Current approach")}</span>
-                          {goal.approach}
-                        </p>
-                      )}
-                      {goal.actual && (
-                        <p>
-                          <span>{t("实际发生", "What happened")}</span>
-                          {goal.actual}
-                        </p>
-                      )}
-                      {goal.due && (
-                        <p>
-                          <span>{t("下次回看", "Next review")}</span>
-                          {goal.due}
-                        </p>
-                      )}
-                    </article>
-                  ))
-                )}
+                {data.goals.map((goal: MeGoal) => (
+                  <article className={`${css.card} ${css.goal}`} key={goal.id}>
+                    <h3>
+                      {t("目标", "Goal")} · {goal.title}
+                    </h3>
+                    {(goal.metric || goal.target) && (
+                      <p>{[goal.metric, goal.target].filter(Boolean).join(" · ")}</p>
+                    )}
+                    {goal.approach && (
+                      <p>
+                        <span>{t("现在的做法", "Current approach")}</span>
+                        {goal.approach}
+                      </p>
+                    )}
+                    {goal.actual && (
+                      <p>
+                        <span>{t("实际发生", "What happened")}</span>
+                        {goal.actual}
+                      </p>
+                    )}
+                    {goal.due && (
+                      <p>
+                        <span>{t("下次回看", "Next review")}</span>
+                        {goal.due}
+                      </p>
+                    )}
+                  </article>
+                ))}
               </section>
             )}
             {data.next.length > 0 && (
               <Section title={t("健康的下一步", "Health next steps")}>
                 {receipt && <output>{receipt}</output>}
-                {!data.next.length ? (
-                  <Empty>
-                    {t(
-                      "让开图根据最近的记录帮你安排下一步。",
-                      "Ask Kaitu for a next step based on your recent records.",
+                {data.next.map((item) => (
+                  <div className={css.next} key={item.id}>
+                    <span aria-hidden="true" />
+                    <span>
+                      {directionText(item.title, 120)}
+                      {item.status === "proposed" && <small>{t(" · AI 建议", " · AI suggestion")}</small>}
+                      {item.due && <small> · {item.due}</small>}
+                    </span>
+                    {item.status === "proposed" && item.taskId && (
+                      <div className={css.actions}>
+                        <button
+                          type="button"
+                          className={css.button}
+                          disabled={!!acting}
+                          onClick={() => void decideTask(item.taskId as string, true)}
+                        >
+                          {acting === item.taskId ? t("正在保存…", "Saving…") : t("采纳", "Adopt")}
+                        </button>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={!!acting}
+                          onClick={() => void decideTask(item.taskId as string, false)}
+                        >
+                          {t("不用了", "Not needed")}
+                        </button>
+                      </div>
                     )}
-                  </Empty>
-                ) : (
-                  data.next.map((item) => (
-                    <div className={css.next} key={item.id}>
-                      <span aria-hidden="true" />
-                      <span>
-                        {directionText(item.title, 120)}
-                        {item.status === "proposed" && <small>{t(" · AI 建议", " · AI suggestion")}</small>}
-                        {item.due && <small> · {item.due}</small>}
-                      </span>
-                      {item.status === "proposed" && item.taskId && (
-                        <div className={css.actions}>
-                          <button
-                            type="button"
-                            className={css.button}
-                            disabled={!!acting}
-                            onClick={() => void decideTask(item.taskId as string, true)}
-                          >
-                            {acting === item.taskId ? t("正在保存…", "Saving…") : t("采纳", "Adopt")}
-                          </button>
-                          <button
-                            type="button"
-                            className={css.link}
-                            disabled={!!acting}
-                            onClick={() => void decideTask(item.taskId as string, false)}
-                          >
-                            {t("不用了", "Not needed")}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
+                  </div>
+                ))}
               </Section>
             )}
           </div>
-          <Section
-            title={t("最近记录", "Recent records")}
-            note={t("近 30 天 · 训练、饮食、测量", "Last 30 days · workouts, meals and measurements")}
-          >
-            {!recent.length ? (
-              <Empty>
-                {t(
-                  "记下训练、饮食或测量结果，在这里回看。",
-                  "Log a workout, meal or measurement to see it here.",
-                )}
-              </Empty>
-            ) : (
-              (showAllRecent ? recent : recent.slice(0, 6)).map((item) => (
+          {recent.length > 0 && (
+            <Section
+              title={t("最近记录", "Recent records")}
+              note={t("近 30 天 · 训练、饮食、测量", "Last 30 days · workouts, meals and measurements")}
+            >
+              {(showAllRecent ? recent : recent.slice(0, 6)).map((item) => (
                 <article className={css.row} key={item.id}>
                   <time dateTime={item.ts}>{stamp(item.ts)}</time>
                   <span className={css.tag}>{item.kind}</span>
                   <span className={css.grow}>{item.title}</span>
                   <span>{item.value}</span>
                 </article>
-              ))
-            )}
-            {recent.length > 6 && (
-              <button
-                type="button"
-                className={css.link}
-                aria-expanded={showAllRecent}
-                onClick={() => setShowAllRecent(!showAllRecent)}
-              >
-                {showAllRecent
-                  ? t("收起", "Show less")
-                  : t(`全部 ${recent.length} 条`, `All ${recent.length} records`)}
-              </button>
-            )}
-          </Section>
-          <h2>{t("细看", "Details")}</h2>
-          <div className={css.tabs} role="tablist" aria-label={t("健康分类", "Health categories")}>
-            {tabs.map((name) => (
-              <button
-                type="button"
-                role="tab"
-                id={`health-tab-${name}`}
-                aria-controls="health-panel"
-                key={name}
-                aria-selected={tab === name}
-                onClick={() => setTab(name)}
-                onKeyDown={(e) => {
-                  const index = tabs.indexOf(tab);
-                  const next =
-                    e.key === "ArrowRight"
-                      ? tabs[(index + 1) % tabs.length]
-                      : e.key === "ArrowLeft"
-                        ? tabs[(index + tabs.length - 1) % tabs.length]
-                        : e.key === "Home"
-                          ? tabs[0]
-                          : e.key === "End"
-                            ? tabs.at(-1)
-                            : null;
-                  if (next) {
-                    e.preventDefault();
-                    setTab(next);
-                    document.getElementById(`health-tab-${next}`)?.focus();
-                  }
-                }}
-                tabIndex={tab === name ? 0 : -1}
-              >
-                {t(
-                  name,
-                  ["Training", "Meals", "Sleep and activity", "Body measurements", "Progress photos"][
-                    tabs.indexOf(name)
-                  ] ?? name,
-                )}
-              </button>
-            ))}
-          </div>
-          <div id="health-panel" role="tabpanel" aria-labelledby={`health-tab-${tab}`} className={css.panel}>
-            {tab === "训练" && hasTrainingData(training) && (
-              <>
-                <dl className={css.stats}>
-                  {[
-                    [
-                      t("本周训练", "Workouts this week"),
-                      amount(training.week, t("次", training.week === 1 ? "session" : "sessions")),
-                      `${ruleText}${target && training.week !== null ? ` · ${training.week >= (target[0] ?? 0) ? t("已达到本周目标", "Weekly goal reached") : t(`距目标还差 ${(target[0] ?? 0) - training.week} 次`, `${sessions((target[0] ?? 0) - training.week)} to goal`)}` : ""}`,
-                    ],
-                    [
-                      t("本月训练", "Workouts this month"),
-                      amount(training.month, t("次", training.month === 1 ? "session" : "sessions")),
-                      training.month !== null && training.previousMonth !== null
-                        ? t(
-                            `上月 ${training.previousMonth} 次 · ${training.month === training.previousMonth ? "与上月持平" : `比上月${training.month > training.previousMonth ? "多" : "少"} ${Math.abs(training.month - training.previousMonth)} 次`}`,
-                            `Last month: ${training.previousMonth} · ${training.month === training.previousMonth ? "Same as last month" : `${Math.abs(training.month - training.previousMonth)} ${training.month > training.previousMonth ? "more" : "fewer"} ${Math.abs(training.month - training.previousMonth) === 1 ? "session" : "sessions"}`}`,
-                          )
-                        : t("上月或本月暂无记录", "No records for last month or this month"),
-                    ],
-                    [
-                      t("练得最多", "Most trained"),
-                      training.topPart ? label(training.topPart.name) : t("暂无记录", "No records yet"),
-                      training.topPart
-                        ? t(
-                            `本月 ${training.topPart.count} 次 · 按动作归类`,
-                            `${sessions(training.topPart.count)} this month · grouped by exercise`,
-                          )
-                        : t("记录动作后可汇总部位", "Log exercises to see the muscle groups"),
-                    ],
-                    [
-                      training.lift
-                        ? t(`最大${training.lift.name}`, `Heaviest ${training.lift.name}`)
-                        : t("最大重量变化", "Change in heaviest lift"),
-                      amount(training.lift?.max ?? null, "kg"),
-                      training.lift?.change !== null && training.lift?.change !== undefined
-                        ? t(
-                            `比本月首个记录日 ${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg`,
-                            `${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg since the first record this month`,
-                          )
-                        : t(
-                            "需要不同日期的力量记录",
-                            "Log strength sets on two different days to see the change",
-                          ),
-                    ],
-                  ].map(([label, value, hint]) => (
-                    <div className={css.stat} key={label}>
-                      <dt>{label}</dt>
-                      <dd>
-                        <strong>{value}</strong>
-                        <small>{hint}</small>
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-                <div className={css.trainingDetails}>
-                  <Section
-                    title={t("近 5 周", "Last 5 weeks")}
-                    note={t("颜色越深，那天练得越多", "Darker squares mean more training")}
-                  >
-                    <div className={css.heatmap}>
-                      {(locale === "en"
-                        ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
-                        : [..."一二三四五六日"]
-                      ).map((d) => (
-                        <span className={css.weekday} key={d}>
-                          {d}
-                        </span>
-                      ))}
-                      {training.heatmap.map((d) => {
-                        const volume = d.repetitions
-                          ? d.repetitions / maxReps
-                          : (d.minutes ?? 0) / maxMinutes;
-                        const text = `${d.date}${t("：", ": ")}${d.future ? t("尚未到来", "Upcoming") : d.sessions === null ? t("暂无记录", "No records yet") : t(`${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`, `${sessions(d.sessions)}${d.repetitions ? ` · ${reps(d.repetitions)}` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} min` : ""}`)}`;
-                        return (
-                          <span
-                            className={css.heat}
-                            key={d.date}
-                            title={text}
-                            aria-label={text}
-                            data-future={d.future}
-                            data-level={d.sessions === null ? 0 : volume > 0.66 ? 3 : volume > 0.33 ? 2 : 1}
-                          />
-                        );
-                      })}
-                    </div>
-                    {!training.heatmap.some((d) => d.sessions !== null) && (
-                      <Empty>{t("记一次训练，就会在这里留下足迹。", "Log a workout to see it here.")}</Empty>
-                    )}
-                  </Section>
-                  <Section title={t("最近的训练", "Recent workouts")} note={t("近 30 天", "Last 30 days")}>
-                    {!training.recent.length ? (
-                      <Empty>
-                        {t(
-                          "点击「记一次训练」，记下动作、组数和重量。",
-                          "Choose “Log a workout” to record exercises, sets and weights.",
-                        )}
-                      </Empty>
-                    ) : (
-                      training.recent.map((session) => (
-                        <article className={css.workout} key={session.id}>
-                          <time dateTime={session.ts}>{stamp(session.ts)}</time>
-                          {session.parts.length > 0 && (
-                            <span className={css.tag}>{session.parts.map(label).join(t("、", ", "))}</span>
-                          )}
-                          <div className={css.exercises}>
-                            {session.exercises.map((exercise) => (
-                              <div key={exercise.id}>
-                                <span>
-                                  {exercise.estimated && t("约 ", "about ")}
-                                  {exercise.name}
-                                  {exercise.cardio
-                                    ? `${exercise.distance !== null ? ` ${number(exercise.distance)} km` : ""}${exercise.duration !== null ? t(` · ${number(exercise.duration)} 分钟`, ` · ${number(exercise.duration)} min`) : ""}`
-                                    : ` ${exercise.sets ?? "—"}×${exercise.reps ?? "—"} · ${amount(exercise.weight, "kg")}`}
-                                </span>
-                                <small>
-                                  {t("记录者：", "Recorded by: ")}
-                                  {label(exercise.recorder)}
-                                </small>
-                              </div>
-                            ))}
-                          </div>
-                          <span className={css.duration}>
-                            {t("时长：", "Duration: ")}
-                            {amount(session.duration, t("分钟", "min"))}
-                          </span>
-                        </article>
-                      ))
-                    )}
-                  </Section>
-                </div>
-              </>
-            )}
-            {tab === "饮食" && (
-              <>
-                <div className={css.trends}>
-                  <Trend
-                    title={t("近 7 天热量", "Calories over 7 days")}
-                    points={data.nutrition.calories}
-                    unit="kcal"
-                  />
-                  <Trend
-                    title={t("近 7 天蛋白质", "Protein over 7 days")}
-                    points={data.nutrition.protein}
-                    unit={t("克", "g")}
-                    target={data.nutrition.target}
-                  />
-                </div>
-                {!data.nutrition.target?.length && (
-                  <p className={css.empty}>
-                    {t(
-                      "暂无蛋白质目标，可在对话中设置每天的目标。",
-                      "No protein goal yet. Set a daily goal in Ask.",
-                    )}
-                  </p>
-                )}
-                <Section title={t("最近餐食", "Recent meals")} note={t("近 30 天", "Last 30 days")}>
-                  <button
-                    type="button"
-                    className={css.link}
-                    onClick={() => ask(t("记录今天的饮食：", "Log today’s meals:"))}
-                  >
-                    {t("记一餐", "Log a meal")}
-                  </button>
-                  {!data.nutrition.meals.length ? (
-                    <Empty>
-                      {t(
-                        "记下吃了什么，开图会帮你整理营养记录。",
-                        "Log what you ate to organize your nutrition records.",
-                      )}
-                    </Empty>
-                  ) : (
-                    data.nutrition.meals.map((meal) => (
-                      <article className={css.row} key={meal.id}>
-                        <time dateTime={meal.ts}>
-                          {stamp(meal.ts)} · {label(meal.meal)}
-                        </time>
-                        <span className={css.grow}>{meal.items}</span>
-                        <span>
-                          {amount(meal.kcal, "kcal", meal.estimated)} · {t("蛋白质", "Protein")}{" "}
-                          {amount(meal.protein, t("克", "g"), meal.estimated)}
-                        </span>
-                      </article>
-                    ))
-                  )}
-                </Section>
-              </>
-            )}
-            {tab === "睡眠与活动" && (
-              <div className={css.trends}>
-                <Trend
-                  title={t("近 14 天睡眠", "Sleep over 14 days")}
-                  points={data.sleep}
-                  unit={t("小时", "hours")}
-                />
-                <Trend
-                  title={t("近 14 天步数", "Steps over 14 days")}
-                  points={data.steps}
-                  unit={t("步", "steps")}
-                />
-              </div>
-            )}
-            {tab === "身体数据" && (
-              <>
+              ))}
+              {recent.length > 6 && (
                 <button
                   type="button"
                   className={css.link}
-                  onClick={() => ask(t("记录今天的身体数据：", "Log today’s measurements:"))}
+                  aria-expanded={showAllRecent}
+                  onClick={() => setShowAllRecent(!showAllRecent)}
                 >
-                  {t("记一次测量", "Log a measurement")}
+                  {showAllRecent
+                    ? t("收起", "Show less")
+                    : t(`全部 ${recent.length} 条`, `All ${recent.length} records`)}
                 </button>
-                {!data.metrics.length ? (
-                  <Empty>
+              )}
+            </Section>
+          )}
+          {hasHealthRecords(data) && (
+            <>
+              <h2>{t("细看", "Details")}</h2>
+              <div className={css.tabs} role="tablist" aria-label={t("健康分类", "Health categories")}>
+                {tabs.map((name) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    id={`health-tab-${name}`}
+                    aria-controls="health-panel"
+                    key={name}
+                    aria-selected={tab === name}
+                    onClick={() => setTab(name)}
+                    onKeyDown={(e) => {
+                      const index = tabs.indexOf(tab);
+                      const next =
+                        e.key === "ArrowRight"
+                          ? tabs[(index + 1) % tabs.length]
+                          : e.key === "ArrowLeft"
+                            ? tabs[(index + tabs.length - 1) % tabs.length]
+                            : e.key === "Home"
+                              ? tabs[0]
+                              : e.key === "End"
+                                ? tabs.at(-1)
+                                : null;
+                      if (next) {
+                        e.preventDefault();
+                        setTab(next);
+                        document.getElementById(`health-tab-${next}`)?.focus();
+                      }
+                    }}
+                    tabIndex={tab === name ? 0 : -1}
+                  >
                     {t(
-                      "记下体重、体脂等测量结果，每项数据会单独展示趋势。",
-                      "Log weight, body fat or other measurements to see each trend.",
+                      name,
+                      ["Training", "Meals", "Sleep and activity", "Body measurements", "Progress photos"][
+                        tabs.indexOf(name)
+                      ] ?? name,
                     )}
-                  </Empty>
-                ) : (
-                  <div className={css.trends}>
-                    {data.metrics.map((metric) => (
-                      <div key={metric.key}>
-                        {metric.points.some((p) => typeof p.value === "number") ? (
-                          <Trend
-                            title={t(
-                              `${metricNames[metric.kind] ?? metric.kind}趋势`,
-                              `${metricNames[metric.kind] ?? metric.kind} trend`,
-                            )}
-                            unit={metric.unit}
-                            line
-                            points={metric.points.map((p) => ({
-                              ...p,
-                              value: typeof p.value === "number" ? p.value : null,
-                            }))}
-                          />
-                        ) : (
-                          <div className={css.heading}>
-                            <h2>
-                              {t(
-                                `${metricNames[metric.kind] ?? metric.kind}记录`,
-                                `${metricNames[metric.kind] ?? metric.kind} records`,
-                              )}
-                            </h2>
-                            <span>{metric.unit}</span>
-                          </div>
-                        )}
-                        <div className={css.measurements}>
-                          {metric.points.map((p) => (
-                            <p
-                              key={p.id}
-                              id={`health-measurement-${p.id}`}
-                              tabIndex={-1}
-                              ref={reviewTarget?.id === p.id ? measurement : undefined}
-                              data-review={reviewTarget?.id === p.id}
-                            >
-                              <time dateTime={p.ts}>{stamp(p.ts)}</time>
-                              <strong>
-                                {p.estimated && t("约 ", "about ")}
-                                {typeof p.value === "number" ? number(p.value) : p.value} {metric.unit}
-                              </strong>
-                            </p>
-                          ))}
+                  </button>
+                ))}
+              </div>
+              <div
+                id="health-panel"
+                role="tabpanel"
+                aria-labelledby={`health-tab-${tab}`}
+                className={css.panel}
+              >
+                {tab === "训练" && hasTrainingData(training) && (
+                  <>
+                    <dl className={css.stats}>
+                      {[
+                        [
+                          t("本周训练", "Workouts this week"),
+                          amount(training.week, t("次", training.week === 1 ? "session" : "sessions")),
+                          `${ruleText}${target && training.week !== null ? ` · ${training.week >= (target[0] ?? 0) ? t("已达到本周目标", "Weekly goal reached") : t(`距目标还差 ${(target[0] ?? 0) - training.week} 次`, `${sessions((target[0] ?? 0) - training.week)} to goal`)}` : ""}`,
+                        ],
+                        [
+                          t("本月训练", "Workouts this month"),
+                          amount(training.month, t("次", training.month === 1 ? "session" : "sessions")),
+                          training.month !== null && training.previousMonth !== null
+                            ? t(
+                                `上月 ${training.previousMonth} 次 · ${training.month === training.previousMonth ? "与上月持平" : `比上月${training.month > training.previousMonth ? "多" : "少"} ${Math.abs(training.month - training.previousMonth)} 次`}`,
+                                `Last month: ${training.previousMonth} · ${training.month === training.previousMonth ? "Same as last month" : `${Math.abs(training.month - training.previousMonth)} ${training.month > training.previousMonth ? "more" : "fewer"} ${Math.abs(training.month - training.previousMonth) === 1 ? "session" : "sessions"}`}`,
+                              )
+                            : t("上月或本月暂无记录", "No records for last month or this month"),
+                        ],
+                        [
+                          t("练得最多", "Most trained"),
+                          training.topPart ? label(training.topPart.name) : t("暂无记录", "No records yet"),
+                          training.topPart
+                            ? t(
+                                `本月 ${training.topPart.count} 次 · 按动作归类`,
+                                `${sessions(training.topPart.count)} this month · grouped by exercise`,
+                              )
+                            : t("记录动作后可汇总部位", "Log exercises to see the muscle groups"),
+                        ],
+                        [
+                          training.lift
+                            ? t(`最大${training.lift.name}`, `Heaviest ${training.lift.name}`)
+                            : t("最大重量变化", "Change in heaviest lift"),
+                          amount(training.lift?.max ?? null, "kg"),
+                          training.lift?.change !== null && training.lift?.change !== undefined
+                            ? t(
+                                `比本月首个记录日 ${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg`,
+                                `${training.lift.change >= 0 ? "+" : ""}${number(training.lift.change)} kg since the first record this month`,
+                              )
+                            : t(
+                                "需要不同日期的力量记录",
+                                "Log strength sets on two different days to see the change",
+                              ),
+                        ],
+                      ].map(([label, value, hint]) => (
+                        <div className={css.stat} key={label}>
+                          <dt>{label}</dt>
+                          <dd>
+                            <strong>{value}</strong>
+                            <small>{hint}</small>
+                          </dd>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </dl>
+                    <div className={css.trainingDetails}>
+                      <Section
+                        title={t("近 5 周", "Last 5 weeks")}
+                        note={t("颜色越深，那天练得越多", "Darker squares mean more training")}
+                      >
+                        <div className={css.heatmap}>
+                          {(locale === "en"
+                            ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+                            : [..."一二三四五六日"]
+                          ).map((d) => (
+                            <span className={css.weekday} key={d}>
+                              {d}
+                            </span>
+                          ))}
+                          {training.heatmap.map((d) => {
+                            const volume = d.repetitions
+                              ? d.repetitions / maxReps
+                              : (d.minutes ?? 0) / maxMinutes;
+                            const text = `${d.date}${t("：", ": ")}${d.future ? t("尚未到来", "Upcoming") : d.sessions === null ? t("暂无记录", "No records yet") : t(`${d.sessions} 次训练${d.repetitions ? ` · ${d.repetitions} 次动作` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} 分钟` : ""}`, `${sessions(d.sessions)}${d.repetitions ? ` · ${reps(d.repetitions)}` : ""}${d.minutes !== null ? ` · ${number(d.minutes)} min` : ""}`)}`;
+                            return (
+                              <span
+                                className={css.heat}
+                                key={d.date}
+                                title={text}
+                                aria-label={text}
+                                data-future={d.future}
+                                data-level={
+                                  d.sessions === null ? 0 : volume > 0.66 ? 3 : volume > 0.33 ? 2 : 1
+                                }
+                              />
+                            );
+                          })}
+                        </div>
+                        {!training.heatmap.some((d) => d.sessions !== null) && <Empty />}
+                      </Section>
+                      <Section
+                        title={t("最近的训练", "Recent workouts")}
+                        note={t("近 30 天", "Last 30 days")}
+                      >
+                        {!training.recent.length ? (
+                          <Empty />
+                        ) : (
+                          training.recent.map((session) => (
+                            <article className={css.workout} key={session.id}>
+                              <time dateTime={session.ts}>{stamp(session.ts)}</time>
+                              {session.parts.length > 0 && (
+                                <span className={css.tag}>
+                                  {session.parts.map(label).join(t("、", ", "))}
+                                </span>
+                              )}
+                              <div className={css.exercises}>
+                                {session.exercises.map((exercise) => (
+                                  <div key={exercise.id}>
+                                    <span>
+                                      {exercise.estimated && t("约 ", "about ")}
+                                      {exercise.name}
+                                      {exercise.cardio
+                                        ? `${exercise.distance !== null ? ` ${number(exercise.distance)} km` : ""}${exercise.duration !== null ? t(` · ${number(exercise.duration)} 分钟`, ` · ${number(exercise.duration)} min`) : ""}`
+                                        : ` ${exercise.sets ?? "—"}×${exercise.reps ?? "—"} · ${amount(exercise.weight, "kg")}`}
+                                    </span>
+                                    <small>
+                                      {t("记录者：", "Recorded by: ")}
+                                      {label(exercise.recorder)}
+                                    </small>
+                                  </div>
+                                ))}
+                              </div>
+                              <span className={css.duration}>
+                                {t("时长：", "Duration: ")}
+                                {amount(session.duration, t("分钟", "min"))}
+                              </span>
+                            </article>
+                          ))
+                        )}
+                      </Section>
+                    </div>
+                  </>
+                )}
+                {tab === "饮食" && (
+                  <>
+                    <div className={css.trends}>
+                      <Trend
+                        title={t("近 7 天热量", "Calories over 7 days")}
+                        points={data.nutrition.calories}
+                        unit="kcal"
+                      />
+                      <Trend
+                        title={t("近 7 天蛋白质", "Protein over 7 days")}
+                        points={data.nutrition.protein}
+                        unit={t("克", "g")}
+                        target={data.nutrition.target}
+                      />
+                    </div>
+                    {!data.nutrition.target?.length && (
+                      <p className={css.empty}>
+                        {t(
+                          "暂无蛋白质目标，可在对话中设置每天的目标。",
+                          "No protein goal yet. Set a daily goal in Ask.",
+                        )}
+                      </p>
+                    )}
+                    <Section title={t("最近餐食", "Recent meals")} note={t("近 30 天", "Last 30 days")}>
+                      <button
+                        type="button"
+                        className={css.link}
+                        onClick={() => ask(t("记录今天的饮食：", "Log today’s meals:"))}
+                      >
+                        {t("记一餐", "Log a meal")}
+                      </button>
+                      {!data.nutrition.meals.length ? (
+                        <Empty />
+                      ) : (
+                        data.nutrition.meals.map((meal) => (
+                          <article className={css.row} key={meal.id}>
+                            <time dateTime={meal.ts}>
+                              {stamp(meal.ts)} · {label(meal.meal)}
+                            </time>
+                            <span className={css.grow}>{meal.items}</span>
+                            <span>
+                              {amount(meal.kcal, "kcal", meal.estimated)} · {t("蛋白质", "Protein")}{" "}
+                              {amount(meal.protein, t("克", "g"), meal.estimated)}
+                            </span>
+                          </article>
+                        ))
+                      )}
+                    </Section>
+                  </>
+                )}
+                {tab === "睡眠与活动" && (
+                  <div className={css.trends}>
+                    <Trend
+                      title={t("近 14 天睡眠", "Sleep over 14 days")}
+                      points={data.sleep}
+                      unit={t("小时", "hours")}
+                    />
+                    <Trend
+                      title={t("近 14 天步数", "Steps over 14 days")}
+                      points={data.steps}
+                      unit={t("步", "steps")}
+                    />
                   </div>
                 )}
-              </>
-            )}
-            {tab === "体态照片" && <Photos photos={data.photos} load={loadHealthPhoto} onPrompt={ask} />}
-          </div>
+                {tab === "身体数据" && (
+                  <>
+                    <button
+                      type="button"
+                      className={css.link}
+                      onClick={() => ask(t("记录今天的身体数据：", "Log today’s measurements:"))}
+                    >
+                      {t("记一次测量", "Log a measurement")}
+                    </button>
+                    {!data.metrics.length ? (
+                      <Empty />
+                    ) : (
+                      <div className={css.trends}>
+                        {data.metrics.map((metric) => (
+                          <div key={metric.key}>
+                            {metric.points.some((p) => typeof p.value === "number") ? (
+                              <Trend
+                                title={t(
+                                  `${metricNames[metric.kind] ?? metric.kind}趋势`,
+                                  `${metricNames[metric.kind] ?? metric.kind} trend`,
+                                )}
+                                unit={metric.unit}
+                                line
+                                points={metric.points.map((p) => ({
+                                  ...p,
+                                  value: typeof p.value === "number" ? p.value : null,
+                                }))}
+                              />
+                            ) : (
+                              <div className={css.heading}>
+                                <h2>
+                                  {t(
+                                    `${metricNames[metric.kind] ?? metric.kind}记录`,
+                                    `${metricNames[metric.kind] ?? metric.kind} records`,
+                                  )}
+                                </h2>
+                                <span>{metric.unit}</span>
+                              </div>
+                            )}
+                            <div className={css.measurements}>
+                              {metric.points.map((p) => (
+                                <p
+                                  key={p.id}
+                                  id={`health-measurement-${p.id}`}
+                                  tabIndex={-1}
+                                  ref={reviewTarget?.id === p.id ? measurement : undefined}
+                                  data-review={reviewTarget?.id === p.id}
+                                >
+                                  <time dateTime={p.ts}>{stamp(p.ts)}</time>
+                                  <strong>
+                                    {p.estimated && t("约 ", "about ")}
+                                    {typeof p.value === "number" ? number(p.value) : p.value} {metric.unit}
+                                  </strong>
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {tab === "体态照片" && <Photos photos={data.photos} load={loadHealthPhoto} onPrompt={ask} />}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>
