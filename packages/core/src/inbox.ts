@@ -317,14 +317,25 @@ async function prepare(ws: Workspace, file: string, text: string) {
     // proposeBlock 在写入前校验完整 NOW 文档。
     return {
       message: `${actor}提出了日程建议：${row.title}`,
-      apply: () =>
-        proposeBlock(
+      apply: () => {
+        // Legacy undated proposals mean today. A date is only a guard, never a
+        // reason to move a historical/future suggestion into today's plan.
+        const now = new Date();
+        const today = localDate(now, ws.timeZone());
+        const dates: unknown[] = [
+          ...(raw.date !== undefined ? [raw.date] : []),
+          ...Array.from(String(row.title).matchAll(/(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)/g), (match) => match[0]),
+        ];
+        if (dates.some((date) => date !== today))
+          throw new KaituError("建议日期不是今天或无法核对；已保留原文，请核对日期后重新提交", "BAD_INBOX");
+        return proposeBlock(
           ws,
           input as unknown as Parameters<typeof proposeBlock>[1],
           actor,
-          new Date(),
+          now,
           `inbox-${inboxHash(file, text)}`,
-        ),
+        );
+      },
     };
   }
   // 其余文字（.md、.txt、读不出结构的 JSON）当待整理笔记收下，不算出错。
