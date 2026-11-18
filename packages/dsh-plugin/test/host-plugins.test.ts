@@ -1,5 +1,15 @@
 import type { BundleInfo, ChangeResult } from "@deepseek-ai/dsh-api-remotes/client";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
+import type fixtureIndex from "../../../docs/site/plugins/index.json";
+
+vi.mock("../../../docs/site/plugins/index.json", async (importOriginal) => {
+  const { default: original } = await importOriginal<{ default: typeof fixtureIndex }>();
+  const index = structuredClone(original);
+  const fortune = index.plugins.find((entry) => entry.name === "kaitu-fortune");
+  if (fortune)
+    fortune.versions.unshift({ ...fortune.versions[0], version: "9.0.0", engines: { dsh: ">=0.3.0" } });
+  return { default: index };
+});
 import type { PluginItem } from "../src/client/Plugins.js";
 import { createHostPluginRequest } from "../src/client/host-plugins.js";
 
@@ -59,32 +69,53 @@ test("unlisted specs cannot be installed and failed host changes remain failures
   await expect(request("remove", "kaitu-fortune")).resolves.toEqual({ application: "restart-required" });
 });
 
-test.each([
-  ["0.3.2", false],
-  ["9.0.0", false],
-  ["0.3.3-rc.1", false],
-  ["0.1.2", true],
-])("candidate catalog only updates a known older installed version %s", async (version, updateAvailable) => {
+test("incompatible installed novels remain removable but are not offered an install or update", async () => {
+  const calls: string[] = [];
   const request = createHostPluginRequest({
     listBundles: async () => [
-      { name: "kaitu-novel-workspace", installed: true, removable: true, version } as BundleInfo,
+      {
+        name: "kaitu-novel-workspace",
+        installed: true,
+        removable: true,
+        version: "0.3.3-rc.1",
+      } as BundleInfo,
     ],
-    installBundle: async () => {
-      throw new Error("No package changes in this check");
+    installBundle: async (spec) => {
+      calls.push(spec);
+      return { application: "applied" } as ChangeResult;
     },
-    removeBundle: async () => {
-      throw new Error("No package changes in this check");
-    },
+    removeBundle: async () => ({ application: "applied" }) as ChangeResult,
     open: () => {},
   });
   const item = ((await request("list")) as PluginItem[]).find(
     (item) => item.name === "kaitu-novel-workspace",
   );
   expect(item).toMatchObject({
-    installedVersion: version,
-    version: "0.3.3-rc.1",
-    updateAvailable,
-    license: "MIT",
-    dshVersion: "0.2.1-rc.3",
+    installed: true,
+    installedVersion: "0.3.3-rc.1",
+    spec: "",
+    updateAvailable: false,
   });
+  await expect(request("install", item?.spec)).rejects.toThrow();
+  expect(calls).toEqual([]);
+  await expect(request("remove", "kaitu-novel-workspace")).resolves.toMatchObject({ application: "applied" });
+});
+
+test.each([
+  ["0.1.6", true],
+  ["0.1.7-rc.4", false],
+  ["9.0.0", false],
+  ["8.0.0", false],
+])("compatible candidate never downgrades installed %s", async (version, updateAvailable) => {
+  const request = createHostPluginRequest({
+    listBundles: async () => [
+      { name: "kaitu-fortune", installed: true, removable: true, version } as BundleInfo,
+    ],
+    installBundle: async () => ({ application: "applied" }) as ChangeResult,
+    removeBundle: async () => ({ application: "applied" }) as ChangeResult,
+    open: () => {},
+  });
+  expect(
+    ((await request("list")) as PluginItem[]).find((item) => item.name === "kaitu-fortune"),
+  ).toMatchObject({ version: "0.1.7-rc.4", updateAvailable });
 });
