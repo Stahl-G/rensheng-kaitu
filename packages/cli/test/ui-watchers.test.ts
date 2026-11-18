@@ -31,8 +31,22 @@ vi.mock("node:fs", async (original) => {
   };
 });
 
-it("closes old directory listeners before moving and observes real edits at the new root", async () => {
+function lifecycle(context: { onTestFailed: (callback: () => void) => void }) {
+  const started = performance.now();
+  const stages: { stage: string; elapsedMs: number }[] = [];
+  context.onTestFailed(() => console.error("Synthetic filesystem lifecycle:", JSON.stringify(stages)));
+  return (stage: string) => {
+    const entry = { stage, elapsedMs: Math.round(performance.now() - started) };
+    stages.push(entry);
+    if (process.env.KAITU_CI_DIAGNOSTICS === "1") console.error("Synthetic filesystem stage:", entry);
+  };
+}
+
+it("closes old directory listeners before moving and observes real edits at the new root", async (context) => {
+  const mark = lifecycle(context);
+  mark("setup.begin");
   const ws = await freshWorkspace();
+  mark("workspace.ready");
   const root = dirname(ws.root);
   const source = ws.root;
   const state = dirname(ws.resolve(".kaitu/cache", { internal: true }));
@@ -63,35 +77,45 @@ it("closes old directory listeners before moving and observes real edits at the 
   const failures: unknown[] = [];
   try {
     ws.writeText(file, "---\ntitle: 合成决定\n---\n迁移前正文");
+    mark("ui.search");
     expect(await search("迁移前")).toHaveLength(1);
+    mark("ui.home.wait");
     await expect.poll(home, { timeout: 15000 }).not.toBeNull();
     expect([...active.values()]).toContain(source);
     expect([...active.values()]).toContain(state);
     const target = join(root, "cloud");
+    mark("storage.move");
     expect((await post("moveStorage", [target, true, "nutstore"])).status).toBe(200);
+    mark("storage.moved");
     expect(paused).toBe(true);
     expect(ws.root).toBe(target);
+    mark("projection.resume.wait");
     // Let the resumed projection settle before external edits, so a startup read cannot mask missing watchers.
     await expect
       .poll(async () => (await post("home", []).then((response) => response.json())).loading, {
         timeout: 15000,
       })
       .toBe(false);
+    mark("ui.search");
     expect(await search("迁移前")).toHaveLength(1);
     writeFileSync(ws.resolve(file), "---\ntitle: 合成决定\n---\n新目录正文");
     writeFileSync(
       ws.resolve("me/goals.json"),
       JSON.stringify([{ id: "a", title: "新目录目标", status: "active" }]),
     );
+    mark("ui.external-search.wait");
     await expect.poll(() => search("新目录")).toHaveLength(1);
+    mark("ui.external-home.wait");
     await expect.poll(async () => (await home())?.threads[0]?.title, { timeout: 15000 }).toBe("新目录目标");
     shutdown.error = new Error("synthetic index shutdown failure");
   } catch (error) {
     failures.push(error);
   } finally {
+    mark("cleanup.begin");
     try {
       if (shutdown.error) await expect(ui.close()).rejects.toBe(shutdown.error);
       else await ui.close();
+      mark("cleanup.server-closed");
       await expect(fetch(ui.url)).rejects.toThrow();
     } catch (error) {
       failures.push(error);
@@ -117,6 +141,7 @@ it("closes old directory listeners before moving and observes real edits at the 
       expect([...active.values()]).not.toContain(ws.root);
       expect([...active.values()]).not.toContain(dirname(ws.resolve(".kaitu/cache", { internal: true })));
       rmSync(root, { recursive: true, force: true });
+      mark("cleanup.files-removed");
     } catch (error) {
       failures.push(error);
     }
@@ -125,8 +150,11 @@ it("closes old directory listeners before moving and observes real edits at the 
   if (failures.length) throw failures[0];
 });
 
-it("refreshes an already open atlas after restoring a version at the same root", async () => {
+it("refreshes an already open atlas after restoring a version at the same root", async (context) => {
+  const mark = lifecycle(context);
+  mark("setup.begin");
   const ws = await freshWorkspace();
+  mark("workspace.ready");
   const source = ws.root;
   const version = (await history(ws))[0]?.oid;
   const moduleFile = "learning/module.json";
