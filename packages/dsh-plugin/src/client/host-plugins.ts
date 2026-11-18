@@ -67,6 +67,7 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
           // Only offer a known older catalog version an update; never downgrade an unlisted version.
           updateAvailable:
             bundle?.installed === true &&
+            typeof bundle.version === "string" &&
             !!entry.spec &&
             !!index.plugins
               .find((plugin) => plugin.name === entry.name)
