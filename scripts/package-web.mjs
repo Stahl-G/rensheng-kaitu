@@ -107,6 +107,11 @@ writeFileSync(
       engines: { node: cli.engines?.node ?? ">=24.9.0" },
       files: ["dist", "dsh-plugin", "web", "schemas", "templates", "THIRD_PARTY_NOTICES.md"],
       dependencies,
+      // Retired rc.1 search adapters share the current host rather than installing old peers.
+      overrides: {
+        "@deepseek-ai/dsh-launch-environment": cli.dependencies["@deepseek-ai/dsh"],
+        "@deepseek-ai/dsh-web": cli.dependencies["@deepseek-ai/dsh"],
+      },
     },
     null,
     2,
