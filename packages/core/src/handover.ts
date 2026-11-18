@@ -1,3 +1,4 @@
+import { agentPathResolver } from "./agent-file-policy.js";
 import { conciseDirection } from "./direction-copy.js";
 import { KaituError } from "./errors.js";
 import type { Direction, ExplorationCommand, ExplorationExperiment } from "./exploration.js";
@@ -17,8 +18,9 @@ import {
   readOnboardingMatter,
 } from "./onboarding.js";
 import { completedAt, goalOrigin, noteLine, readPlans, taskGoal } from "./plans.js";
-import { listProjects } from "./projects.js";
+import { listProjectStatuses } from "./projects.js";
 import { readRecords } from "./records.js";
+import { hasStatusResult } from "./results.js";
 import type { Task } from "./tasks.js";
 import { localDate, localMonth, parseTs } from "./time.js";
 import type { Goal } from "./workbench.js";
@@ -305,7 +307,7 @@ function attempt<T>(read: () => T, fallback: T): T {
 const records = (ws: Workspace, type: string) => attempt(() => readRecords(ws, type), []);
 
 /** 资料包和方向提示词只读用得到的几样，不扫整个工作区。 */
-function handoverData(ws: Workspace, now: Date) {
+function handoverData(ws: Workspace) {
   return {
     ws,
     goals: attempt(() => ws.readJson<Goal[]>("me/goals.json"), []),
@@ -314,7 +316,11 @@ function handoverData(ws: Workspace, now: Date) {
       direction: records(ws, "direction"),
       exploration_experiment: records(ws, "exploration_experiment"),
     },
-    projects: attempt(() => listProjects(ws, { now }), []),
+    projects: attempt(() => {
+      if (!agentCanRead(ws, "projects", { id: "handover", finance: false })) return [];
+      const resolveSource = agentPathResolver(ws.root);
+      return listProjectStatuses(ws, (file) => attempt(() => resolveSource(file) === file, false));
+    }, []),
     memories: attempt(() => listMemories(ws), []),
   };
 }
@@ -363,19 +369,28 @@ function sections(
       .filter((task) => task.status === "done" && noteLine(task.notes ?? "", "完成结果"))
       .map((task) => ({
         at: completedAt(task),
-        line: `- ${clip(`${task.title}${t("：", ": ")}${noteLine(task.notes ?? "", "完成结果")}`, locale)}${recordSource("task", task)}`,
+        line: () =>
+          `- ${clip(`${task.title}${t("：", ": ")}${noteLine(task.notes ?? "", "完成结果")}`, locale)}${recordSource("task", task)}`,
       })),
+    ...data.projects.flatMap((project) =>
+      project.next.filter(hasStatusResult).map((step) => ({
+        at: Date.parse(step.completed),
+        line: () =>
+          `- ${clip(`${project.title} · ${step.title}${t("：", ": ")}${step.result}`, locale)}${source(clip(`${project.file}#${step.id}`, locale))}`,
+      })),
+    ),
     ...experiments
       .filter((item) => item.status === "completed" && item.result)
       .map((item) => ({
         at: Date.parse(item.updated_at ?? item.ts),
-        line: `- ${clip(`${item.action}${t("：", ": ")}${item.result}`, locale)}${recordSource("exploration_experiment", item)}`,
+        line: () =>
+          `- ${clip(`${item.action}${t("：", ": ")}${item.result}`, locale)}${recordSource("exploration_experiment", item)}`,
       })),
   ]
-    .filter((item) => item.at >= since)
+    .filter((item) => item.at >= since && item.at <= now.getTime())
     .sort((a, b) => b.at - a.at)
     .slice(0, 8)
-    .map((item) => item.line);
+    .map((item) => item.line());
   const open = tasks
     .filter((task) => task.status === "open")
     .slice(-8)
@@ -388,7 +403,7 @@ function sections(
   const projects = data.projects
     .filter((project) => project.stage === "active")
     .slice(0, 8)
-    .map((project) => `- ${clip(project.title, locale)}${source(`projects/${project.slug}/STATUS.md`)}`);
+    .map((project) => `- ${clip(project.title, locale)}${source(clip(project.file, locale))}`);
   const active = directions
     .filter((item) => item.status === "active")
     .slice(0, 6)
@@ -430,7 +445,7 @@ function sections(
 
 /** Shared file projection: reuse handover filtering/redaction, never request finance. */
 export function userProfileSections(ws: Workspace, locale: Locale, now: Date) {
-  const data = handoverData(ws, now);
+  const data = handoverData(ws);
   const list = sections(locale, now, data, { id: "handover", finance: false }, true);
   // Keep a current correction discoverable even when many older facts fill the section.
   const about = list.find((section) => section.id === "about");
@@ -501,7 +516,7 @@ export function handoverPack(
     "The pack includes your selected sections. Keys and local paths are removed before sharing; raw health records and sensitive memories stay in your workspace.",
   );
   const connection = { id: "handover", finance: includeFinance } as const;
-  const list = sections(locale, now, handoverData(ws, now), connection);
+  const list = sections(locale, now, handoverData(ws), connection);
   if (agentCanRead(ws, "finance", connection)) {
     const lines = attempt(
       () =>
@@ -529,7 +544,7 @@ export function handoverPack(
 
 export function directionsPrompt(ws: Workspace, localeInput?: Locale, now = new Date()): string {
   const locale = normalizeLocale(localeInput);
-  const data = handoverData(ws, now);
+  const data = handoverData(ws);
   const context = sections(locale, now, data).filter((section) =>
     ["goals", "projects", "directions", "about"].includes(section.id),
   );

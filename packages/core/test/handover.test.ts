@@ -8,6 +8,7 @@ import {
   addRecord,
   addTask,
   adoptOnboardingMatter,
+  applyResultAction,
   changeOnboardingNext,
   confirmOnboardingMemory,
   directionsPrompt,
@@ -23,10 +24,43 @@ import {
   readOverviewPage,
   readRecords,
   saveOnboardingMatter,
+  stringifyFrontmatter,
+  ulid,
   updateRecord,
+  userProfileSections,
   validateWorkspace,
 } from "../src/index.js";
 import { clonedWorkspace } from "./helpers.js";
+
+it("项目下一步的结果随资料包接续，撤销后从资料包移除", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-project-handover-"));
+  try {
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
+    const file = "projects/interviews/STATUS.md";
+    const next = { id: "first", title: "试访", status: "todo" };
+    ws.writeText(file, stringifyFrontmatter({ updated: null, title: "用户调研", next: [next] }, ""));
+    ws.writeText("projects/Old Copies/STATUS.md", "Unrelated folder");
+    const { effect } = await applyResultAction(ws, {
+      client_id: ulid(),
+      op: "complete_next_result",
+      args: {
+        file,
+        id: next.id,
+        expected_next: next,
+        result_text: "访谈完成，笔记在 /Users/example/draft.md",
+      },
+    });
+    const results = () =>
+      handoverPack(ws, "zh-CN").sections.find((section) => section.id === "results")?.lines;
+    expect(results()).toEqual(["- 用户调研 · 试访：访谈完成，笔记在 （本机路径已去掉）"]);
+    const profile = userProfileSections(ws, "zh-CN", new Date()).find((section) => section.id === "results");
+    expect(profile?.lines[0]).toContain(`(${file}#${next.id})`);
+    await applyResultAction(ws, { client_id: ulid(), op: "restore_next", args: effect });
+    expect(results()).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参考链接仍可追溯", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-direction-copy-"));
