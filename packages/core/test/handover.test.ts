@@ -37,8 +37,11 @@ it("项目下一步的结果随资料包接续，撤销后从资料包移除", a
   try {
     const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
     const file = "projects/interviews/STATUS.md";
-    const next = { id: "first", title: "试访", status: "todo" };
-    ws.writeText(file, stringifyFrontmatter({ updated: null, title: "用户调研", next: [next] }, ""));
+    const next = { id: "first", title: "试访".repeat(100), status: "todo" };
+    ws.writeText(
+      file,
+      stringifyFrontmatter({ updated: null, title: "用户调研".repeat(60), next: [next] }, ""),
+    );
     ws.writeText("projects/Old Copies/STATUS.md", "Unrelated folder");
     const { effect } = await applyResultAction(ws, {
       client_id: ulid(),
@@ -52,7 +55,7 @@ it("项目下一步的结果随资料包接续，撤销后从资料包移除", a
     });
     const results = () =>
       handoverPack(ws, "zh-CN").sections.find((section) => section.id === "results")?.lines;
-    expect(results()).toEqual(["- 用户调研 · 试访：访谈完成，笔记在 （本机路径已去掉）"]);
+    expect(results()).toEqual([expect.stringContaining("访谈完成，笔记在 （本机路径已去掉）")]);
     const profile = userProfileSections(ws, "zh-CN", new Date()).find((section) => section.id === "results");
     expect(profile?.lines[0]).toContain(`(${file}#${next.id})`);
     await applyResultAction(ws, { client_id: ulid(), op: "restore_next", args: effect });

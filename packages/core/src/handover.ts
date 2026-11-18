@@ -291,7 +291,8 @@ export function redact(text: string, locale: Locale): string {
 }
 
 /** 资料包里的每一行：先去掉密钥和路径，再截短，免得截剩半个 Key。 */
-const clip = (value: string, locale: Locale, size = 200) => {
+const lineLimit = 200;
+const clip = (value: string, locale: Locale, size = lineLimit) => {
   const line = singleLine(redact(value, locale));
   return line.length > size ? `${line.slice(0, size - 1)}…` : line;
 };
@@ -336,7 +337,7 @@ function sections(
   const since = now.getTime() - 30 * 86400000;
   const tasks = (data.records.task ?? []) as Task[];
   const t = (zh: string, en: string) => pick(locale, zh, en);
-  const source = (file: string) => (sources ? ` (${file})` : "");
+  const source = (file: string) => (sources ? ` (${singleLine(redact(file, locale))})` : "");
   const recordSource = (type: string, item: { id: string; ts: string }) =>
     sources
       ? source(
@@ -375,8 +376,10 @@ function sections(
     ...data.projects.flatMap((project) =>
       project.next.filter(hasStatusResult).map((step) => ({
         at: Date.parse(step.completed),
-        line: () =>
-          `- ${clip(`${project.title} · ${step.title}${t("：", ": ")}${step.result}`, locale)}${source(clip(`${project.file}#${step.id}`, locale))}`,
+        line: () => {
+          const label = `${clip(project.title, locale, 40)} · ${clip(step.title, locale, 40)}${t("：", ": ")}`;
+          return `- ${label}${clip(step.result, locale, lineLimit - label.length)}${source(`${project.file}#${step.id}`)}`;
+        },
       })),
     ),
     ...experiments
@@ -403,7 +406,7 @@ function sections(
   const projects = data.projects
     .filter((project) => project.stage === "active")
     .slice(0, 8)
-    .map((project) => `- ${clip(project.title, locale)}${source(clip(project.file, locale))}`);
+    .map((project) => `- ${clip(project.title, locale)}${source(project.file)}`);
   const active = directions
     .filter((item) => item.status === "active")
     .slice(0, 6)
