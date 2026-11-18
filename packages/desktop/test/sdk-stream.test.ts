@@ -21,6 +21,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
   const requests: Record<string, unknown>[] = [];
   let finish = () => {};
   const completed = Promise.withResolvers<void>();
+  const streamed = Promise.withResolvers<void>();
   const server = createServer(async (request, response) => {
     let raw = "";
     for await (const part of request) raw += part;
@@ -97,6 +98,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
     ask.subscribe(row.id, (event) => {
       events.push(event);
       mark(`event.${event.type}${event.type === "session.status" ? `.${event.data.status}` : ""}`);
+      if (event.type === "assistant/delta" && event.data.text === "Synthetic ") streamed.resolve();
       if (event.type === "session.status" && event.data.status === "idle") completed.resolve();
     });
     const png =
@@ -111,11 +113,8 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
       },
     ]);
     mark("send.accepted");
-    await expect
-      .poll(() =>
-        events.some((event) => event.type === "assistant/delta" && event.data.text === "Synthetic "),
-      )
-      .toBe(true);
+    // Observe the actual stream event; the whole test still has its unchanged 15s deadline.
+    await streamed.promise;
     await expect(ask.send(row.id, "Another question")).rejects.toMatchObject({ code: "AI_CONNECTION" });
     await expect(ask.configure({ choice: "external" })).rejects.toMatchObject({ code: "AI_CONNECTION" });
     mark("first-delta.observed");
