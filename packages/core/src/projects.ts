@@ -46,8 +46,10 @@ export interface ProjectStatus extends ModuleStatus {
 export type ProjectInput = Pick<ProjectStatus, "title" | "kind"> &
   Partial<Pick<ProjectStatus, "links">> & { slug?: string };
 
+const validSlug = (slug: string) =>
+  /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) && !["data", "projects"].includes(slug);
 function slugCheck(slug: string) {
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || ["data", "projects"].includes(slug)) {
+  if (!validSlug(slug)) {
     throw new KaituError("项目 slug 不合法", "BAD_ARGS");
   }
 }
@@ -126,10 +128,9 @@ export function readProject(ws: Workspace, slug: string) {
     log: ws.exists(`${dir}/log.md`) ? (ws.scanText(`${dir}/log.md`) ?? "") : "",
   };
 }
-/** 列表只读用：STATUS.md、log.md 没变时直接用上次解析的结果（已冻结）。要改项目请用 readProject。 */
-export function projectSnapshot(ws: Workspace, slug: string, partial = false) {
+function cachedProjectStatus(ws: Workspace, slug: string, partial: boolean) {
   const dir = projectDirectory(ws, slug);
-  const status = ws.scanParsed(`${dir}/STATUS.md`, partial ? "project-partial" : "project", (text) => {
+  return ws.scanParsed(`${dir}/STATUS.md`, partial ? "project-partial" : "project", (text) => {
     try {
       const raw = parseFrontmatter<ProjectStatus>(text);
       if (!raw.data || typeof raw.data !== "object" || Array.isArray(raw.data))
@@ -152,29 +153,45 @@ export function projectSnapshot(ws: Workspace, slug: string, partial = false) {
       });
     }
   });
+}
+/** 列表只读用：STATUS.md、log.md 没变时直接用上次解析的结果（已冻结）。要改项目请用 readProject。 */
+export function projectSnapshot(ws: Workspace, slug: string, partial = false) {
+  const dir = projectDirectory(ws, slug);
+  const status = cachedProjectStatus(ws, slug, partial);
   if (!status) throw new KaituError("找不到项目", "NOT_FOUND");
   const log = ws.exists(`${dir}/log.md`)
     ? (ws.scanParsed(`${dir}/log.md`, "text", (text) => text) ?? "")
     : "";
   return { slug, dir, ...status, log };
 }
-function slugs(ws: Workspace): string[] {
+function slugs(ws: Workspace, includeStatus?: (file: string) => boolean): string[] {
   const names = new Set<string>();
   for (const base of ["projects"]) {
     if (!ws.exists(base)) continue;
     for (const entry of fs.readdirSync(ws.resolve(base, { internal: true }), { withFileTypes: true })) {
+      const file = `${base}/${entry.name}/STATUS.md`;
       if (
         entry.isDirectory() &&
-        !entry.name.startsWith(".") &&
-        !ws.conflictCopy(`${base}/${entry.name}`) &&
-        ws.exists(`${base}/${entry.name}/STATUS.md`) &&
-        ws.scanText(`${base}/${entry.name}/STATUS.md`) !== undefined
+        validSlug(entry.name) &&
+        ws.exists(file) &&
+        (!includeStatus || includeStatus(file)) &&
+        !ws.conflictCopy(file) &&
+        !ws.isUnavailable(file)
       ) {
         names.add(entry.name);
       }
     }
   }
   return [...names].sort();
+}
+/** A handover needs only project STATUS frontmatter, without logs, metrics or GitHub history. */
+export function listProjectStatuses(ws: Workspace, includeStatus: (file: string) => boolean) {
+  return slugs(ws, includeStatus).flatMap((slug) => {
+    const status = cachedProjectStatus(ws, slug, true);
+    if (!status || status.error) return [];
+    const { title, stage, next } = status.data;
+    return [{ file: `projects/${slug}/STATUS.md`, title, stage, next: next ?? [] }];
+  });
 }
 export function projectStatusFiles(ws: Workspace) {
   return slugs(ws).flatMap((slug) => {
