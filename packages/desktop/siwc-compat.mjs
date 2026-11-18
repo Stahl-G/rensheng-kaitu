@@ -1,4 +1,4 @@
-// Reviewed adaptations for dsh-plugin-chatgpt-siwc 0.9.4. Fail closed on upstream changes.
+// Reviewed adaptations for dsh-plugin-chatgpt-siwc 0.9.7. Fail closed on upstream changes.
 // invalid_grant recovery: https://developers.openai.com/siwc/token-sharing-open-source/sign-in
 // Retain only the issued public client ID in memory; never replay a rejected authorization code.
 function replaceOnce(source, before, after) {
