@@ -35,8 +35,14 @@ import {
 } from "../src/workspace-backup.js";
 import { tmp } from "./helpers.js";
 
-it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不写历史与备份", async () => {
+it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不写历史与备份", async ({ onTestFailed }) => {
+  const started = performance.now();
+  const stages: { stage: string; elapsedMs: number }[] = [];
+  const mark = (stage: string) => stages.push({ stage, elapsedMs: Math.round(performance.now() - started) });
+  onTestFailed(() => console.error("Synthetic profile lifecycle:", JSON.stringify(stages)));
+  mark("start");
   const ws = await initWorkspace(join(tmp(), "ws"));
+  mark("workspace.ready");
   addRecord(ws, "finance_account", {
     name: "SYNTH_FINANCE",
     kind: "wallet",
@@ -61,10 +67,13 @@ it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不�
   await addMemory(ws, { type: "fact", name: "secret", text: "私密代号SYNTH", sensitive: true });
   addRecord(ws, "phase", { title: "写第一本书", start: "2026-01", status: "confirmed" }, { by: "user" });
   configureProfilePublisher(ws, true);
+  mark("publisher.configured");
   expect(ws.readText("USER.md")).toContain("旧任务");
   await archiveMemory(ws, old.file, { by: "user", expected: memoryExpectation(old) });
+  mark("memory.archived");
   deleteRecord(ws, "task", task.record.id, { by: "user", now: new Date("2026-10-23T12:00:00Z") });
   refreshOverview(ws);
+  mark("overview.refreshed");
   const text = ws.readText("USER.md");
   for (const hidden of [
     "旧任务",
@@ -84,7 +93,9 @@ it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不�
   expect(readRecords(ws, "task")).toEqual([]);
   expect(readFileSync(ws.resolve(task.file))).toEqual(before);
   refreshOverview(ws);
+  mark("overview.refreshed");
   await snapshot(ws, "synthetic snapshot");
+  mark("snapshot.completed");
   expect(await isTracked(ws, "USER.md")).toBe(false);
   let files: BackupFiles = {};
   const remote: BackupRemote = {
@@ -96,10 +107,13 @@ it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不�
     },
   };
   await connectWorkspaceBackup(ws, { repo: "synthetic/memory", text: true, records: true }, remote);
+  mark("backup.connected");
   await syncWorkspaceBackup(ws, remote);
+  mark("backup.synced");
   expect(files["USER.md"]).toBeUndefined();
   const secondRoot = join(tmp(), "second");
   cpSync(ws.root, secondRoot, { recursive: true });
+  mark("workspace.copied");
   setStateBinding(secondRoot, join(tmp(), "second-state"), "drive");
   const second = new Workspace(secondRoot, { maintain: false });
   expect(refreshUserProfile(second).status).toBe("disabled");
@@ -107,6 +121,7 @@ it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不�
   addRecord(second, "task", { title: "第二台正常写", status: "open" }, { by: "user" });
   expect(readRecords(second, "task")).toHaveLength(1);
   expect(second.readText("USER.md")).toBe(ws.readText("USER.md"));
+  mark("second-publisher.checked");
   rmSync(ws.resolve("USER.md"));
   const prepared = prepareUserProfile(ws);
   if (!prepared.change) throw new Error("Expected a prepared profile");
@@ -117,6 +132,7 @@ it("共享画像撤下已删除/归档/敏感资料，单发布端生成，不�
   configureProfilePublisher(ws, false);
   expect(publishUserProfile(ws, prepared.change)).toBe(false);
   expect(ws.exists("USER.md")).toBe(false);
+  mark("publication-race.checked");
 });
 
 it("来源占位撤下旧正文，恢复后再生成；画像占位不阻断修改、删除、恢复和升级", async () => {
