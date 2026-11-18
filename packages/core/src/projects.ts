@@ -173,8 +173,8 @@ function slugs(ws: Workspace, includeStatus?: (file: string) => boolean): string
       if (
         entry.isDirectory() &&
         validSlug(entry.name) &&
-        ws.exists(file) &&
         (!includeStatus || includeStatus(file)) &&
+        ws.exists(file) &&
         !ws.conflictCopy(file) &&
         !ws.isUnavailable(file)
       ) {
