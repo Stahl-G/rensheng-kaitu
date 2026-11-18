@@ -14,7 +14,7 @@ import {
 } from "./records.js";
 import { schemas } from "./schema.js";
 import { localDate, parseTs } from "./time.js";
-import { type WorkbenchData, statusFiles } from "./workbench.js";
+import { type NextItem, type WorkbenchData, statusFiles } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
 export type ResultArgs = {
@@ -155,6 +155,16 @@ function hasCompletionTime(at: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function hasStatusResult(next: NextItem): next is NextItem & { result: string; completed: string } {
+  return (
+    next.status === "done" &&
+    typeof next.result === "string" &&
+    !!next.result.trim() &&
+    typeof next.completed === "string" &&
+    hasCompletionTime(next.completed)
+  );
 }
 
 export function completionNotes(previous: string, text: string, at: string): string {
@@ -376,18 +386,11 @@ export function collectResults(
     loaded?.statuses ??
     statusFiles(ws).map(({ file }) => ({
       file,
-      data: normalizeStatus(parseFrontmatter(ws.readText(file)).data) as { next?: Record<string, unknown>[] },
+      data: normalizeStatus(parseFrontmatter(ws.readText(file)).data) as { next?: NextItem[] },
     }));
   for (const { file, data } of statuses)
     for (const next of data.next ?? []) {
-      if (
-        next.status !== "done" ||
-        typeof next.result !== "string" ||
-        !next.result.trim() ||
-        typeof next.completed !== "string" ||
-        !hasCompletionTime(next.completed)
-      )
-        continue;
+      if (!hasStatusResult(next)) continue;
       results.push({
         file,
         id: next.id,
@@ -396,7 +399,7 @@ export function collectResults(
         completed_at: next.completed,
         by: "unknown",
         source: `${file}#${next.id}`,
-      } as ResultRow);
+      });
     }
   return results.sort(
     (a, b) =>
