@@ -10,7 +10,13 @@ import { type AskEvent, createAskService } from "../../cli/src/ui/ask.js";
 import { createSdkRuntime } from "../sdk-runtime.mjs";
 
 // The real DSH subprocess talks only to this loopback provider with a synthetic key.
-test("SDK streams raw reasoning and attachments, blocks changes while busy, and restores settings and history", async () => {
+test("SDK streams raw reasoning and attachments, blocks changes while busy, and restores settings and history", async ({
+  onTestFailed,
+}) => {
+  const started = performance.now();
+  const stages: { stage: string; elapsedMs: number }[] = [];
+  const mark = (stage: string) => stages.push({ stage, elapsedMs: Math.round(performance.now() - started) });
+  onTestFailed(() => console.error("Synthetic SDK lifecycle:", JSON.stringify(stages)));
   const root = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-sdk-stream-")));
   const requests: Record<string, unknown>[] = [];
   let finish = () => {};
@@ -20,6 +26,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
     for await (const part of request) raw += part;
     const body = JSON.parse(raw);
     requests.push(body);
+    mark(body.stream ? "provider.stream.request" : "provider.request");
     if (!body.stream) {
       response.setHeader("Content-Type", "application/json");
       response.end(JSON.stringify({ choices: [{ message: { content: "OK" } }] }));
@@ -32,6 +39,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
       );
     chunk({ role: "assistant", reasoning_content: "<signature>synthetic</signature>\nThought" });
     chunk({ content: "Synthetic " });
+    mark("provider.first-chunks-written");
     finish = () => {
       chunk({ content: "answer" });
       chunk({}, "stop");
@@ -44,6 +52,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
   let sdk: ReturnType<typeof createSdkRuntime> | undefined;
   try {
     const ws = await initWorkspace(join(root, "workspace"));
+    mark("workspace.ready");
     const home = join(root, "app");
     const cli = createRequire(new URL("../../cli/package.json", import.meta.url));
     const make = () => {
@@ -76,14 +85,18 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
       apiKey: "synthetic-loopback-key",
       supportsImages: true,
     });
+    mark("configuration.saved");
     const settings = readFileSync(join(home, "kaitu-ai.json"));
     await ask.close();
     ask = make();
     expect(await ask.settings()).toMatchObject({ configured: true, model: "synthetic-model", baseURL: url });
+    mark("settings.restored");
     const row = await ask.create();
+    mark("session.created");
     const events: AskEvent[] = [];
     ask.subscribe(row.id, (event) => {
       events.push(event);
+      mark(`event.${event.type}${event.type === "session.status" ? `.${event.data.status}` : ""}`);
       if (event.type === "session.status" && event.data.status === "idle") completed.resolve();
     });
     const png =
@@ -97,6 +110,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
         name: "synthetic.txt",
       },
     ]);
+    mark("send.accepted");
     await expect
       .poll(() =>
         events.some((event) => event.type === "assistant/delta" && event.data.text === "Synthetic "),
@@ -104,8 +118,10 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
       .toBe(true);
     await expect(ask.send(row.id, "Another question")).rejects.toMatchObject({ code: "AI_CONNECTION" });
     await expect(ask.configure({ choice: "external" })).rejects.toMatchObject({ code: "AI_CONNECTION" });
+    mark("first-delta.observed");
     finish();
     await completed.promise;
+    mark("session.completed");
     const answer = ask.events(row.id).find((event) => event.type === "assistant/message");
     expect(answer?.data.message).toMatchObject({
       content: [
@@ -138,8 +154,10 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
     expect(readFileSync(join(home, "kaitu-ai.json"))).toEqual(settings);
     expect((await ask.settings()).configured).toBe(true);
   } finally {
+    mark("cleanup.start");
     finish();
     await ask?.close();
+    mark("cleanup.runtime-closed");
     server.closeAllConnections();
     await new Promise<void>((done) => server.close(() => done()));
     rmSync(root, { recursive: true, force: true });
