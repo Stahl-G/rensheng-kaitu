@@ -8,6 +8,7 @@ export interface NewsRulesProps {
   suggest?: () => Promise<string[]>;
   onPrompt: (text: string) => void;
   onSaved: (keywords: string[]) => void;
+  onClose: () => void;
 }
 export function NewsRules(props: NewsRulesProps) {
   const t = useT();
@@ -20,7 +21,8 @@ export function NewsRules(props: NewsRulesProps) {
   const keywords = [
     ...new Set(
       text
-        .split("\n")
+        // 一行一个，也认顿号和逗号，不靠说明文字教格式。
+        .split(/[\n、，,]/)
         .map((line) => line.trim())
         .filter(Boolean),
     ),
@@ -41,20 +43,16 @@ export function NewsRules(props: NewsRulesProps) {
     }
   };
   return (
-    <section className={css.rules} aria-label={t("关注方向", "Interests")}>
-      <h3>{t("关注方向", "Interests")}</h3>
-      <p className={css.meta}>
-        {baseline.length
-          ? t(`当前关注：${baseline.join("、")}`, `Current interests: ${baseline.join(", ")}`)
-          : t(
-              "还没有关注方向。写下你想持续了解的主题。",
-              "No interests yet. Add topics you want to keep up with.",
-            )}
-      </p>
+    <section className={css.rules} aria-label={t("关注话题", "Interests")}>
+      <div className={css.heading}>
+        <h3>{t("关注话题", "Interests")}</h3>
+        <button type="button" className={css.link} onClick={props.onClose}>
+          {t("收起", "Close")}
+        </button>
+      </div>
       <label className={css.editor}>
-        {t("每行一个方向，可增删改", "One interest per line; add, edit or remove any")}
         <textarea
-          aria-label={t("关注方向，每行一个", "Interests, one per line")}
+          aria-label={t("关注话题，每行一个", "Interests, one per line")}
           rows={6}
           value={text}
           disabled={busy}
@@ -65,12 +63,6 @@ export function NewsRules(props: NewsRulesProps) {
           }}
         />
       </label>
-      <p className={css.meta}>
-        {t(
-          "资讯反馈会在生成下一版时一起参考，确认保存后用于后续采集。",
-          "Your feedback helps shape the next news collection. Review and save these interests to use them.",
-        )}
-      </p>
       <div className={css.actions}>
         <button
           type="button"
@@ -80,7 +72,7 @@ export function NewsRules(props: NewsRulesProps) {
             if (!props.suggest) {
               props.onPrompt(
                 t(
-                  "请按开图 feed/COLLECT.md 的采集规则，读取我的目标、项目、方向、所在地、当前关注方向和资讯反馈，提出 5–10 个关注关键词。只在对话里给草稿，不修改采集规则。我会复制到资讯的采集规则，查看差异后确认保存。",
+                  "请按开图 feed/COLLECT.md 的采集规则，读取我的目标、项目、方向、所在地、当前关注话题和资讯反馈，提出 5–10 个关注话题。只在对话里给草稿，不修改采集规则。我会复制到资讯的关注话题，查看变化后确认保存。",
                   "Follow the collection rules in Kaitu feed/COLLECT.md. Read my goals, projects, directions, location, current interests and news feedback, then suggest 5–10 keywords. Draft them in chat without changing the rules. I will copy them into News, review the changes and save.",
                 ),
               );
@@ -125,7 +117,7 @@ export function NewsRules(props: NewsRulesProps) {
               {removed.join(t("、", ", "))}
             </p>
           )}
-          {!changed && <p>{t("与当前关注方向相同", "No changes to your interests")}</p>}
+          {!changed && <p>{t("与当前关注话题相同", "No changes to your interests")}</p>}
           {changed && (
             <div className={css.actions}>
               <button
@@ -144,7 +136,7 @@ export function NewsRules(props: NewsRulesProps) {
                 }
               >
                 {keywords.length === 0
-                  ? t("确认保存并清空关注方向", "Save and clear interests")
+                  ? t("确认保存并清空关注话题", "Save and clear interests")
                   : t("确认保存", "Save interests")}
               </button>
               <button
@@ -163,7 +155,7 @@ export function NewsRules(props: NewsRulesProps) {
         </div>
       )}
       {error && <p role="alert">{error}</p>}
-      {saved && <output className={css.saved}>{t("已保存关注方向", "Interests saved")}</output>}
+      {saved && <output className={css.saved}>{t("已保存关注话题", "Interests saved")}</output>}
     </section>
   );
 }

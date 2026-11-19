@@ -108,8 +108,9 @@ export function DirectionMap({
     return () => observer.disconnect();
   }, [map, input, state?.next]);
 
-  if (!state) return null;
   const projects = input?.projects ?? [];
+  // 还没有目标和项目时没有可看的，不放「让开图看一看」。
+  if (!state || (!goals.length && !projects.length)) return null;
   const header = (
     <div className={css.lens}>
       <span>

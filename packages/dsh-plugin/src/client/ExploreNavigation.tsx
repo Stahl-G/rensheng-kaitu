@@ -141,17 +141,6 @@ export function ExploreModulesPage({
       aria-label={t("全部模块", "All modules")}
     >
       <h1>{t("全部模块", "All modules")}</h1>
-      <p>
-        {empty
-          ? t(
-              "开图里可以放这些。选一个模块，记下第一条资料。",
-              "Here is what you can keep in Kaitu. Choose a module to add your first record.",
-            )
-          : t(
-              "拖动调整顺序。排在第一个的，就是点“开图”时打开的那一页。",
-              "Drag to reorder. The first one opens when you click Explore.",
-            )}
-      </p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

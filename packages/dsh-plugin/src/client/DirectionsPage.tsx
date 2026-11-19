@@ -782,7 +782,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
             </button>
             {props.pasteDirections && (
               <button type="button" className={v2.link} onClick={() => setClipboard(!clipboard)}>
-                {t("用你常用的 AI 提", "Use your own AI")}
+                {t("用你常用的 AI 提方向", "Use your own AI")}
               </button>
             )}
             <button type="button" className={v2.link} onClick={() => openForm("direction")}>
@@ -822,6 +822,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
               const attempt =
                 ownAttempts.find((e) => e.status === "active") ??
                 ownAttempts.find((e) => e.status === "planned");
+              const summary = directionText(d.motivation, 110).split(/(?<=[。！？!?])\s*/)[0];
               const hypothesis = directionText(d.hypothesis, 160);
               const budget = directionText(attempt?.budget, 100);
               const criteria = directionText(attempt?.criteria, 160);
@@ -858,10 +859,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
                         {directionText(d.title, 60)}
                       </button>
                     </h3>
-                    <p className={css.ideaSummary}>
-                      {directionText(d.motivation, 110).split(/(?<=[。！？!?])\s*/)[0] ||
-                        t("先记下这个想法，试过再判断。", "Keep the idea and learn by trying.")}
-                    </p>
+                    {summary && <p className={css.ideaSummary}>{summary}</p>}
                     {attempt?.action && (
                       <p className={css.ideaNext}>
                         <span>{t("第一步", "First step")}</span>
@@ -934,11 +932,6 @@ export function DirectionsPage(props: DirectionsPageProps) {
               );
             })}
           </div>
-          {!data.directions.length && (
-            <div className={base.focus}>
-              <h2>{t("一个值得探索的问题", "A question worth exploring")}</h2>
-            </div>
-          )}
           {!!data.directions.length && !listedDirections.length && (
             <p className={base.muted}>
               {filter === "favorites"

@@ -68,3 +68,44 @@ test("sparse health data hides training charts while other records and later wor
     await act(async () => app?.unmount());
   }
 });
+
+test.each([0, 2000])(
+  "older step records (%i) keep the fourteen-day detail chart accessible",
+  async (steps) => {
+    const ws = await freshWorkspace("UTC");
+    const now = new Date("2026-11-16T12:00:00Z");
+    addRecord(ws, "activity", {
+      ts: "2026-11-06T08:00:00Z",
+      date: "2026-11-06",
+      steps,
+      source: "manual",
+    });
+    const data = readHealthPage(ws, now);
+    expect(data.dashboard?.activity.every((day) => day.steps === null)).toBe(true);
+    expect(data.steps.find((day) => day.date === "2026-11-06")?.value).toBe(steps);
+    let app!: ReturnType<typeof create>;
+    try {
+      await act(async () => {
+        app = create(
+          createElement(HealthPage, {
+            loadHealth: async () => data,
+            loadHealthPhoto: vi.fn(),
+            onPrompt: vi.fn(),
+            adoptTask: vi.fn(),
+            cancelTask: vi.fn(),
+          }),
+        );
+      });
+      const tab = app.root
+        .findAllByProps({ role: "tab" })
+        .find((item) => item.children.includes("睡眠与活动"));
+      expect(tab).toBeDefined();
+      await act(async () => tab?.props.onClick());
+      expect(app.root.findAllByType("section").map((item) => item.props["aria-label"])).toContain(
+        "近 14 天步数",
+      );
+    } finally {
+      await act(async () => app?.unmount());
+    }
+  },
+);
