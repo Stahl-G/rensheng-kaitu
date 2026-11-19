@@ -69,7 +69,13 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
           ws,
           config.enableAutomation,
         )
+          .then(() => {
+            if (process.env.KAITU_EMBEDDED_AI === "1")
+              process.stdout.write(`${JSON.stringify({ type: "kaitu:automation", ready: true })}\n`);
+          })
           .catch((error: unknown) => {
+            if (process.env.KAITU_EMBEDDED_AI === "1")
+              process.stdout.write(`${JSON.stringify({ type: "kaitu:automation", ready: false })}\n`);
             services.logger.warn(`开图自动化初始化失败：${String(error)}`);
           })
           .finally(() => {

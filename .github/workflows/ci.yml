@@ -28,4 +28,37 @@ jobs:
       - run: pnpm build
       - run: pnpm --filter @kaitu/dsh-plugin build:testsite
       - run: pnpm typecheck
-      - run: pnpm test
+      - id: tests
+        run: pnpm test
+      - name: Diagnose Windows filesystem timeouts
+        if: failure() && runner.os == 'Windows' && steps.tests.outcome == 'failure'
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $env:KAITU_CI_DIAGNOSTICS = '1'
+          $failed = $false
+          $files = @(
+            'packages/core/test/note-search.test.ts',
+            'packages/core/test/drive.test.ts',
+            'packages/cli/test/ui-watchers.test.ts'
+          )
+          foreach ($file in $files) {
+            $os = Get-CimInstance Win32_OperatingSystem
+            $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average
+            $processes = @(Get-Process -Name node,git -ErrorAction SilentlyContinue)
+            $disks = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object {
+              @{ sizeBytes = $_.Size; freeBytes = $_.FreeSpace }
+            })
+            @{
+              stage = 'before-file'; file = $file; utc = [DateTime]::UtcNow.ToString('o')
+              cpuLoadPercent = $cpu.Average; freeMemoryKB = $os.FreePhysicalMemory
+              totalMemoryKB = $os.TotalVisibleMemorySize; nodeGitProcessCount = $processes.Count
+              nodeGitCpuSeconds = ($processes | Measure-Object -Property CPU -Sum).Sum
+              disks = $disks
+            } | ConvertTo-Json -Compress -Depth 3
+            pnpm exec vitest run $file --maxWorkers=1 --no-file-parallelism --reporter=verbose --silent=false
+            $code = $LASTEXITCODE
+            @{ stage = 'after-file'; file = $file; exitCode = $code; utc = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress
+            if ($code -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }

@@ -106,7 +106,9 @@ export interface PlansData {
 
 /** 今天页「你带来的规划」：进行中的目标、各自的下一步和已记下的结果。只读已加载的数据。 */
 export function readPlans(
-  data: Pick<WorkbenchData, "goals" | "records" | "projects">,
+  data: Pick<WorkbenchData, "goals" | "records"> & {
+    projects: ReadonlyArray<Pick<WorkbenchData["projects"][number], "stage">>;
+  },
   sharedResults?: ResultRow[],
 ): PlansData {
   // 只列正在推进的目标；暂停的不算「进行中」。

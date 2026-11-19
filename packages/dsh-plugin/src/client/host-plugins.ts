@@ -1,5 +1,8 @@
 import type { BundleInfo, ChangeResult } from "@deepseek-ai/dsh-api-remotes/client";
+import gt from "semver/functions/gt.js";
+import satisfies from "semver/functions/satisfies.js";
 import index from "../../../../docs/site/plugins/index.json";
+import manifest from "../../package.json";
 import type { PluginItem, PluginRequest } from "./Plugins.js";
 
 interface PluginManager {
@@ -14,7 +17,11 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
   const catalog: PluginItem[] = index.plugins
     .filter((entry) => entry.name !== "kaitu-dsh")
     .map((entry) => {
-      const latest = entry.versions[0];
+      const latest = entry.versions.find(
+        (version) =>
+          !version.engines.dsh ||
+          satisfies(manifest.engines.dsh, version.engines.dsh, { includePrerelease: true }),
+      );
       const source = latest?.source;
       return {
         name: entry.name,
@@ -25,7 +32,7 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
         homepage: entry.homepage,
         dshVersion: latest?.engines.dsh,
         spec:
-          source && "url" in source
+          source && "url" in source && "commit" in source
             ? `git+${source.url}#${source.commit}`
             : latest
               ? `${entry.name}@${latest.version}`
@@ -60,9 +67,12 @@ export function createHostPluginRequest(manager: PluginManager): PluginRequest {
           // Only offer a known older catalog version an update; never downgrade an unlisted version.
           updateAvailable:
             bundle?.installed === true &&
-            (index.plugins
+            typeof bundle.version === "string" &&
+            !!entry.spec &&
+            !!index.plugins
               .find((plugin) => plugin.name === entry.name)
-              ?.versions.findIndex((version) => version.version === bundle.version) ?? -1) > 0,
+              ?.versions.some((version) => version.version === bundle.version) &&
+            gt(entry.version, bundle.version),
           removable: bundle?.removable,
         };
       });

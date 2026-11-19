@@ -1,6 +1,6 @@
 # Windows 安装包
 
-Windows 与 Mac 使用同一份 React 界面、core、资料服务、DSH 插件和问问 SDK。当前内核固定为 DSH 0.2.1-rc.3、宿主接口为 HOST_API 2；只分别构建桌面启动入口、图标和安装器。
+Windows 与 Mac 使用同一份 React 界面、core、资料服务、DSH 插件和问问 SDK。当前内核固定为 DSH 0.2.2-rc.4、宿主接口为 HOST_API 3；只分别构建桌面启动入口、图标和安装器。
 
 ## 使用
 
@@ -22,7 +22,7 @@ Windows 用户从 [官网下载页](https://kaitu.si/download/#windows) 查看 D
 pnpm install --frozen-lockfile
 pnpm build
 npm install --prefix .kaitu/windows-tools --no-audit --no-fund electron-builder@26.17.0 sharp@0.35.5 @electron/asar@3.4.1 rcedit@4.0.1 7zip-bin@5.2.0
-curl.exe -L --fail https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-0.2.1-rc.3-win-x64.exe -o .kaitu/dsh-windows.exe
+curl.exe -L --fail https://download.deepseek.com/dsh-desk/bin/win-x64/deepseek-harness-0.2.2-rc.4-win-x64.exe -o .kaitu/dsh-windows.exe
 Get-AuthenticodeSignature .kaitu/dsh-windows.exe
 ```
 
@@ -41,7 +41,7 @@ node packages/desktop/package-windows.mjs .kaitu/dsh-windows --output dist/windo
 
 这次没有改变 npm 发布方式，也没有单独的 Windows 后端包。普通功能改动继续在同一仓库维护；宿主升级才需要分别适配桌面壳。
 
-从 0.1.1 起，正式版打包默认嵌入仓库中的公开验签公钥，可加 `--update-public-key <Ed25519公钥文件>` 指定公钥，当前使用与 Mac 相同的 `desktop-stable-dsh-0.2.1-rc.3-host-2` 签名功能包更新频道；测试源可用 `--update-config <配置文件>`。检查、下载、重启与完整安装包兜底见 [desktop.md](desktop.md#开图功能包独立更新)。旧 RC 安装包需先覆盖安装一次新版，无须先卸载。
+从 0.1.1 起，正式版打包默认嵌入仓库中的公开验签公钥，可加 `--update-public-key <Ed25519公钥文件>` 指定公钥，当前使用与 Mac 相同的 `desktop-stable-dsh-0.2.2-rc.4-host-3` 签名功能包更新频道；测试源可用 `--update-config <配置文件>`。检查、下载、重启与完整安装包兜底见 [desktop.md](desktop.md#开图功能包独立更新)。旧 RC 安装包需先覆盖安装一次新版，无须先卸载。
 
 ## 隔离调试
 

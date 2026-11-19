@@ -47,7 +47,7 @@ const updateConfig = readUpdateConfig({
     values["update-public-key"] ??
     (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
 });
-const dshVersion = "0.2.1-rc.3";
+const dshVersion = "0.2.2-rc.4";
 if (manifest.version !== dshVersion || manifest.main !== "lib/main.js")
   throw new Error(`输入必须是 DSH ${dshVersion} 官方 Windows 桌面包`);
 const appDir = join(output, "win-unpacked");
@@ -63,6 +63,8 @@ await writePayload({
   target: { platform: "win32", arch: "x64" },
 });
 cpSync(join(directory, "payload-loader.mjs"), join(resources, "kaitu-loader.mjs"));
+cpSync(join(directory, "state-backup.mjs"), join(resources, "kaitu-state-backup.mjs"));
+cpSync(join(directory, "backup-progress.mjs"), join(resources, "kaitu-backup-progress.mjs"));
 if (updateConfig) writeFileSync(join(resources, "kaitu-update.json"), JSON.stringify(updateConfig));
 rmSync(join(resources, "app-update.yml"), { force: true });
 
