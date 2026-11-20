@@ -1,5 +1,5 @@
 import fs, { cpSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import git from "isomorphic-git";
 import { describe, expect, it, vi } from "vitest";
 import { pendingWorkspaceFiles } from "../src/history.js";
@@ -95,6 +95,46 @@ it("后台版本保留同长度改写、追加记录、删除与收件箱归档�
   expect(ws.readText(note)).toContain("合成待归档原文");
   expect(ws.readText(file)).toBe("before\n");
   expect(readRecords(ws, "workout")).toEqual([]);
+});
+
+it("无文件名的事件仍将同秒等长的外部改写存入版本", async () => {
+  const ws = await clonedWorkspace();
+  const file = "me/same-stat.txt";
+  const path = ws.resolve(file);
+  writeFileSync(path, "open\n");
+  await snapshotNow(ws, "初始版本");
+
+  const lstat = fs.promises.lstat;
+  for (const [event, text] of [
+    ["工作区", "done\n"],
+    [".", "next\n"],
+  ]) {
+    // 让盘点看到刚存入索引的时间，确定性地模拟低精度文件系统时钟。
+    const { mtimeMs, ctimeMs } = fs.lstatSync(path);
+    writeFileSync(path, text);
+    const stat = vi.spyOn(fs.promises, "lstat").mockImplementation(async (...args) => {
+      const value = await lstat(...args);
+      if (resolve(String(args[0])) === path) Object.assign(value, { mtimeMs, ctimeMs });
+      return value;
+    });
+    try {
+      invalidateHistoryFile(ws, event);
+      const oid = await snapshotNow(ws, (files) => (files.includes(file) ? "外部改写" : null), undefined, {
+        changedOnly: true,
+      });
+      expect(oid).not.toBeNull();
+      const { blob } = await git.readBlob({
+        fs,
+        dir: ws.root,
+        gitdir: historyDirectory(ws),
+        oid: oid as string,
+        filepath: file,
+      });
+      expect(Buffer.from(blob).toString()).toBe(text);
+    } finally {
+      stat.mockRestore();
+    }
+  }
 });
 
 it("后台保存的未知事件和 ignore 变化仍盘点未报告的文件，敏感索引项仍移出", async () => {
