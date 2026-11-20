@@ -1,0 +1,55 @@
+name: Windows timeout sample
+
+on:
+  push:
+    branches: [codex/windows-timeout-1120]
+    paths: [.github/workflows/windows-timeout-sample.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.3
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - id: suite
+        run: pnpm test
+      - name: Repeat the four original files on this runner
+        if: "${{ !cancelled() && (steps.suite.outcome == 'success' || steps.suite.outcome == 'failure') }}"
+        shell: pwsh
+        env:
+          KAITU_CI_DIAGNOSTICS: '1'
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $files = @(
+            'packages/core/test/user-profile.test.ts',
+            'packages/core/test/note-search.test.ts',
+            'packages/core/test/drive.test.ts',
+            'packages/cli/test/ui-watchers.test.ts'
+          )
+          $failed = $false
+          $sample = 0
+          foreach ($workers in 2, 1, 1, 2) {
+            $sample++
+            Write-Output "::group::Sample $sample on $env:COMPUTERNAME with $workers workers"
+            $os = Get-CimInstance Win32_OperatingSystem
+            $cpu = Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average
+            Write-Output "Start $([DateTime]::UtcNow.ToString('o')) CPU $($cpu.Average)% available $($os.FreePhysicalMemory) KiB"
+            pnpm exec vitest run @files --maxWorkers=$workers --reporter=verbose --silent=false
+            $code = $LASTEXITCODE
+            Write-Output "Sample $sample exit $code at $([DateTime]::UtcNow.ToString('o'))"
+            Write-Output '::endgroup::'
+            if ($code -ne 0) { $failed = $true }
+          }
+          if ($failed) { exit 1 }
