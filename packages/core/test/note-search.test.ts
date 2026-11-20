@@ -4,14 +4,30 @@ import { deferSnapshots, readLearning, restore, saveLearningCheckin, startLearni
 import { disposeNoteIndex, searchLibraryNotes } from "../src/note-search.js";
 import { freshWorkspace } from "./helpers.js";
 
-it("正常保存的学习正文可搜索并打开所属主题，后续保存和仅正文更新会刷新索引", async () => {
+function lifecycle(context: { onTestFailed: (callback: () => void) => void }) {
+  const started = performance.now();
+  const stages: { stage: string; elapsedMs: number }[] = [];
+  context.onTestFailed(() => console.error("Synthetic filesystem lifecycle:", JSON.stringify(stages)));
+  return (stage: string) => {
+    const entry = { stage, elapsedMs: Math.round(performance.now() - started) };
+    stages.push(entry);
+    if (process.env.KAITU_CI_DIAGNOSTICS === "1") console.error("Synthetic filesystem stage:", entry);
+  };
+}
+
+it("正常保存的学习正文可搜索并打开所属主题，后续保存和仅正文更新会刷新索引", async (context) => {
+  const mark = lifecycle(context);
+  mark("setup.begin");
   const ws = await freshWorkspace();
+  mark("workspace.ready");
   const failures: unknown[] = [];
   deferSnapshots(ws, () => {});
   try {
+    mark("learning.create");
     const topic = await startLearning(ws, { title: "合成植物学习" });
     const file = `learning/${topic.topic}/STATUS.md`;
     const notes = `learning/${topic.topic}/notes.md`;
+    mark("learning.save");
     await saveLearningCheckin(ws, {
       topic: topic.topic,
       operationId: "body-search-first",
@@ -20,12 +36,15 @@ it("正常保存的学习正文可搜索并打开所属主题，后续保存和�
       next: "",
     });
     expect(ws.readText(file)).not.toContain("银杏气孔");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "银杏气孔")).toEqual([
       expect.objectContaining({ file, title: topic.title, snippet: expect.stringContaining("银杏气孔") }),
     ]);
     const result = (await searchLibraryNotes(ws, "ONLY THE LEARNING BODY"))[0];
     expect(readLearning(ws, result?.file.split("/")[1] ?? "").notes).toContain("银杏气孔");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "%_")).toHaveLength(1);
+    mark("learning.save");
     await saveLearningCheckin(ws, {
       topic: topic.topic,
       operationId: "body-search-second",
@@ -33,19 +52,26 @@ it("正常保存的学习正文可搜索并打开所属主题，后续保存和�
       questions: "",
       next: "",
     });
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "梧桐叶片")).toHaveLength(1);
     ws.writeText(notes, "只保留枫树叶绿素的学习记录。");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "银杏气孔")).toEqual([]);
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "枫树叶绿素")).toHaveLength(1);
     const read = vi.spyOn(ws, "readText");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "枫树")).toHaveLength(1);
     expect(read).not.toHaveBeenCalled();
   } catch (error) {
     failures.push(error);
   } finally {
+    mark("cleanup.begin");
     try {
       await disposeNoteIndex(ws);
+      mark("cleanup.index-closed");
       rmSync(ws.root, { recursive: true, force: true });
+      mark("cleanup.files-removed");
     } catch (error) {
       failures.push(error);
     }
@@ -54,14 +80,19 @@ it("正常保存的学习正文可搜索并打开所属主题，后续保存和�
   if (failures.length) throw failures[0];
 });
 
-it("学习正文外部修改、删除和版本恢复保持一致，索引与摘要去掉密钥和本机路径", async () => {
+it("学习正文外部修改、删除和版本恢复保持一致，索引与摘要去掉密钥和本机路径", async (context) => {
+  const mark = lifecycle(context);
+  mark("setup.begin");
   const ws = await freshWorkspace();
+  mark("workspace.ready");
   const failures: unknown[] = [];
   try {
+    mark("learning.create");
     const topic = await startLearning(ws, { title: "合成版本学习" });
     const file = `learning/${topic.topic}/STATUS.md`;
     const notes = `learning/${topic.topic}/notes.md`;
     const secret = "sk-syntheticSearchFixture000000000000";
+    mark("learning.save");
     const saved = await saveLearningCheckin(ws, {
       topic: topic.topic,
       operationId: "body-search-restore",
@@ -69,31 +100,44 @@ it("学习正文外部修改、删除和版本恢复保持一致，索引与摘�
       questions: "",
       next: "",
     });
+    mark("index.search");
     const found = await searchLibraryNotes(ws, "合成恢复正文");
     expect(found).toHaveLength(1);
     expect(found[0]?.snippet).not.toContain(secret);
     expect(found[0]?.snippet).not.toContain("/Users/");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "syntheticSearchFixture")).toEqual([]);
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "private-body.txt")).toEqual([]);
     writeFileSync(ws.resolve(notes), "外部改为合成雨林正文。");
+    mark("index.observe-change");
     await vi.waitFor(async () => {
+      mark("index.search");
       expect(await searchLibraryNotes(ws, "合成雨林正文")).toHaveLength(1);
+      mark("index.search");
       expect(await searchLibraryNotes(ws, "合成恢复正文")).toEqual([]);
     });
     rmSync(ws.resolve(notes));
+    mark("index.observe-change");
     await vi.waitFor(async () => expect(await searchLibraryNotes(ws, "合成雨林正文")).toEqual([]));
+    mark("history.restore");
     await restore(ws, saved.version as string, { path: notes });
     expect((await searchLibraryNotes(ws, "合成恢复正文"))[0]?.file).toBe(file);
     rmSync(ws.resolve(`learning/${topic.topic}`), { recursive: true });
+    mark("index.observe-change");
     await vi.waitFor(async () => expect(await searchLibraryNotes(ws, "合成恢复正文")).toEqual([]));
+    mark("history.restore");
     await restore(ws, saved.version as string, { path: `learning/${topic.topic}` });
     expect((await searchLibraryNotes(ws, "合成恢复正文"))[0]?.file).toBe(file);
   } catch (error) {
     failures.push(error);
   } finally {
+    mark("cleanup.begin");
     try {
       await disposeNoteIndex(ws);
+      mark("cleanup.index-closed");
       rmSync(ws.root, { recursive: true, force: true });
+      mark("cleanup.files-removed");
     } catch (error) {
       failures.push(error);
     }
@@ -102,34 +146,47 @@ it("学习正文外部修改、删除和版本恢复保持一致，索引与摘�
   if (failures.length) throw failures[0];
 });
 
-it("正文索引支持中英文、转义、修改、重命名和删除，热搜索不读资料文件", async () => {
+it("正文索引支持中英文、转义、修改、重命名和删除，热搜索不读资料文件", async (context) => {
+  const mark = lifecycle(context);
+  mark("setup.begin");
   const ws = await freshWorkspace();
+  mark("workspace.ready");
   const failures: unknown[] = [];
   const file = "decisions/synthetic/STATUS.md";
   try {
     ws.writeText(file, "---\ntitle: 合成决定\n---\n\nOnly the body contains 海边散步 and 50%_value.");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "海边")).toEqual([
       expect.objectContaining({ file, title: "合成决定" }),
     ]);
     const read = vi.spyOn(ws, "readText");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "ONLY THE BODY")).toHaveLength(1);
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "%_")).toHaveLength(1);
     expect(read).not.toHaveBeenCalled();
     ws.writeText(file, "---\ntitle: 合成决定\n---\n\nChanged to 山间散步.");
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "海边")).toEqual([]);
+    mark("index.search");
     expect(await searchLibraryNotes(ws, "山间")).toHaveLength(1);
     renameSync(ws.resolve("decisions/synthetic"), ws.resolve("decisions/renamed"));
+    mark("index.observe-change");
     await vi.waitFor(async () =>
       expect((await searchLibraryNotes(ws, "山间"))[0]?.file).toBe("decisions/renamed/STATUS.md"),
     );
     rmSync(ws.resolve("decisions/renamed"), { recursive: true });
+    mark("index.observe-change");
     await vi.waitFor(async () => expect(await searchLibraryNotes(ws, "山间")).toEqual([]));
   } catch (error) {
     failures.push(error);
   } finally {
+    mark("cleanup.begin");
     try {
       await disposeNoteIndex(ws);
+      mark("cleanup.index-closed");
       rmSync(ws.root, { recursive: true, force: true });
+      mark("cleanup.files-removed");
     } catch (error) {
       failures.push(error);
     }

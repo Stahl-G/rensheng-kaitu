@@ -99,6 +99,7 @@ const props: OverviewPageProps = {
     return data;
   },
   loadSettings: () => call("settings"),
+  selectPhoneConsumer: (deviceId) => call("selectPhoneConsumer", deviceId),
   organizerSeen: () => call("organizerSeen"),
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),
@@ -163,10 +164,15 @@ const props: OverviewPageProps = {
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadHome: () => call("home"),
+  // 服务端签名和插件一样收发 JSON 字符串。
+  resultDraft: async (root, value, expected) =>
+    JSON.parse(await call<string>("resultDraft", root, JSON.stringify(value), JSON.stringify(expected))),
+  resultAction: async (root, request) =>
+    JSON.parse(await call<string>("resultAction", root, JSON.stringify(request))),
   captureOnce: (text, operationId) => call("captureOnce", text, operationId),
   loadWeather: () => call("weather"),
   setWeatherPlace: (name, latitude, longitude, source) =>
-    call("weatherPlace", { name, source, ...(latitude === undefined ? {} : { latitude, longitude }) }),
+    call("weatherPlace", name, latitude, longitude, source),
   hometownCities: (name) => call("hometownCities", name),
   saveHometown: (name, id) => call("saveHometown", name, id),
   loadExperienceImports: () => call("experienceImports"),

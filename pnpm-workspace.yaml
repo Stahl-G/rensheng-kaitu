@@ -8,7 +8,12 @@ allowBuilds:
   koffi: true
   node-pty: true
   protobufjs: false
-# DSH 0.2.1-rc.3 is newer than pnpm's default release-age window.
+# DSH 0.2.2-rc.4 is newer than pnpm's default release-age window.
 minimumReleaseAgeExclude:
   - "@deepseek-ai/*"
   - dsh-plugin-chatgpt-siwc@0.9.4
+
+# The retired Exa/Perplexity adapters are used as providers, not loaded as old hosts.
+overrides:
+  "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.4"
+  "@deepseek-ai/dsh-web": "0.2.2-rc.4"

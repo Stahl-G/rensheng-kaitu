@@ -1,6 +1,5 @@
-import { realpathSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { confinedFileSystem } from "./sdk-filesystem.mjs";
 import { agentSearch } from "./sdk-search.mjs";
@@ -11,7 +10,8 @@ const [{ LocalFileSystem }, { FsError }] = await Promise.all([
   load("@deepseek-ai/dsh-fs-local"),
   load("@deepseek-ai/dsh-fs"),
 ]);
-const root = realpathSync(process.env.KAITU_DIR);
+// Keep the selected spelling used by session cwd; the filesystem policy also checks real paths.
+const root = resolve(process.env.KAITU_DIR);
 const connection = process.env.KAITU_AGENT_CONNECTION === "phone-ask" ? "phone-ask" : "local-ask";
 export const name = "kaitu-sdk-host";
 export const inject = ["loader", "tools"];

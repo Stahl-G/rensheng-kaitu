@@ -75,7 +75,7 @@ export function createHomeCache(
         const watcher = watch(directory, { recursive: true }, (_event, file) => {
           if (
             file &&
-            /^(?:phone(?:[/\\]|$)|OVERVIEW\.md$|USER\.md$)|(?:^|[/\\])(?:index\.sqlite[^/\\]*|cache|secrets\.json|\.git)(?:[/\\]|$)|\.tmp$/.test(
+            /^(?:phone(?:[/\\]|$)|OVERVIEW\.md$|USER\.md$)|(?:^|[/\\])(?:index\.sqlite[^/\\]*|cache|secrets\.json|result-draft\.json|\.git)(?:[/\\]|$)|\.tmp$/.test(
               String(file),
             )
           )

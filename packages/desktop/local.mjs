@@ -25,6 +25,7 @@ import { createPluginService } from "./plugins.mjs";
 import { showPrivacyNotice } from "./privacy.mjs";
 import { createSdkRuntime } from "./sdk-runtime.mjs";
 import { createSpeech } from "./speech.mjs";
+import { assertScheduleCompatible } from "./state-backup.mjs";
 
 export function createLocalAsk({
   state,
@@ -244,6 +245,7 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
     createAiProcess(launcher, {
       ...process.env,
       KAITU_EMBEDDED_AI: "1",
+      KAITU_BACKUP_ROOT: state,
       KAITU_PARENT_PAYLOAD: resources,
       KAITU_APP_HOME: aiHome,
       KAITU_DIR: ws.root,
@@ -279,7 +281,10 @@ export async function startDesktop({ app, BrowserWindow, Menu, shell, dialog }) 
   });
   const startAutomation = async () => {
     const settings = readAutomation(ws);
-    if (settings.asked && Object.values(settings.tasks).some(Boolean)) await ai.open({ background: true });
+    if (settings.asked && Object.values(settings.tasks).some(Boolean)) {
+      assertScheduleCompatible(aiHome, process.env.DSH_CLIENT_VERSION);
+      await ai.open({ background: true, waitForAutomation: true });
+    }
   };
   const plugins = createPluginService({
     fetchIndex: (url, options) => window.webContents.session.fetch(url, options),

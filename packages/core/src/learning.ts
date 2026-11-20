@@ -128,23 +128,17 @@ export function listLearning(ws: Workspace) {
     next: item.next,
   }));
 }
-async function saved(ws: Workspace, topic: string, scheduleVersion?: (message: string) => void) {
+async function saved(ws: Workspace, topic: string) {
   let version: string | null = null;
   let versionError: string | undefined;
   try {
-    if (scheduleVersion) scheduleVersion("更新了学习主题");
-    else version = await snapshot(ws, "更新了学习主题");
+    version = await snapshot(ws, "更新了学习主题");
   } catch {
     versionError = "资料已保存，版本记录暂未完成";
   }
   return { ...readLearning(ws, topic), version, ...(versionError ? { versionError } : {}) };
 }
-export async function startLearning(
-  ws: Workspace,
-  input: StartLearningInput,
-  now = new Date(),
-  scheduleVersion?: (message: string) => void,
-) {
+export async function startLearning(ws: Workspace, input: StartLearningInput, now = new Date()) {
   const value = startLearningSchema.parse(input);
   const slug = value.title
     .toLowerCase()
@@ -188,14 +182,9 @@ export async function startLearning(
         `# ${source.title}\n\n${source.url ? `来源：${source.url}\n\n` : ""}保存于 ${isoInZone(now, ws.timeZone())}\n\n${source.text || "仅保存来源链接，尚未读取原文。"}\n`,
       );
   }
-  return saved(ws, topic, scheduleVersion);
+  return saved(ws, topic);
 }
-export async function saveLearningCheckin(
-  ws: Workspace,
-  input: LearningCheckinInput,
-  now = new Date(),
-  scheduleVersion?: (message: string) => void,
-) {
+export async function saveLearningCheckin(ws: Workspace, input: LearningCheckinInput, now = new Date()) {
   const value = learningCheckinSchema.parse(input);
   const { operationId, ...content } = value;
   const inputHash = createHash("sha256").update(JSON.stringify(content)).digest("hex");
@@ -241,5 +230,5 @@ export async function saveLearningCheckin(
     stringifyFrontmatter({ ...parsed.data, updated: stamp, next }, parsed.body),
   );
   ws.writeJson(receipt, { topic: value.topic, inputHash }, { internal: true });
-  return { ...(await saved(ws, value.topic, scheduleVersion)), replayed: false };
+  return { ...(await saved(ws, value.topic)), replayed: false };
 }

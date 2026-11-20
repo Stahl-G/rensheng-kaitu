@@ -215,6 +215,50 @@ export function NewsPage(props: NewsPageProps) {
     : [];
   const todayPicked = todayItems.filter((item) => data?.picked.some((row) => row.id === item.id));
   const todayOthers = todayItems.filter((item) => !data?.picked.some((row) => row.id === item.id));
+  const keywords = data?.keywords ?? [];
+  const todayCount = todayItems.length + (data?.trends.length ?? 0);
+  const hasNews = todayCount > 0 || earlierItems.length > 0;
+  const subtitle = !data
+    ? ""
+    : hasNews
+      ? [
+          new Intl.DateTimeFormat(locale, { month: "long", day: "numeric", timeZone: "UTC" }).format(
+            new Date(`${data.date}T12:00:00Z`),
+          ),
+          todayCount ? t(`今日 ${todayCount} 条`, `${todayCount} today`) : "",
+          earlierItems.length
+            ? t(
+                `更早 ${earlierItems.length} 条${props.showEarlierDetails ? "" : "已收起"}`,
+                `${earlierItems.length} earlier${props.showEarlierDetails ? "" : ", collapsed"}`,
+              )
+            : "",
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : keywords.length
+        ? t("还没有收到资讯", "No news yet")
+        : "";
+  const interests = (
+    <section className={css.sideCard} aria-label={t("你关注的", "Your interests")}>
+      <div className={css.heading}>
+        <h2>{t("你关注的", "Your interests")}</h2>
+        {!rules && (
+          <button type="button" className={css.link} onClick={() => setRules(true)}>
+            {keywords.length ? t("编辑", "Edit") : t("添加", "Add")}
+          </button>
+        )}
+      </div>
+      {keywords.length > 0 && (
+        <div className={css.tags}>
+          {keywords.map((word) => (
+            <span key={word} className={css.tag}>
+              {word}
+            </span>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 
   return (
     <div className={css.page} aria-label={t("资讯", "News")}>
@@ -224,26 +268,8 @@ export function NewsPage(props: NewsPageProps) {
             <span className={css.dot} aria-hidden="true" />
             {t("资讯", "News")}
           </h1>
-          <p className={css.subtitle}>
-            {data
-              ? `${new Intl.DateTimeFormat(locale, {
-                  month: "long",
-                  day: "numeric",
-                  timeZone: "UTC",
-                }).format(
-                  new Date(`${data.date}T12:00:00Z`),
-                )} · ${t(`今日 ${todayItems.length + data.trends.length} 条`, `${todayItems.length + data.trends.length} today`)}${earlierItems.length ? t(` · 更早 ${earlierItems.length} 条${props.showEarlierDetails ? "" : "已收起"}`, ` · ${earlierItems.length} earlier${props.showEarlierDetails ? "" : ", collapsed"}`) : ""}`
-              : t("正在读取资讯…", "Loading news…")}
-          </p>
+          {subtitle && <p className={css.subtitle}>{subtitle}</p>}
         </div>
-        <button
-          type="button"
-          className={css.button}
-          aria-expanded={rules}
-          onClick={() => setRules((open) => !open)}
-        >
-          {t("采集规则", "Collection rules")}
-        </button>
       </header>
       {rules && data && (
         <NewsRules
@@ -252,6 +278,7 @@ export function NewsPage(props: NewsPageProps) {
           suggest={props.suggestNewsKeywords}
           onPrompt={props.onPrompt}
           onSaved={(keywords) => setData((current) => (current ? { ...current, keywords } : current))}
+          onClose={() => setRules(false)}
         />
       )}
       {error && (
@@ -270,23 +297,22 @@ export function NewsPage(props: NewsPageProps) {
       )}
       {!data ? (
         <p className={css.empty}>{t("正在整理资讯…", "Loading news…")}</p>
+      ) : !hasNews ? (
+        keywords.length ? (
+          interests
+        ) : (
+          !rules && (
+            <section className={`${css.sideCard} ${css.start}`}>
+              <h2>{t("从你关心的话题开始", "Start with what interests you")}</h2>
+              <button type="button" className={css.button} onClick={() => setRules(true)}>
+                {t("添加关注话题", "Add an interest")}
+              </button>
+            </section>
+          )
+        )
       ) : (
         <div className={css.columns}>
           <div className={css.main}>
-            {!data.picked.length && !data.others.length && !data.trends.length && (
-              <section className={css.sideCard}>
-                <h2>{t("从你关心的话题开始", "Start with what interests you")}</h2>
-                <p className={css.empty}>
-                  {t(
-                    "这里留下你关心的资讯和原始来源。先添加一个关注话题。",
-                    "Keep news you care about and its original sources here. Add an interest to get started.",
-                  )}
-                </p>
-                <button type="button" className={css.button} onClick={() => setRules(true)}>
-                  {t("添加关注话题", "Add an interest")}
-                </button>
-              </section>
-            )}
             {!!todayPicked.length && (
               <section aria-label={t("和你有关", "Relevant to you")}>
                 <div className={css.heading}>
@@ -332,57 +358,37 @@ export function NewsPage(props: NewsPageProps) {
             )}
           </div>
           <aside className={css.aside}>
-            <section className={css.sideCard} aria-label={t("你关注的", "Your interests")}>
-              <div className={css.heading}>
-                <h2>{t("你关注的", "Your interests")}</h2>
-                <button type="button" className={css.link} onClick={() => setRules(true)}>
-                  {t("编辑", "Edit")}
-                </button>
-              </div>
-              <div className={css.tags}>
-                {data.keywords?.map((word) => (
-                  <span key={word} className={css.tag}>
-                    {word}
-                  </span>
-                ))}
-              </div>
-              {!data.keywords?.length && (
-                <p className={css.empty}>{t("还没有关注方向。", "No interests yet.")}</p>
-              )}
-            </section>
-            <section className={css.sideCard} aria-label={t("新闻从哪来", "News sources")}>
-              <div className={css.heading}>
-                <h2>{t("新闻从哪来", "News sources")}</h2>
-              </div>
-              <p className={css.meta}>
-                {sources.length
-                  ? t(
-                      `来自${sources.map(([via]) => (via === "user" ? "你保存的内容" : viaNames[via])).join("、")}，保留原始来源。`,
-                      `From ${sources.map(([via]) => (via === "user" ? "your saved items" : viaNames[via])).join(", ")}, with original sources.`,
-                    )
-                  : t(
-                      "你保存的文章和已连接来源的资讯会出现在这里。",
-                      "Articles you save and news from connected sources appear here.",
+            {interests}
+            {sources.length > 0 && (
+              <section className={css.sideCard} aria-label={t("新闻从哪来", "News sources")}>
+                <div className={css.heading}>
+                  <h2>{t("新闻从哪来", "News sources")}</h2>
+                </div>
+                <p className={css.meta}>
+                  {t(
+                    `来自${sources.map(([via]) => (via === "user" ? "你保存的内容" : viaNames[via])).join("、")}`,
+                    `From ${sources.map(([via]) => (via === "user" ? "your saved items" : viaNames[via])).join(", ")}`,
+                  )}
+                </p>
+                <details open={props.showEarlierDetails || undefined}>
+                  <summary className={css.link}>{t("来源统计", "Source counts")}</summary>
+                  <dl className={css.sources}>
+                    {data.feedCount !== null && (
+                      <div>
+                        <dt>{t("订阅源", "Subscriptions")}</dt>
+                        <dd>{t(`${data.feedCount} 个`, String(data.feedCount))}</dd>
+                      </div>
                     )}
-              </p>
-              <details open={props.showEarlierDetails || undefined}>
-                <summary className={css.link}>{t("来源统计", "Source counts")}</summary>
-                <dl className={css.sources}>
-                  <div>
-                    <dt>{t("订阅源", "Subscriptions")}</dt>
-                    <dd>
-                      {data.feedCount === null ? "—" : t(`${data.feedCount} 个`, String(data.feedCount))}
-                    </dd>
-                  </div>
-                  {sources.map(([via, count]) => (
-                    <div key={via}>
-                      <dt>{via === "user" ? t("你", "You") : viaNames[via]}</dt>
-                      <dd>{t(`${count} 条`, String(count))}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </details>
-            </section>
+                    {sources.map(([via, count]) => (
+                      <div key={via}>
+                        <dt>{via === "user" ? t("你", "You") : viaNames[via]}</dt>
+                        <dd>{t(`${count} 条`, String(count))}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+              </section>
+            )}
           </aside>
         </div>
       )}

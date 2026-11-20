@@ -7,7 +7,7 @@ import { LifeAtlasPage, atlasLabel, mapAvailableHeight } from "../src/client/Lif
 import {
   defaultExploreEntries,
   exploreDestination,
-  migrateLifeMapFirst,
+  undoLifeMapFirst,
 } from "../src/client/explore-modules.js";
 
 test("map height stays stable when its scroll container moves", () => {
@@ -16,15 +16,22 @@ test("map height stays stable when its scroll container moves", () => {
   expect(mapAvailableHeight(600, 300, 0)).toBe(284);
 });
 
-test("map-first migration persists across restarts and preserves later reorder or hiding", () => {
+test("an install that was forced map-first moves the map back once, then keeps later choices", () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-map-pref-"));
   vi.stubEnv("KAITU_LOCAL_STATE_DIR", root);
   try {
-    savePreferences({ locale: null, exploreEntries: ["news", "health", "life-map"] });
-    const migration = migrateLifeMapFirst(readPreferences());
-    expect(migration?.exploreEntries).toEqual(["life-map", "news", "health"]);
+    savePreferences({
+      locale: null,
+      exploreEntries: ["life-map", "footprints", "health"],
+      lifeMapFirstMigrated: true,
+    });
+    const migration = undoLifeMapFirst(readPreferences());
+    expect(migration).toEqual({
+      exploreEntries: ["footprints", "health", "life-map"],
+      lifeMapFirstMigrated: false,
+    });
     savePreferences(migration ?? {});
-    savePreferences({ exploreEntries: ["health", "news"] });
+    savePreferences({ exploreEntries: ["life-map", "news"] });
     const entry = new URL("../../core/dist/index.js", import.meta.url).href;
     const reopened = JSON.parse(
       execFileSync(
@@ -37,10 +44,10 @@ test("map-first migration persists across restarts and preserves later reorder o
         { encoding: "utf8" },
       ),
     );
-    expect(reopened.exploreEntries).toEqual(["health", "news"]);
-    expect(migrateLifeMapFirst(reopened)).toBeNull();
+    expect(reopened.exploreEntries).toEqual(["life-map", "news"]);
+    expect(undoLifeMapFirst(reopened)).toBeNull();
     savePreferences({ exploreEntries: [] });
-    expect(migrateLifeMapFirst(readPreferences())).toBeNull();
+    expect(undoLifeMapFirst(readPreferences())).toBeNull();
     expect(readPreferences().exploreEntries).toEqual([]);
   } finally {
     vi.unstubAllEnvs();
@@ -48,12 +55,13 @@ test("map-first migration persists across restarts and preserves later reorder o
   }
 });
 
-test("new Explore default is the map; explicit user ordering and empty selection still work", () => {
+test("Explore opens footprints by default; the map is optional and explicit ordering still works", () => {
   const empty = { hometown: false, experiences: 0, healthRecords: 0, newsTopics: 0, goals: 0, directions: 0 };
-  expect(exploreDestination(defaultExploreEntries, empty)).toBe("life-map");
+  expect(exploreDestination(defaultExploreEntries, { ...empty, experiences: 1 })).toBe("footprints");
+  expect(exploreDestination(defaultExploreEntries, empty)).toBe("modules");
+  expect(exploreDestination(["life-map", "health"], empty)).toBe("life-map");
   expect(exploreDestination(["health", "life-map"], { ...empty, healthRecords: 1 })).toBe("health");
   expect(exploreDestination([], empty)).toBe("modules");
-  expect(exploreDestination(defaultExploreEntries, empty, ["footprints", "health"])).toBe("modules");
 });
 
 test("existing map collapses controls and keyboard activation opens the correct domain", async () => {

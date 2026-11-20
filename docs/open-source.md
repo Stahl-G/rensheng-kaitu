@@ -30,9 +30,6 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | [OpenFreeMap](https://openfreemap.org/) | 纸本地图的区域水面与河流；按需联网，无需 Key | 软件 MIT；保留 OpenMapTiles、OpenStreetMap 等原署名 |
 | [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) | 随包全球地形晕渲，调色并重投影为纸本底图 | Public Domain，可修改及商业使用 |
 | [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | 城市层按需加载 Terrarium 地形 | 多来源许可；保留 [Tilezen/Joerd 完整署名](https://github.com/tilezen/joerd/blob/master/docs/attribution.md) |
-| [Preact](https://github.com/preactjs/preact) | packages/web 中的轻量工作台界面 | MIT |
-| [Apache ECharts](https://github.com/apache/echarts) | 轻量工作台中的趋势与统计图表 | Apache-2.0 |
-| [markdown-it](https://github.com/markdown-it/markdown-it) | 轻量工作台显示 Markdown 内容 | MIT |
 | [clsx](https://github.com/lukeed/clsx) | 前端开发依赖声明中的类名组合工具 | MIT |
 
 ## 资料、导入、存储与 Agent 接口
@@ -77,8 +74,6 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | [TypeScript](https://github.com/microsoft/TypeScript) | 项目开发语言与编译器 | Apache-2.0 |
 | [Biome](https://github.com/biomejs/biome) | 代码格式与规范检查 | MIT OR Apache-2.0 |
 | [Vitest](https://github.com/vitest-dev/vitest) | 行为测试 | MIT |
-| [Vite](https://github.com/vitejs/vite) | 轻量工作台的前端构建 | MIT |
-| [Preact Vite preset](https://github.com/preactjs/preset-vite) | Vite 中的 Preact 构建适配 | MIT |
 | [esbuild](https://github.com/evanw/esbuild) | DSH 插件、CLI 引擎和桌面功能包打包 | MIT |
 | [Lightning CSS](https://github.com/parcel-bundler/lightningcss) | CSS Modules 与样式编译 | MPL-2.0 |
 | [sharp](https://github.com/lovell/sharp) | 从 SVG 生成 PNG、macOS App 图标 | Apache-2.0 |
@@ -86,7 +81,7 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 | [Electron macOS Sign](https://github.com/electron/osx-sign) | macOS App 代码签名 | BSD-2-Clause |
 | [electron-builder / app-builder-lib](https://github.com/electron-userland/electron-builder) | 桌面打包脚本使用其 ASAR、签名工具依赖 | MIT |
 | [pnpm](https://github.com/pnpm/pnpm) | 工作区依赖安装、锁文件与构建命令 | MIT |
-| [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped) | Node、React、React DOM、mailparser、markdown-it 的 TypeScript 类型 | MIT（本项目使用的类型包） |
+| [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped) | Node、React、React DOM、mailparser 的 TypeScript 类型 | MIT（本项目使用的类型包） |
 
 ## 数据与额外来源
 
@@ -102,7 +97,7 @@ DSH 内核更深层的传递依赖见其上游和随包许可证。原始许可�
 ## 在源码里查找
 
 - 直接依赖：根目录和 `packages/*/package.json`。
-- UI：`packages/dsh-plugin/src/client/`、`packages/web/src/`。
+- UI：`packages/dsh-plugin/src/client/`。
 - 资料与导入：`packages/core/src/`；外部 Agent 接口：`packages/cli/src/`。
 - 邮件与聊天：`packages/channels/src/`；微信移植代码：`packages/channels/src/weixin/`。
 - 桌面打包：`packages/desktop/package-kaitu.mjs`；插件构建：`packages/dsh-plugin/scripts/`。

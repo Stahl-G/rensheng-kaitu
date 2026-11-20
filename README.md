@@ -104,7 +104,6 @@ node packages/cli/dist/main.js ui --dir /tmp/kaitu-demo         # 在浏览器�
 | `packages/dsh-plugin` | App 和 DSH 插件的界面与工具 |
 | `packages/desktop` | macOS / Windows 桌面打包 |
 | `packages/channels` | 手机消息通道 |
-| `packages/web` | 浏览器版工作台 |
 
 - 给进入仓库的 Agent：先读 [AGENTS.md](AGENTS.md)
 - 产品定义：[docs/PRODUCT.md](docs/PRODUCT.md) · 数据规范：[docs/PRD.md](docs/PRD.md) §6 · 开发交接：[docs/HANDOFF.md](docs/HANDOFF.md)

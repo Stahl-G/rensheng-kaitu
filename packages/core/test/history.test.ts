@@ -40,6 +40,28 @@ it("另一台电脑打开同步资料时，没有本机版本库也能读取并�
   expect((await history(original))[0]?.message).toBe("初始化开图工作区");
 });
 
+it("盘点时被改名走的临时文件不会中断存版本", async () => {
+  const ws = await clonedWorkspace();
+  const temp = join(ws.root, ".kaitu", "organizer.json.4b018d32.tmp");
+  writeFileSync(temp, "{}");
+  writeFileSync(join(ws.root, "notes-from-elsewhere.md"), "synthetic note\n");
+  const readdir = fs.promises.readdir;
+  // 原子写入在列目录之后、lstat 之前把临时文件改名走。
+  const spy = vi.spyOn(fs.promises, "readdir").mockImplementation((async (
+    ...args: Parameters<typeof readdir>
+  ) => {
+    const names = await readdir(...args);
+    if ((names as string[]).includes("organizer.json.4b018d32.tmp")) fs.rmSync(temp, { force: true });
+    return names;
+  }) as typeof readdir);
+  try {
+    expect(await snapshot(ws, "synthetic version")).toEqual(expect.any(String));
+    expect(await isTracked(ws, "notes-from-elsewhere.md")).toBe(true);
+  } finally {
+    spy.mockRestore();
+  }
+});
+
 it("后台版本保留同长度改写、追加记录、删除与收件箱归档，恢复可读回", async () => {
   const ws = await freshWorkspace();
   const file = "me/synthetic.md";

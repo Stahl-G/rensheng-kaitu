@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const output = resolve(process.argv[2] ?? join(root, "dist/kaitu-dsh"));
 const { build } = createRequire(join(root, "packages/dsh-plugin/package.json"))("esbuild");
+const rootPackage = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const cli = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8"));
 const plugin = JSON.parse(readFileSync(join(root, "packages/dsh-plugin/package.json"), "utf8"));
 const name = "kaitu-dsh";
@@ -97,7 +98,7 @@ writeFileSync(
         "LICENSE",
         "THIRD_PARTY_NOTICES.md",
       ],
-      engines: { node: "^22.19.0 || >=24" },
+      engines: { node: rootPackage.engines.node, dsh: cli.dependencies["@deepseek-ai/dsh"] },
       dsh: { ...plugin.dsh, bundle: { patch: "./cordis.patch.yml" } },
       dependencies,
       peerDependencies: plugin.peerDependencies,

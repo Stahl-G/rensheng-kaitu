@@ -7,9 +7,11 @@ import { freshWorkspace } from "./helpers.js";
 it("文件预览绑定原字节，同记录数替换不能确认，合法令牌仅能确认一次", async () => {
   const ws = await freshWorkspace();
   try {
+    // The importer keeps events from 30 days ago to 180 days ahead of the real clock; stay inside it.
+    const day = new Date(Date.now() + 86400000).toISOString().slice(0, 10).replaceAll("-", "");
     const ics = (title: string) =>
       Buffer.from(
-        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:synthetic-token\r\nDTSTART:20261016T090000Z\r\nDTEND:20261016T100000Z\r\nSUMMARY:${title}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
+        `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:synthetic-token\r\nDTSTART:${day}T090000Z\r\nDTEND:${day}T100000Z\r\nSUMMARY:${title}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
       );
     const preview = await previewOnboardingImport(ws, "ics", "synthetic.ics", ics("previewed"));
     const upload = readdirSync(ws.resolve(".kaitu/cache/uploads", { internal: true })).find((file) =>

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, it } from "vitest";
@@ -8,6 +8,7 @@ import {
   addRecord,
   addTask,
   adoptOnboardingMatter,
+  applyResultAction,
   changeOnboardingNext,
   confirmOnboardingMemory,
   directionsPrompt,
@@ -23,10 +24,46 @@ import {
   readOverviewPage,
   readRecords,
   saveOnboardingMatter,
+  stringifyFrontmatter,
+  ulid,
   updateRecord,
+  userProfileSections,
   validateWorkspace,
 } from "../src/index.js";
 import { clonedWorkspace } from "./helpers.js";
+
+it("项目下一步的结果随资料包接续，撤销后从资料包移除", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-project-handover-"));
+  try {
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
+    const file = "projects/interviews/STATUS.md";
+    const next = { id: "first", title: "试访".repeat(100), status: "todo" };
+    ws.writeText(
+      file,
+      stringifyFrontmatter({ updated: null, title: "用户调研".repeat(60), next: [next] }, ""),
+    );
+    ws.writeText("projects/Old Copies/STATUS.md", "Unrelated folder");
+    const { effect } = await applyResultAction(ws, {
+      client_id: ulid(),
+      op: "complete_next_result",
+      args: {
+        file,
+        id: next.id,
+        expected_next: next,
+        result_text: "访谈完成，笔记在 /Users/example/draft.md",
+      },
+    });
+    const results = () =>
+      handoverPack(ws, "zh-CN").sections.find((section) => section.id === "results")?.lines;
+    expect(results()).toEqual([expect.stringContaining("访谈完成，笔记在 （本机路径已去掉）")]);
+    const profile = userProfileSections(ws, "zh-CN", new Date()).find((section) => section.id === "results");
+    expect(profile?.lines[0]).toContain(`(${file}#${next.id})`);
+    await applyResultAction(ws, { client_id: ulid(), op: "restore_next", args: effect });
+    expect(results()).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 it("长篇 AI 方向贴回后正文简短可读，定位符不进入正文，参考链接仍可追溯", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-direction-copy-"));
@@ -266,3 +303,80 @@ it("最近 30 天的结果按完成时间算：两个月前定下、今天完成
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("项目结果按完成时间筛选，缓存命中后撤销仍从画像中移除", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-handover-window-"));
+  try {
+    const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
+    const file = "projects/window/STATUS.md";
+    const now = new Date("2026-11-18T12:00:00Z");
+    const data = {
+      title: "窗口",
+      next: [
+        {
+          id: "recent",
+          title: "近期",
+          status: "done",
+          completed: "2026-11-17T12:00:00Z",
+          result: "近期结果",
+        },
+        { id: "old", title: "旧", status: "done", completed: "2026-10-01T12:00:00Z", result: "旧结果" },
+        {
+          id: "future",
+          title: "未来",
+          status: "done",
+          completed: "2026-11-19T12:00:00Z",
+          result: "未来结果",
+        },
+      ],
+    };
+    ws.writeText(file, stringifyFrontmatter(data, ""));
+    const old = new Date(Date.now() - 10000);
+    utimesSync(ws.resolve(file), old, old);
+    const results = () =>
+      userProfileSections(ws, "zh-CN", now).find((section) => section.id === "results")?.lines;
+    expect(results()).toEqual([expect.stringContaining("近期结果")]);
+    expect(results()).toEqual([expect.stringContaining("近期结果")]);
+    const next = data.next[0];
+    next.status = "todo";
+    ws.writeText(file, stringifyFrontmatter(data, ""));
+    expect(results()).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+it.skipIf(process.platform === "win32")(
+  "不读取链接项目状态，也不让一个越界来源抹去其他项目结果",
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), "kaitu-handover-boundary-"));
+    try {
+      const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
+      const now = new Date("2026-11-18T12:00:00Z");
+      const status = (result: string) =>
+        stringifyFrontmatter(
+          {
+            title: "项目",
+            next: [{ id: "first", title: "步骤", status: "done", completed: "2026-11-17T12:00:00Z", result }],
+          },
+          "",
+        );
+      ws.writeText("projects/good/STATUS.md", status("可见结果"));
+      writeFileSync(join(root, "outside.md"), status("外部秘密"));
+      ws.writeText(".kaitu/private.md", status("本机秘密"), { internal: true });
+      for (const [slug, target] of [
+        ["outside", join(root, "outside.md")],
+        ["private", join(ws.root, ".kaitu/private.md")],
+      ]) {
+        mkdirSync(join(ws.root, "projects", slug), { recursive: true });
+        symlinkSync(target, join(ws.root, "projects", slug, "STATUS.md"));
+      }
+      const results = userProfileSections(ws, "zh-CN", now).find(
+        (section) => section.id === "results",
+      )?.lines;
+      expect(results).toEqual([expect.stringContaining("可见结果")]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);

@@ -100,6 +100,7 @@ it("问问的文件和记忆导入只能预览；伪造确认与取消均不写�
         .map((entry) => entry.text)
         .join("\n"),
     ).toContain("只供测试");
+    await ui.settled();
     expect((await history(ws)).length).toBeGreaterThan(before.length);
   } finally {
     await ctx.fiber.dispose();

@@ -7,6 +7,7 @@ export interface PhoneReceipt {
   message?: string;
   target?: { id: string; rev: number };
   memory?: { file: string; status: "saved" | "duplicate" | "undone" | "superseded" };
+  effect?: import("./results.js").ResultEffect;
   at: string;
 }
 export function phoneReceipts(ws: Workspace): PhoneReceipt[] {

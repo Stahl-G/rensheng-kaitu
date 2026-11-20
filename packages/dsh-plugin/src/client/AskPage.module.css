@@ -779,3 +779,114 @@ output.progress,
     font-size: 26px;
   }
 }
+
+.withEvidence {
+  grid-template-columns: minmax(0, 1fr) 270px;
+}
+.withEvidence.showThreads {
+  grid-template-columns: 208px minmax(0, 1fr) 260px;
+}
+.evidencePanel {
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 18px;
+  border-left: 1px solid var(--kt-control);
+  background: var(--kt-subtle);
+}
+.evidencePanel > section + section {
+  margin-top: 32px;
+}
+.evidencePanel h2 {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kt-muted);
+}
+.evidenceItem {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--kt-control);
+}
+.evidenceItem summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: var(--kt-muted);
+}
+.evidenceItem summary::-webkit-details-marker {
+  display: none;
+}
+.evidenceTitle {
+  min-width: 0;
+  color: var(--kt-text);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.evidenceItem summary > span:last-child {
+  flex: none;
+}
+.evidenceItem[data-state="failed"] summary > span:last-child,
+.evidenceItem[data-state="proposed"] summary > span:last-child,
+.evidenceItem[data-state="preview"] summary > span:last-child {
+  color: var(--kt-map-ink);
+}
+.evidenceItem pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 14px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--kt-secondary);
+  font: 12px / 1.7 ui-monospace, Menlo, monospace;
+}
+.evidenceItem > button {
+  min-height: 36px;
+  margin-top: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--kt-control);
+  border-radius: 8px;
+  color: var(--kt-link);
+  background: var(--kt-card);
+}
+.user {
+  color: var(--kt-on-primary);
+  background: var(--kt-primary);
+  border-radius: 18px 18px 4px 18px;
+}
+@container (max-width: 1050px) {
+  .withEvidence.showThreads {
+    grid-template-columns: minmax(0, 1fr) 250px;
+  }
+  .withEvidence.showThreads .threads {
+    grid-column: 1 / -1;
+  }
+}
+@container (max-width: 820px) {
+  .withEvidence,
+  .withEvidence.showThreads {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+  }
+  .withEvidence .threads,
+  .withEvidence .conversation,
+  .withEvidence .evidencePanel {
+    flex-shrink: 0;
+  }
+  .withEvidence .conversation {
+    min-height: 500px;
+  }
+  .evidencePanel {
+    min-height: auto;
+    border-left: 0;
+    border-top: 1px solid var(--kt-control);
+    overflow: visible;
+  }
+}

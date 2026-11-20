@@ -244,6 +244,9 @@
   border-radius: 16px;
   background: var(--surface);
 }
+.planning > h2 {
+  margin-bottom: 12px;
+}
 .ideaActions {
   flex-wrap: wrap;
   margin-top: auto;

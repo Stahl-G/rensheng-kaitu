@@ -3,13 +3,6 @@
  */
 export const exploreModules = [
   {
-    id: "life-map",
-    default: true,
-    title: ["人生地图", "Life map"],
-    description: ["让关心的事逐渐成图", "Map the parts of life you care about"],
-    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
-  },
-  {
     id: "footprints",
     default: true,
     title: ["足迹", "Footprints"],
@@ -38,6 +31,13 @@ export const exploreModules = [
     icon: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4 6-2 6-6 2 2-6 6-2Z",
   },
   {
+    id: "life-map",
+    default: false,
+    title: ["人生地图", "Life map"],
+    description: ["让关心的事逐渐成图", "Map the parts of life you care about"],
+    icon: "M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Zm0-15v15m6-12v15",
+  },
+  {
     id: "jobs",
     default: false,
     title: ["工作与求职", "Work and job search"],
@@ -46,12 +46,13 @@ export const exploreModules = [
   },
 ] as const;
 export const defaultExploreEntries = exploreModules.filter((entry) => entry.default).map(({ id }) => id);
-export function migrateLifeMapFirst(value: { exploreEntries?: string[]; lifeMapFirstMigrated?: boolean }) {
-  if (value.lifeMapFirstMigrated) return null;
-  const entries = value.exploreEntries ?? defaultExploreEntries;
+/** 10 月 27 日的迁移把人生地图强制排到第一；按当前设计挪回最后，只做一次（存 false）。之后照用户的顺序。 */
+export function undoLifeMapFirst(value: { exploreEntries?: string[]; lifeMapFirstMigrated?: boolean }) {
+  const entries = value.exploreEntries;
+  if (value.lifeMapFirstMigrated !== true || !entries) return null;
   return {
-    exploreEntries: ["life-map", ...entries.filter((id) => id !== "life-map")],
-    lifeMapFirstMigrated: true,
+    exploreEntries: entries[0] === "life-map" ? [...entries.slice(1), "life-map"] : entries,
+    lifeMapFirstMigrated: false,
   };
 }
 export interface ExploreModule {
