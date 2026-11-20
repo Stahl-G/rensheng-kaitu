@@ -311,7 +311,6 @@ function Overview({
   } | null>(null);
   const [exploreError, setExploreError] = useState("");
   const [exploreAttempt, setExploreAttempt] = useState(0);
-  const planning = useRef<HTMLDivElement>(null);
   // Read only on entering Explore or an explicit retry, never on unrelated workspace notifications.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry refreshes failed projections.
   useEffect(() => {
@@ -1046,15 +1045,18 @@ function Overview({
     if (todaySession.current.root === root) void refresh();
     return response;
   };
+  const planActions = {
+    resultSession: todaySession.current.board,
+    resultAction,
+    addGoalNext: props.addGoalNext,
+    changeNext: props.changeOnboardingNext,
+    refresh,
+  };
   const plansCard = data?.plans && (
     <PlansCard
+      {...planActions}
       plans={data.plans}
-      resultSession={todaySession.current.board}
-      resultAction={resultAction}
       goalId={view === "records" && record === "projects" ? libraryGoal : undefined}
-      addGoalNext={props.addGoalNext}
-      changeNext={props.changeOnboardingNext}
-      refresh={refresh}
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
@@ -1313,11 +1315,11 @@ function Overview({
         onConnect={() => openAskSettings("ai")}
         planningContent={
           <>
-            <div ref={planning} id="direction-plans" tabIndex={-1}>
-              {plansCard}
-            </div>
             {props.loadDirectionMap && props.generateDirectionMap && props.dismissDirectionLink ? (
               <DirectionMap
+                key={workspaceRoot}
+                planGoals={data?.plans.goals}
+                planActions={planActions}
                 load={props.loadDirectionMap}
                 generate={props.generateDirectionMap}
                 dismiss={props.dismissDirectionLink}
@@ -1329,13 +1331,16 @@ function Overview({
                 openDirection={(id) => openTarget({ kind: "direction", id }, "directions")}
               />
             ) : (
-              <ProgressMap
-                plans={data?.plans}
-                projects={data?.projects ?? []}
-                loadExploration={props.loadExploration}
-                subscribe={props.subscribe}
-                open={(target) => openTarget(target, "directions")}
-              />
+              <>
+                {plansCard}
+                <ProgressMap
+                  plans={data?.plans}
+                  projects={data?.projects ?? []}
+                  loadExploration={props.loadExploration}
+                  subscribe={props.subscribe}
+                  open={(target) => openTarget(target, "directions")}
+                />
+              </>
             )}
             {!data?.plans.goals.length && (
               <button type="button" className={css.btn} onClick={() => startMatter("")}>
