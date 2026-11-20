@@ -185,6 +185,12 @@ test("map record actions open the matching saved goal, project and direction", a
     await click(app, "方向");
     const goal = (await readOverviewPage(ws)).plans.goals[0];
     if (!goal) throw new Error("Goal missing");
+    await vi.waitFor(() => {
+      const card = app.root.findByType(DirectionMap).findByProps({ "data-node": `goal:${goal.id}` });
+      expect(card.findAllByType("button").map((button) => button.children)).toContainEqual(["完成"]);
+      expect(card.findAllByType("button").map((button) => button.children)).toContainEqual(["改期"]);
+    });
+    expect(app.root.findAllByType(PlansCard)).toHaveLength(0);
     await click(app, "合成导航目标");
     expect(app.root.findByType(PlansCard).findByProps({ id: `plan-${goal.id}` })).toBeTruthy();
     expect(app.root.findByType(PlansCard).props.plans.projects).toBeGreaterThan(0);
