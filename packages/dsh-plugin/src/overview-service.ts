@@ -371,6 +371,13 @@ export class KaituOverviewService extends TypertRemoteService {
     return this.files.find(query);
   }
 
+  @Remote("openLifePortrait")
+  async openLifePortrait(root: string, file: string): Promise<{ opened: boolean }> {
+    const result = await this.files.openPortrait(root, file);
+    if (!result.opened) this.homeCache?.invalidate();
+    return result;
+  }
+
   @Remote("openWorkspacePath")
   async openWorkspacePath(path: string, action: "open" | "reveal"): Promise<{ opened: boolean }> {
     return this.files.open(path, action);

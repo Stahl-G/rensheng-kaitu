@@ -2,15 +2,17 @@ import type { SessionReference } from "@deepseek-ai/dsh-api-session-controller/c
 import type { PluginAskServices } from "./PluginAsk.js";
 
 export interface PluginAskSession {
+  readonly workspace?: string;
   pendingPrompts: string[];
   open(): Promise<SessionReference>;
   dispose(): void;
 }
 
 /** The plugin owns its native session across panel unmounts, releasing it on plugin disposal. */
-export function createPluginAskSession(services: PluginAskServices): PluginAskSession {
+export function createPluginAskSession(services: PluginAskServices, expectedRoot?: string): PluginAskSession {
   let opening: Promise<SessionReference> | undefined;
   let reference: SessionReference | undefined;
+  let workspace: string | undefined;
   let disposed = false;
   const release = () => {
     reference?.release();
@@ -22,6 +24,8 @@ export function createPluginAskSession(services: PluginAskServices): PluginAskSe
   const create = async () => {
     const path = await services.workspacePath();
     check();
+    if (expectedRoot && path !== expectedRoot) throw new Error("工作区已切换 / Workspace changed");
+    workspace = path;
     const target = await services.workspaces.create({ path });
     check();
     const id = await services.sessions.create({
@@ -42,6 +46,9 @@ export function createPluginAskSession(services: PluginAskServices): PluginAskSe
     return next;
   };
   return {
+    get workspace() {
+      return workspace;
+    },
     pendingPrompts: [],
     open() {
       if (disposed) return Promise.reject(new Error("Kaitu plugin session is disposed"));

@@ -651,6 +651,13 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
           );
         }
         if (method === "findWorkspaceFiles") return json(res, 200, await files.find(String(args[0] ?? "")));
+        if (method === "openLifePortrait") {
+          if (typeof args[0] !== "string" || typeof args[1] !== "string")
+            throw new KaituError("请选择人生展览 / Select a life exhibition", "BAD_ARGS");
+          const opened = await files.openPortrait(args[0], args[1]);
+          if (!opened.opened) home.invalidate();
+          return json(res, 200, opened);
+        }
         if (method === "openWorkspacePath") {
           if (typeof args[0] !== "string" || !["open", "reveal"].includes(String(args[1] ?? "open")))
             throw new KaituError("请选择要打开的资料", "BAD_ARGS");

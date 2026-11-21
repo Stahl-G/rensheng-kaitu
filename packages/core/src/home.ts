@@ -1,3 +1,4 @@
+import { latestPortrait } from "./life-portrait.js";
 import { readOverviewPage } from "./overview-page.js";
 import { readProjectsPage } from "./project-page.js";
 
@@ -23,6 +24,7 @@ type Projects = ReturnType<typeof readProjectsPage>;
 type LearningStatus = WorkbenchData["statuses"][number];
 
 export interface HomeSources {
+  portrait?: ReturnType<typeof latestPortrait>;
   overview: Overview;
   projects: Projects;
   statuses: readonly LearningStatus[];
@@ -38,6 +40,7 @@ export async function readHomeSources(ws: Workspace, now = new Date()): Promise<
   const overview = await readOverviewPage(ws, now, data, false);
   return {
     overview,
+    portrait: latestPortrait(ws.root),
     projects: readProjectsPage(ws, { now, loaded: data, partial: true }),
     statuses: data.statuses,
     records: data.records,
@@ -75,6 +78,7 @@ export interface HomeTrace {
   sourceFiles: string[];
 }
 export interface HomeData {
+  portrait?: HomeSources["portrait"];
   today: string;
   /** Unknown until provenance identifies an actual user action, not merely the writer. */
   lastAuthored: string | null;
@@ -329,6 +333,7 @@ export function readHome(input: HomeSources): HomeData {
     threads,
     traces: recentTraces.slice(0, 3),
     pending: overview.proposedTasks.slice(0, 2).map(({ id, title, rev }) => ({ id, title, rev })),
+    portrait: input.portrait,
     atlas: null,
   };
 }
