@@ -5,6 +5,7 @@ import {
 } from "@deepseek-ai/dsh-file-reference-local/search";
 import { openNativeAssociatedPath, openNativePath, revealNativePath } from "@deepseek-ai/dsh-native-command";
 import { assertAgentPath } from "./agent-file-policy.js";
+import { portraitTarget } from "./life-portrait.js";
 import { listProjects } from "./projects.js";
 import type { Workspace } from "./workspace.js";
 
@@ -13,6 +14,7 @@ export interface DshFiles {
   invalidate(): void;
   dispose(): void;
   find(query: string): Promise<{ path: string; kind: "file" | "directory" }[]>;
+  openPortrait(root: string, file: string): Promise<{ opened: boolean }>;
   open(path: string, action?: "open" | "reveal"): Promise<{ opened: boolean }>;
 }
 export function dshFiles(ws: Workspace): DshFiles {
@@ -44,6 +46,13 @@ export function dshFiles(ws: Workspace): DshFiles {
           return false;
         }
       });
+    },
+    async openPortrait(root, file) {
+      if (root !== ws.root) return { opened: false };
+      const target = portraitTarget(root, file);
+      if (!target) return { opened: false };
+      await openNativePath(target, AbortSignal.timeout(10000));
+      return { opened: true };
     },
     async open(path: string, action: "open" | "reveal" = "open") {
       const target = resolve(ws.root, path);

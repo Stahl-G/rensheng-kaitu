@@ -11,6 +11,7 @@ import type {
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
 import { useEffect, useRef, useState } from "react";
+import type { PortraitDraft } from "./ask-handoff.js";
 import { useT } from "./i18n.js";
 import type { PluginAskSession } from "./plugin-ask-session.js";
 
@@ -58,6 +59,7 @@ export function PluginAsk({
   services,
   session,
   prompt,
+  portraitDraft,
   promptRequest = 0,
   SessionProvider,
   renderSlot,
@@ -65,6 +67,7 @@ export function PluginAsk({
   services: PluginAskServices;
   session: PluginAskSession;
   prompt: string;
+  portraitDraft?: PortraitDraft;
   promptRequest?: number;
 } & PropsRenderSlots<"kaitu.ask.chat">) {
   const t = useT();
@@ -109,6 +112,19 @@ export function PluginAsk({
           : [...current, prompt];
     setPendingPrompts(session.pendingPrompts);
   }, [reference, prompt, promptRequest, services, session]);
+  const handledPortrait = useRef<PortraitDraft>();
+  useEffect(() => {
+    if (!reference || !portraitDraft || handledPortrait.current === portraitDraft) return;
+    handledPortrait.current = portraitDraft;
+    if (session.workspace !== portraitDraft.root) return;
+    const snapshot = reference.binding.session.getSnapshot();
+    if (!snapshot.blank || snapshot.running) return;
+    services.conversation.input.requestDraftInitialization(reference.binding, {
+      prompt: portraitDraft.text,
+      whenDraftExists: "keep",
+    });
+  }, [reference, portraitDraft, services, session]);
+
   const pendingPrompt = pendingPrompts.join("\n\n");
   if (error) return <p role="alert">{error}</p>;
   if (!reference) return null;

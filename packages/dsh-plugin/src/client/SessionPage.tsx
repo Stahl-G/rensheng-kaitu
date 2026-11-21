@@ -10,7 +10,7 @@ type Props = Omit<OverviewPageProps, "onAgent" | "onPrompt"> & {
   onPrompt: (text: string) => Promise<void>;
   fileServices: FileServices;
   askServices: PluginAskServices;
-  askSession: PluginAskSession;
+  askSession: (root: string) => PluginAskSession;
 } & PropsRenderSlots<"kaitu.ask.chat">;
 
 export function SessionPage(props: Props) {
@@ -31,16 +31,33 @@ export function SessionPage(props: Props) {
         {...props}
         onPrompt={(text) => void open(text)}
         onAgent={() => void open()}
-        renderAsk={(prompt, _configure, _builtin, _connections, promptRequest) => (
-          <PluginAsk
-            services={props.askServices}
-            session={props.askSession}
-            prompt={prompt}
-            promptRequest={promptRequest}
-            SessionProvider={props.SessionProvider}
-            renderSlot={props.renderSlot}
-          />
-        )}
+        renderAsk={(
+          prompt,
+          _configure,
+          _builtin,
+          _connections,
+          promptRequest,
+          _active,
+          _today,
+          _settings,
+          _new,
+          _submit,
+          _organize,
+          context,
+        ) =>
+          context?.workspace && (
+            <PluginAsk
+              services={props.askServices}
+              key={context.workspace}
+              session={props.askSession(context.workspace)}
+              portraitDraft={context?.portrait}
+              prompt={prompt}
+              promptRequest={promptRequest}
+              SessionProvider={props.SessionProvider}
+              renderSlot={props.renderSlot}
+            />
+          )
+        }
       />
     </FileServicesContext.Provider>
   );

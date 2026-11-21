@@ -61,15 +61,32 @@ test("portrait only fills an empty draft and saved links open outside the conver
     await act(async () => {
       app = create(wrap(createElement(AskPage, { workspace: "synthetic" })));
     });
+    const requestPortrait = (root = "synthetic") =>
+      act(async () =>
+        app.update(
+          wrap(
+            createElement(AskPage, {
+              workspace: "synthetic",
+              portraitDraft: { root, text: "按 life-portrait 技能，为我生成人生开图" },
+            }),
+          ),
+        ),
+      );
     const input = () => app.root.findByType("textarea");
     const button = () =>
       app.root.find((item) => item.type === "button" && item.children.includes("生成我的人生开图"));
     const type = async (value: string) =>
       act(async () => input().props.onChange({ target: { value, selectionStart: value.length } }));
+    await requestPortrait("other");
+    expect(input().props.value).toBe("");
+    await requestPortrait();
+    expect(input().props.value).toBe("按 life-portrait 技能，为我生成人生开图");
+    await type("");
     await act(async () => button().props.onClick());
     expect(input().props.value).toBe("按 life-portrait 技能，为我生成人生开图");
     expect(button().props.disabled).toBe(true);
     await type("unfinished draft");
+    await requestPortrait();
     await act(async () => button().props.onClick());
     expect(input().props.value).toBe("unfinished draft");
     await type("");
@@ -79,6 +96,7 @@ test("portrait only fills an empty draft and saved links open outside the conver
       }),
     );
     expect(button().props.disabled).toBe(true);
+    await requestPortrait();
     await act(async () => button().props.onClick());
     expect(input().props.value).toBe("");
     expect(app.root.findAllByProps({ "aria-label": "移除 synthetic.txt" })).toHaveLength(1);
@@ -89,6 +107,7 @@ test("portrait only fills an empty draft and saved links open outside the conver
     );
     expect(input().props.value).toBe("");
     expect(button().props.disabled).toBe(true);
+    await requestPortrait();
     await act(async () => button().props.onClick());
     expect(app.root.findAllByProps({ "aria-label": "移除引用 projects/synthetic/STATUS.md" })).toHaveLength(
       1,
@@ -115,6 +134,17 @@ test("portrait only fills an empty draft and saved links open outside the conver
     expect(
       app.root.findAll((item) => item.type === "button" && item.children.includes("生成我的人生开图")),
     ).toHaveLength(0);
+    await act(async () =>
+      stream.onmessage?.({
+        data: JSON.stringify({
+          id: "running",
+          type: "session.status",
+          data: { status: "running" },
+        }),
+      }),
+    );
+    await requestPortrait();
+    expect(input().props.value).toBe("");
     configured = false;
     await act(async () =>
       app.update(wrap(createElement(AskPage, { key: "unconfigured", workspace: "synthetic" }))),

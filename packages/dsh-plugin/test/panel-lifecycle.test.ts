@@ -65,7 +65,8 @@ test("主面板卸载后回到原开图位置，不改变另一个插件实例�
 
 test("问问重挂载复用原生会话，插件卸载与打开失败都只释放自己持有的引用", async () => {
   const scope = new Context();
-  const binding = {} as SessionReference["binding"];
+  const state = { blank: true, running: false };
+  const binding = { session: { getSnapshot: () => state } } as unknown as SessionReference["binding"];
   const release = vi.fn();
   const reference: SessionReference = {
     sessionId: "synthetic-session" as SessionReference["sessionId"],
@@ -77,7 +78,8 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   let hostDraft = "";
   let blocked = false;
   const initializeDraft = vi.fn<PluginAskServices["conversation"]["input"]["requestDraftInitialization"]>(
-    (_binding, { prompt }) => {
+    (_binding, { prompt, whenDraftExists }) => {
+      if (whenDraftExists === "keep" && hostDraft) return "preserved";
       if (blocked) return "blocked";
       hostDraft = [hostDraft, prompt].filter(Boolean).join("\n\n");
       return "applied";
@@ -101,7 +103,12 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   };
   const renderSlot: PropsRenderSlots<"kaitu.ask.chat">["renderSlot"] = () =>
     createElement("output", null, "native");
-  const page = (prompt = "", promptRequest = 0, inputServices = services) =>
+  const page = (
+    prompt = "",
+    promptRequest = 0,
+    inputServices = services,
+    portraitDraft?: { root: string; text: string },
+  ) =>
     createElement(PluginAsk, {
       services: inputServices,
       session,
@@ -109,6 +116,7 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
       renderSlot,
       prompt,
       promptRequest,
+      portraitDraft,
     });
   let root!: ReactTestRenderer;
   await act(async () => {
@@ -162,6 +170,26 @@ test("问问重挂载复用原生会话，插件卸载与打开失败都只释�
   await act(async () => root.update(page()));
   expect(root.root.findAllByType("details")).toHaveLength(0);
   expect(hostDraft).toBe(`合成预填\n\n${contextA}\n\nContext B`);
+  const exhibition = { root: "/synthetic/kaitu", text: "Synthetic portrait request" };
+  const request = (rootPath = exhibition.root) =>
+    act(async () => root.update(page("", 0, services, { ...exhibition, root: rootPath })));
+  await request();
+  expect(hostDraft).toBe(`合成预填\n\n${contextA}\n\nContext B`);
+  expect(initializeDraft).toHaveBeenLastCalledWith(binding, {
+    prompt: exhibition.text,
+    whenDraftExists: "keep",
+  });
+  hostDraft = "";
+  await request("/synthetic/other");
+  state.running = true;
+  await request();
+  state.running = false;
+  state.blank = false;
+  await request();
+  expect(hostDraft).toBe("");
+  state.blank = true;
+  await request();
+  expect(hostDraft).toBe(exhibition.text);
   await act(async () => {
     root.unmount();
   });

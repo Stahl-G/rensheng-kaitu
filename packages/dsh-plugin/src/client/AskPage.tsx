@@ -11,6 +11,7 @@ import { FilePicker } from "./DshFiles.js";
 import filesCss from "./DshFiles.module.css";
 import v2 from "./Prototype.module.css";
 import { askEvidence, toolFailed, toolIntent } from "./ask-evidence.js";
+import { type PortraitDraft, lifePortraitPrompt } from "./ask-handoff.js";
 import type { AskAutoSubmit, AskHandoffStatus } from "./ask-handoff.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 import { OpenmaicCard } from "./openmaic/OpenmaicCard.js";
@@ -263,6 +264,7 @@ function NativeApproval({
 export function AskPage({
   workspace,
   active = true,
+  portraitDraft,
   initialPrompt = "",
   initialPromptRequest = 0,
   initialPromptNewConversation = false,
@@ -276,6 +278,7 @@ export function AskPage({
 }: {
   workspace: string;
   active?: boolean;
+  portraitDraft?: PortraitDraft;
   initialPrompt?: string;
   initialPromptRequest?: number;
   initialPromptNewConversation?: boolean;
@@ -446,6 +449,14 @@ export function AskPage({
     busy ||
     readingFiles
   );
+  const handledPortrait = useRef<PortraitDraft>();
+  useEffect(() => {
+    if (!portraitDraft || portraitDraft === handledPortrait.current) return;
+    handledPortrait.current = portraitDraft;
+    if (portraitDraft.root !== workspace || selected || draft.length || draftOccupied) return;
+    setDraft(portraitDraft.text);
+    input.current?.focus();
+  }, [portraitDraft, workspace, selected, draft, draftOccupied]);
   useEffect(() => {
     const guard = (event: Event) => {
       if (draftOccupied) event.preventDefault();
@@ -1285,12 +1296,7 @@ export function AskPage({
                   disabled={draftOccupied}
                   onClick={() => {
                     if (draftOccupied) return;
-                    setDraft(
-                      t(
-                        "按 life-portrait 技能，为我生成人生开图",
-                        "Use the life-portrait skill to create my life portrait.",
-                      ),
-                    );
+                    setDraft(lifePortraitPrompt(t));
                     input.current?.focus();
                   }}
                 >

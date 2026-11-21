@@ -142,8 +142,18 @@ export async function apply(ctx: Context) {
         },
       };
       const navigation = createPanelNavigation();
-      const askSession = createPluginAskSession(askServices);
-      ctx.effect(() => () => askSession.dispose());
+      const askSessions = new Map<string, ReturnType<typeof createPluginAskSession>>();
+      const askSession = (root: string) => {
+        let session = askSessions.get(root);
+        if (!session) {
+          session = createPluginAskSession(askServices, root);
+          askSessions.set(root, session);
+        }
+        return session;
+      };
+      ctx.effect(() => () => {
+        for (const session of askSessions.values()) session.dispose();
+      });
       ctx.slots.inject("kaitu.ask.chat", () => ctx.slots.register({ name: "kaitu.ask.chat" }, AskChat));
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
@@ -232,6 +242,11 @@ export async function apply(ctx: Context) {
                 const r = await ctx.remote.kaitu.resultAction(root, JSON.stringify(request));
                 if (!r.ok) throw r.error;
                 return JSON.parse(r.value);
+              },
+              openLifePortrait: async (root: string, file: string) => {
+                const result = await ctx.remote.kaitu.openLifePortrait(root, file);
+                if (!result.ok) throw result.error;
+                return result.value;
               },
               loadHome: async () => {
                 const result = await ctx.remote.kaitu.home();
