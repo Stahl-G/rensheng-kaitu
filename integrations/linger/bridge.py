@@ -295,6 +295,68 @@ def run(args):
     preview(args.output, note)
 
 
+def import_reviewed(root, raw, reviewed_sha256):
+    require(reviewed_sha256 == sha(raw), "Reviewed SHA-256 did not match; nothing was imported.")
+    inbox = root / "inbox" / "agents"
+    name = "linger-" + reviewed_sha256[:24] + ".note.md"
+    with directory(inbox) as fd:
+        publish(fd, name, raw)
+    return inbox / name
+
+
+def review():
+    import tkinter as tk
+    from tkinter import filedialog, messagebox
+    from tkinter.scrolledtext import ScrolledText
+
+    window = tk.Tk()
+    window.withdraw()
+    window.title("Linger → 开图收件箱")
+    queued = False
+    try:
+        source = filedialog.askopenfilename(parent=window, title="选择允许读取的 Linger 附件",
+                                            filetypes=[("Markdown", "*.md")])
+        if not source:
+            return False
+        try:
+            raw = read_file(Path(source), (".md",))
+        except (BridgeError, OSError, ValueError) as exc:
+            messagebox.showerror("无法预览", display(exc), parent=window)
+            raise
+        digest = sha(raw)
+        tk.Label(window, text=display(source), wraplength=720).pack(fill="x")
+        view = ScrolledText(window, wrap="word", width=90, height=28)
+        view.insert("1.0", display(text(raw)))
+        view.configure(state="disabled")
+        view.pack(fill="both", expand=True)
+
+        def submit():
+            nonlocal queued
+            chosen = filedialog.askdirectory(parent=window, title="选择接收附件的开图工作区", mustexist=True)
+            if not chosen:
+                return
+            root = Path(chosen)
+            if not messagebox.askyesno("投递预览内容", display(root / "inbox" / "agents") + "\nSHA-256: " + digest,
+                                       parent=window, default="no"):
+                return
+            try:
+                import_reviewed(root, raw, digest)
+            except (BridgeError, OSError, ValueError) as exc:
+                messagebox.showerror("投递失败", display(exc), parent=window)
+                return
+            queued = True
+            window.quit()
+
+        tk.Button(window, text="选择收件箱…", command=submit).pack(side="right")
+        tk.Button(window, text="取消", command=window.quit).pack(side="right")
+        window.protocol("WM_DELETE_WINDOW", window.quit)
+        window.deiconify()
+        window.mainloop()
+        return queued
+    finally:
+        window.destroy()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -311,7 +373,11 @@ def main():
     add.add_argument("attachment", type=Path)
     add.add_argument("--kaitu-root", type=Path, required=True)
     add.add_argument("--reviewed-sha256", required=True)
+    commands.add_parser("review", help="Choose and review a local attachment on the graphical desktop.")
     args = parser.parse_args()
+    if args.command == "review":
+        print("queued" if review() else "cancelled")
+        return
     if args.command == "run":
         run(args)
         return
@@ -319,12 +385,8 @@ def main():
     if args.command == "preview":
         preview(args.attachment, raw)
         return
-    require(args.reviewed_sha256 == sha(raw), "Reviewed SHA-256 did not match; nothing was imported.")
-    inbox = args.kaitu_root / "inbox" / "agents"
-    name = "linger-" + sha(raw)[:24] + ".note.md"
-    with directory(inbox) as fd:
-        publish(fd, name, raw)
-    print(f"Queued for Kaitu: {display(inbox / name)}")
+    target = import_reviewed(args.kaitu_root, raw, args.reviewed_sha256)
+    print(f"Queued for Kaitu: {display(target)}")
 
 
 if __name__ == "__main__":
