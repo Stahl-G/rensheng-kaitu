@@ -2,9 +2,11 @@ import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-api-remotes/client";
 import type { MainPanelId } from "@deepseek-ai/dsh-client-ui-layout/client";
 import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/client";
+import type {} from "@deepseek-ai/dsh-client-ui-plugin-manager/remote";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
 import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type {} from "@deepseek-ai/dsh-client-ui-tool/client";
+import type {} from "@deepseek-ai/dsh-client-ui-workspace/client";
 import type {
   AgentConnectionId,
   FileImportSource,
@@ -144,7 +146,15 @@ export async function apply(ctx: Context) {
       const navigation = createPanelNavigation();
       const askSession = createPluginAskSession(askServices);
       ctx.effect(() => () => askSession.dispose());
-      ctx.slots.inject("kaitu.ask.chat", () => ctx.slots.register({ name: "kaitu.ask.chat" }, AskChat));
+      ctx.slots.inject("kaitu.ask.chat", () =>
+        ctx.slots.register(
+          {
+            name: "kaitu.ask.chat",
+            inject: () => ({ openWorkspace: ctx.uiWorkspace.openWorkspace.bind(ctx.uiWorkspace) }),
+          },
+          AskChat,
+        ),
+      );
       const loadVersion = async () => {
         const result = await ctx.remote.kaitu.dshVersion();
         if (!result.ok) throw new Error(result.error.message);
@@ -182,7 +192,7 @@ export async function apply(ctx: Context) {
               askSession,
               navigation,
               fileServices: {
-                pickDirectory: () => ctx.get("uiWorkspace").pickDirectory(),
+                pickDirectory: () => ctx.uiWorkspace.pickDirectory(),
                 findFiles: async (query: string) => {
                   const result = await ctx.remote.kaitu.findWorkspaceFiles(query);
                   if (!result.ok) throw new Error(result.error.message);
@@ -454,7 +464,7 @@ export async function apply(ctx: Context) {
                 if (!r.ok) throw new Error(r.error.message);
                 return r.value;
               },
-              pickStorageFolder: () => ctx.get("uiWorkspace").pickDirectory(),
+              pickStorageFolder: () => ctx.uiWorkspace.pickDirectory(),
               loadCalendar: async () => {
                 const r = await ctx.remote.kaitu.calendar();
                 if (!r.ok) throw new Error(r.error.message);
