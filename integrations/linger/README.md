@@ -33,3 +33,11 @@ python3 integrations/linger/bridge.py import '/附件.md' \
 自动适配只接受一个 UTF-8 Markdown/TXT 源文件（最大 1 MiB），只连接明确的本机 Linger IP，禁用代理和跳转，不扫目录。它用普通会话 API 上传和回读实际版本，再接受该 Agent 的匹配附件；网络、运行时或模型失败不会写入开图。
 
 接口依据为 [Linger v0.1.6 固定源码](https://github.com/simplexai-labs/linger/tree/77abdcb37f779f9c9d2de89fa245efa88d3f6584) 的 [TeamHub 会话和 Room 路由](https://github.com/simplexai-labs/linger/blob/77abdcb37f779f9c9d2de89fa245efa88d3f6584/apps/teamhub/internal/app/routes_public.go)、[文件投递说明](https://github.com/simplexai-labs/linger/blob/77abdcb37f779f9c9d2de89fa245efa88d3f6584/.agents/skills/verify-linger/features/documents.md#agent-file-delivery)。适配器使用其接口，没有复制 Linger 源码或内置其运行时。自动链路尚未以真实 GPT 账户端到端验证。
+
+## DSH 插件
+
+在本机图形桌面上从独立环境运行 `dsh plugin --profile web add ./integrations/linger`，
+或在插件页选择打包后的 `kaitu-linger-inbox`。本候选支持 DSH 0.2.3-alpha.2、
+macOS/Linux、Python 3.9+ 和 Tk。从 DSH 输入 `/linger-inbox`，在运行宿主的电脑上选择
+允许读取的 Markdown，查看全文、选择目标工作区，再确认投递。关闭窗口可以取消。
+命令只返回结果状态。Room 自动收件仍使用上面的本机终端流程。
