@@ -17,14 +17,18 @@ export function apply(ctx) {
     recordInput: false,
     async handler({ rawInput, signal }) {
       if (rawInput.trim()) return { kind: "error", text: "请只输入 /linger-inbox，在本机窗口选择文件。" };
-      if (process.platform === "win32") return { kind: "error", text: "收件桥需要 macOS 或 Linux 图形桌面。" };
+      if (process.platform === "win32")
+        return { kind: "error", text: "收件桥需要 macOS 或 Linux 图形桌面。" };
       if (active) return { kind: "error", text: "本机已有预览窗口。" };
       active = new AbortController();
       try {
         const result = await run("python3", ["-I", "-B", bridge, "review"], {
           signal: AbortSignal.any([signal, active.signal]),
         });
-        return { kind: "success", text: result.stdout.trim() === "queued" ? "已投递开图收件箱。" : "已取消。" };
+        return {
+          kind: "success",
+          text: result.stdout.trim() === "queued" ? "已投递开图收件箱。" : "已取消。",
+        };
       } catch {
         return { kind: "error", text: "本机预览未完成。请检查图形桌面及 Python 3 的 Tk 支持。" };
       } finally {

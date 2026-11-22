@@ -1,1 +1,6 @@
-{"meta":{"title":"Linger inbox","description":"Review one Markdown attachment locally and submit it to a selected Kaitu inbox."}}
+{
+  "meta": {
+    "title": "Linger inbox",
+    "description": "Review one Markdown attachment locally and submit it to a selected Kaitu inbox."
+  }
+}
