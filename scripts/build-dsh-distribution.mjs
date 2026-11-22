@@ -3,6 +3,8 @@ import { execFileSync } from "node:child_process";
 import { cpSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { linkNodeModules } from "../packages/dsh-plugin/scripts/link-node-modules.mjs";
+
 export function buildDistribution(root, stage, release) {
   const source = join(root, "packages/dsh-plugin");
   const sdk = join(root, "packages/kaitu-dsh");
@@ -10,8 +12,8 @@ export function buildDistribution(root, stage, release) {
   mkdirSync(pkg, { recursive: true });
   symlinkSync(join(root, "docs"), join(stage, "docs"), "junction");
   cpSync(join(root, "tsconfig.base.json"), join(stage, "tsconfig.base.json"));
-  symlinkSync(join(root, "node_modules"), join(stage, "node_modules"), "junction");
-  symlinkSync(join(sdk, "node_modules"), join(pkg, "node_modules"), "junction");
+  linkNodeModules(join(root, "node_modules"), join(stage, "node_modules"));
+  linkNodeModules(join(sdk, "node_modules"), join(pkg, "node_modules"));
   for (const dir of ["src", "scripts"]) cpSync(join(source, dir), join(pkg, dir), { recursive: true });
   const manifest = JSON.parse(readFileSync(join(source, "package.json"), "utf8"));
   // Typert uses the source package identity for the shared Host and Client declarations.
