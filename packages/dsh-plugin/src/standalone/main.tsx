@@ -18,7 +18,6 @@ const route = new URLSearchParams(window.location.hash.slice(1));
 const initialChatDraft = route.get("kaitu-chat-draft") ?? "";
 if (initialChatDraft)
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
-let workspace = "";
 const props: OverviewPageProps = {
   speech: (action, locale) => call("speech", action, locale),
   initialChatDraft,
@@ -76,6 +75,7 @@ const props: OverviewPageProps = {
     newConversation,
     autoSubmit,
     onOrganize,
+    workspace = "",
   ) => (
     <AskPage
       workspace={workspace}
@@ -93,11 +93,7 @@ const props: OverviewPageProps = {
     />
   ),
   subscribe: createEventSubscription("/api/events"),
-  load: async () => {
-    const data = await call<Awaited<ReturnType<OverviewPageProps["load"]>>>("overview");
-    workspace = data.root;
-    return data;
-  },
+  load: () => call("overview"),
   loadSettings: () => call("settings"),
   selectPhoneConsumer: (deviceId) => call("selectPhoneConsumer", deviceId),
   organizerSeen: () => call("organizerSeen"),
