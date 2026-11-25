@@ -10,13 +10,19 @@ https://kaitu.si/ ，由 GitHub Pages 直接发布本分支（`gh-pages`）根�
 | `docs/`、`en/docs/` | 文档 |
 | `download/`、`en/download/` | 下载 |
 | `privacy/`、`en/privacy/` | 资料去向，来自产品仓库 `docs/site/privacy.*.md` |
-| `mock/persona.js` | 首页可点击示例的全部资料和界面文字（虚构人物「小林」，中英两份） |
-| `mock/mock.js`、`mock/mock.css` | 示例界面的交互和样式 |
-| `tokens.css` | 颜色、字体等，和开图应用一致，含深色 |
-| `style.css`、`app.js` | 全站样式与脚本（动效、语言切换、下载信息） |
+| `vision/`、`en/vision/` | 愿景与灵感来源（首页 `#inspiration` 链到这里） |
+| `shots/` | 首页截图：`<页面>-<zh\|en>-<light\|dark>.webp` 为桌面图（2400 宽），`-m` 结尾为手机裁切；深色模式和手机宽度由 `<picture>` 自动选择 |
+| `og-zh.png`、`og-en.png` | 分享卡片（1200×630） |
+| `tokens.css` | 颜色、字体，和开图应用 `Prototype.module.css` 一致，含深色 |
+| `style.css`、`app.js` | 全站样式与脚本（语言切换、首页标签、复制、文档目录、下载信息） |
 | `404.html`、`sitemap.xml`、`robots.txt`、`favicon.svg` | 其他 |
 | `plugins/index.json` | DSH 插件市场索引（开图插件列表） |
+| `testsite/` | 浏览器体验站（由产品仓库构建后发布） |
 | `CNAME` | 域名 `kaitu.si`，不要删 |
+
+## 截图
+
+首页截图来自真实的开图界面（`kaitu ui`），用虚构人物「小林」的合成资料，在 1440×900 窗口、2 倍像素下截取，中英文、浅色深色各一份。界面改版后重截同一组：今天、足迹、健康、方向、资料。不要放真实用户资料。
 
 ## 本地预览
 

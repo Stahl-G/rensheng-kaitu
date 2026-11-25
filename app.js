@@ -1,7 +1,5 @@
-/* Kaitu site: reveal, AI swap, language switch, docs TOC + copy, download enhancer. Everything works without this file. */
+/* Kaitu site: language switch, tabs, copy buttons, docs TOC, latest release, OS-aware download link. Every page works without this file. */
 (() => {
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const canObserve = "IntersectionObserver" in window;
   const en = document.documentElement.lang === "en";
 
   /* language switch: remember the choice, keep the hash */
@@ -12,45 +10,56 @@
     });
   }
 
-  /* scroll reveal: one observer */
-  const items = document.querySelectorAll("[data-reveal]");
-  for (const group of document.querySelectorAll("[data-reveal-group]")) {
-    group.querySelectorAll("[data-reveal]").forEach((el, i) => el.style.setProperty("--i", i));
-  }
-  if (still || !canObserve) items.forEach((el) => el.classList.add("is-in"));
-  else {
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) {
-        if (!e.isIntersecting) continue;
-        e.target.classList.add("is-in");
-        io.unobserve(e.target);
-      }
-    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
-    items.forEach((el) => io.observe(el));
-  }
-
-  /* AI swap: the chip changes name, the card grows a row; plays once */
-  const swap = document.querySelector("[data-swap]");
-  if (swap && !still && canObserve) {
-    const names = [...swap.querySelectorAll(".swap-name")];
-    const rows = [...swap.querySelectorAll(".swap-row")];
-    swap.classList.add("is-armed");
-    names[0].classList.add("is-on");
-    let i = 0;
-    const step = () => {
-      names[i].classList.replace("is-on", "is-off");
-      i += 1;
-      names[i].classList.add("is-on");
-      rows[i]?.classList.add("is-on");
-      if (i < names.length - 1) setTimeout(step, 1400);
+  /* tabs: without JS every panel shows in turn; with JS one shows at a time */
+  for (const box of document.querySelectorAll("[data-tabs]")) {
+    const panels = [...box.querySelectorAll(":scope > .panel")];
+    if (panels.length < 2) continue;
+    const bar = document.createElement("div");
+    bar.className = "tabs-bar";
+    const list = document.createElement("div");
+    list.className = "tablist";
+    list.setAttribute("role", "tablist");
+    if (box.dataset.tabsLabel) list.setAttribute("aria-label", box.dataset.tabsLabel);
+    const caption = document.createElement("p");
+    caption.className = "tab-caption";
+    caption.setAttribute("aria-live", "polite");
+    const tabs = panels.map((panel, i) => {
+      const tab = document.createElement("button");
+      tab.type = "button";
+      tab.id = `${panel.id}-tab`;
+      tab.textContent = panel.querySelector("h3")?.textContent ?? String(i + 1);
+      tab.setAttribute("role", "tab");
+      tab.setAttribute("aria-controls", panel.id);
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", tab.id);
+      panel.removeAttribute("aria-label");
+      list.append(tab);
+      return tab;
+    });
+    const select = (i, focus) => {
+      tabs.forEach((tab, j) => {
+        const on = i === j;
+        tab.setAttribute("aria-selected", String(on));
+        tab.tabIndex = on ? 0 : -1;
+        panels[j].toggleAttribute("data-on", on);
+      });
+      caption.textContent = panels[i].querySelector("p")?.textContent ?? "";
+      if (focus) tabs[i].focus();
     };
-    const io = new IntersectionObserver((entries) => {
-      if (!entries.some((e) => e.isIntersecting)) return;
-      io.disconnect();
-      rows[0].classList.add("is-on");
-      setTimeout(step, 1400);
-    }, { threshold: 0.4 });
-    io.observe(swap);
+    tabs.forEach((tab, i) => tab.addEventListener("click", () => select(i)));
+    list.addEventListener("keydown", (e) => {
+      const i = tabs.indexOf(document.activeElement);
+      if (i < 0) return;
+      const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      select((next + tabs.length) % tabs.length, true);
+    });
+    bar.append(list, caption);
+    box.prepend(bar);
+    box.classList.add("tabs-on");
+    const fromHash = panels.findIndex((p) => `#${p.id}` === location.hash);
+    select(fromHash < 0 ? 0 : fromHash);
   }
 
   /* copy buttons */
@@ -70,20 +79,19 @@
     });
   }
 
-  /* docs TOC: scrollspy; on phones the TOC is a <details> that closes after a pick */
+  /* docs TOC: scrollspy; on narrow screens the TOC is a <details> that closes after a pick */
   const toc = document.querySelector("[data-toc]");
   if (toc) {
     const links = [...toc.querySelectorAll('a[href^="#"]')];
     const targets = links.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean);
-    const narrow = matchMedia("(max-width: 760px)");
+    const narrow = matchMedia("(max-width: 960px)");
     toc.open = !narrow.matches;
     narrow.addEventListener("change", () => { if (!narrow.matches) toc.open = true; });
     links.forEach((a) => a.addEventListener("click", () => { if (narrow.matches) toc.open = false; }));
     let current = null;
     const mark = () => {
-      const y = 120;
       let found = targets[0];
-      for (const t of targets) if (t.getBoundingClientRect().top - y <= 0) found = t;
+      for (const t of targets) if (t.getBoundingClientRect().top - 120 <= 0) found = t;
       if (found === current) return;
       current = found;
       for (const a of links) {
@@ -96,22 +104,20 @@
     mark();
   }
 
-  /* every page: newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
-  const rel = document;
+  /* newest non-draft release with a .dmg fills [data-rel] spots, cached 10 minutes; any failure keeps the static text */
   if (document.querySelector("[data-rel]") && "fetch" in window) {
-    const KEY = "kaitu-release-v6";
+    const KEY = "kaitu-release-v7";
     const fill = (r) => {
       const dmg = r.assets.find((a) => /\.dmg$/i.test(a.name));
       if (!dmg) return;
       const tgz = r.assets.find((a) => /^rensheng-kaitu-.*\.tgz$/i.test(a.name));
-      const set = (name, fn) => rel.querySelectorAll(`[data-rel="${name}"]`).forEach(fn);
+      const set = (name, fn) => document.querySelectorAll(`[data-rel="${name}"]`).forEach(fn);
       const version = r.tag.replace(/^v/, "");
       const date = new Date(r.published);
-      const mb = Math.round(dmg.size / 1048576);
       set("version", (el) => { el.textContent = version; });
       if (!Number.isNaN(date.getTime()))
         set("date", (el) => { el.textContent = new Intl.DateTimeFormat(en ? "en-US" : "zh-CN", { year: "numeric", month: "long", day: "numeric" }).format(date); el.dateTime = r.published.slice(0, 10); });
-      set("size", (el) => { el.textContent = `${mb} MB`; });
+      set("size", (el) => { el.textContent = `${Math.round(dmg.size / 1048576)} MB`; });
       set("dmg", (el) => { el.href = dmg.url; });
       set("dmg-name", (el) => { el.textContent = dmg.name; });
       set("sha", (el) => { el.textContent = dmg.digest ? dmg.digest.replace(/^sha256:/, "") : "—"; });
@@ -138,14 +144,12 @@
       fetch("https://api.github.com/repos/Stahl-G/rensheng-kaitu/releases?per_page=10", { headers: { Accept: "application/vnd.github+json" }, signal: ctrl?.signal })
         .then((res) => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
         .then((list) => {
-          const find = (re) => Array.isArray(list) && list.find((x) => !x.draft && x.assets?.some((a) => re.test(a.name)));
-          const pack = (x) => ({
-            tag: x.tag_name, published: x.published_at || x.created_at, prerelease: !!x.prerelease, page: x.html_url,
-            assets: x.assets.map((a) => ({ id: a.id, name: a.name, size: a.size, digest: a.digest || "", url: a.browser_download_url })),
-          });
-          const pick = find(/\.dmg$/i);
+          const pick = Array.isArray(list) && list.find((x) => !x.draft && x.assets?.some((a) => /\.dmg$/i.test(a.name)));
           if (!pick) return;
-          const r = pack(pick);
+          const r = {
+            tag: pick.tag_name, published: pick.published_at || pick.created_at, prerelease: !!pick.prerelease, page: pick.html_url,
+            assets: pick.assets.map((a) => ({ name: a.name, size: a.size, digest: a.digest || "", url: a.browser_download_url })),
+          };
           fill(r);
           try { sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), r })); } catch {}
         })
@@ -155,7 +159,7 @@
   }
 })();
 
-/* Windows 和 Linux 访客进入 DSH 插件指引；Mac 保留原下载入口。 */
+/* Windows and Linux visitors go to the DSH plugin guide; Macs keep the download. */
 (() => {
   const platform = navigator.userAgentData?.platform || navigator.platform || "";
   const agent = navigator.userAgent || "";
@@ -168,7 +172,7 @@
   const en = location.pathname.startsWith("/en/");
   for (const el of document.querySelectorAll("[data-dl]")) {
     el.href = `${en ? "/en" : ""}/download/#${os === "Windows" ? "windows" : "plugin"}`;
-    el.textContent = os === "Windows" ? (en ? "Install DSH plugin on Windows" : "Windows 插件安装指引") : (en ? "Install on Linux" : "Linux 版安装指引");
+    el.textContent = os === "Windows" ? (en ? "Install on Windows" : "Windows 插件安装指引") : (en ? "Install on Linux" : "Linux 版安装指引");
   }
   for (const el of document.querySelectorAll("[data-dl-meta]"))
     el.textContent = os === "Windows" ? (en ? "Windows · DeepSeek Harness plugin" : "Windows · DeepSeek Harness 插件") : (en ? "Linux · DeepSeek Harness plugin" : "Linux · DeepSeek Harness 插件");

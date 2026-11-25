@@ -1,90 +1,68 @@
-/* Kaitu tokens — copied from the app (packages/dsh-plugin/src/client/Prototype.module.css, Brand.module.css). Light + dark. */
+/* Kaitu site tokens. Colours follow the app (packages/dsh-plugin/src/client/Prototype.module.css .app):
+   paper ground, blue-black primary, vermilion only for "now", highlighter only for the one thing that matters, pencil for what is not settled. */
 :root {
   color-scheme: light;
-  /* 底与文字 */
-  --bg: #fcfcfb;          /* 暖纸白 */
-  --surface: #ffffff;     /* 卡片 */
-  --sunken: #f5f5f3;      /* 下沉区域、统计格、悬停底 */
-  --control: #f0efec;     /* 分段控件底、次按钮、空格子 */
-  --line: #e6e4dd;        /* 发丝线、卡片外圈 */
-  --ink: #1f1e1d;         /* 墨：正文、主按钮 */
-  --ink2: #4d4c48;        /* 次要正文 */
-  --muted: #6b6a66;       /* 说明、时间、区块标签 */
-  --link: #2b4c7e;        /* 岩山靛：链接 */
-  --primary: #1f1e1d;     /* 主按钮 = 墨色 */
+  --bg: #f2f1ed;
+  --surface: #ffffff;
+  --sunken: #ecebe5;
+  --control: #e9e8e3;
+  --line: #e2e0d9;
+  --line-strong: #cfcdc5;
+  --ink: #1a1b19;
+  --ink2: #474944;
+  --muted: #6a6c66;
+  --link: #1b3f94;
+  --link-soft: #e4eaf6;
+  --primary: #1b3f94;
+  --primary-hover: #16347c;
   --on-primary: #ffffff;
-  --strong: #1f1e1d;      /* 选中的子标签、发送键 */
-  --on-strong: #ffffff;
-  --ask: #f7f6f3;         /* 问问气泡、选中选项底 */
-  --ask-line: #e6e4dd;
-  --scrim: rgba(31, 30, 29, 0.42);
-  --empty: #f0efec;
-  /* 板块色：主色 / 淡底 tint / 深字 ink */
-  --health: #3e8a5a;  --health-tint: #e5f1e9;  --health-ink: #2a6a41;  --on-health: #020d05;
-  --doing: #4a6a8f;   --doing-tint: #e7edf4;   --doing-ink: #344e6e;
-  --explore: #1b3254; --explore-tint: #eef2f7; --explore-ink: #1b3254; --on-explore: #ffffff;
-  --news: #b5711a;    --news-tint: #f7ecdc;    --news-ink: #84520f;    --on-news: #191005;
-  --finance: #5f6f2a; --finance-tint: #eef1e2; --finance-ink: #4a5720;
-  --me: #b5577a;      --me-tint: #f6e7ed;      --me-ink: #8a3a5a;      --on-me: #ffffff;
-  /* 淡靛蓝小按钮（今天页「确认」），Prototype.module.css .confirmationAccept */
-  --confirm-bg: #edf2fa; --confirm-bg-hover: #e1eaf8; --confirm-ink: #234782;
-  --confirm-line: #d5e0f2; --confirm-line-hover: #a9bfdc;
-  /* 健康热力格 1、2 级的 color-mix 预算值（health 30% / 60% 混 surface） */
-  --heat-1: #c5dcce; --heat-2: #8bb99c;
-  /* 标志：Brand.module.css */
-  --mark-fold0: #1f3550;  /* 左折，最深，还折着 */
-  --mark-fold1: #2b4c7e;  /* 中折 */
-  --mark-fold2: #e8dfcc;  /* 右折，羊皮纸，已展开 */
+  --now: #d23f27;
+  --mark: #ffe66b;
+  --pencil: #5b5d58;
+  --route: #1f3550;
+  --mark-fold0: #1f3550;
+  --mark-fold1: #2b4c7e;
+  --mark-fold2: #e8dfcc;
   --mark-route-folded: #ffffff;
   --mark-route-open: #1f3550;
-  /* 阴影：应用里只有这几档 */
-  --shadow-ring: 0 0 0 1px var(--line);                                   /* 普通卡片 */
-  --shadow-raised: 0 1px 3px rgba(31, 30, 29, 0.08), 0 0 0 1px var(--line); /* 重点卡、输入条、问问输入框 */
-  --shadow-tab: 0 1px 2px rgba(31, 30, 29, 0.12);                         /* 选中的分段 */
-  --shadow-float: 0 6px 20px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--line);  /* 地图上的浮层 */
-  --shadow-menu: 0 12px 40px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--line); /* 头像菜单 */
-  --shadow-dialog: 0 20px 60px rgba(0, 0, 0, 0.25);                       /* 对话框 */
-  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-shot: 0 0 0 1px rgba(26, 27, 25, 0.1), 0 2px 4px rgba(26, 27, 25, 0.04), 0 28px 64px -28px rgba(26, 27, 25, 0.32);
+  --shadow-card: 0 0 0 1px var(--line), 0 1px 3px rgba(26, 27, 25, 0.06);
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --serif: "Songti SC", "STSong", "Noto Serif SC", "Noto Serif CJK SC", "Source Han Serif SC", "Iowan Old Style", Georgia, "Microsoft YaHei", serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --radius: 14px;
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+:root[lang="en"] {
+  --serif: "Iowan Old Style", "Charter", "Palatino", Georgia, "Songti SC", "Noto Serif CJK SC", serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #171716; --surface: #201f1e; --sunken: #1b1b1a; --control: #2a2927; --line: #2f2e2c;
-    --ink: #ecebe8; --ink2: #c9c7c2; --muted: #a09e98; --link: #b8cbe4;
-    --primary: #ecebe8; --on-primary: #171716; --strong: #ecebe8; --on-strong: #171716;
-    --ask: #252422; --ask-line: #393735; --scrim: rgba(0, 0, 0, 0.6); --empty: #2a2927;
-    --health: #6dba8a;  --health-tint: #203a2b;  --health-ink: #a2d9b6;
-    --doing: #93adcb;   --doing-tint: #263243;   --doing-ink: #bfd0e4;
-    --explore: #8faed6; --explore-tint: #242e3e; --explore-ink: #b8cbe4; --on-explore: #16243a;
-    --news: #ddaa5e;    --news-tint: #43331e;    --news-ink: #f0ca8f;
-    --finance: #a9b86a; --finance-tint: #2f3420; --finance-ink: #cbd69a;
-    --me: #dc92ae;      --me-tint: #452b36;      --me-ink: #f1bbcf;      --on-me: #361525;
-    --confirm-bg: #263348; --confirm-bg-hover: #31415a; --confirm-ink: #b8cbe4;
-    --confirm-line: #3c506d; --confirm-line-hover: #3c506d;
-    --heat-1: #374e3e; --heat-2: #4e7c5f;
-    --mark-fold0: #3a5a86; --mark-fold1: #5c7daa; --mark-fold2: #cfc4ad;
-    --mark-route-folded: #ece6da; --mark-route-open: #3a5a86;
+    --bg: #1a1916;
+    --surface: #22201c;
+    --sunken: #1e1d1a;
+    --control: #2a2723;
+    --line: #34312c;
+    --line-strong: #4a463f;
+    --ink: #ece6da;
+    --ink2: #c2bbae;
+    --muted: #9e978a;
+    --link: #a3b9dd;
+    --link-soft: rgba(163, 185, 221, 0.12);
+    --primary: #a9bedf;
+    --primary-hover: #bfd0ea;
+    --on-primary: #16202e;
+    --now: #e8705a;
+    --mark: rgba(255, 230, 107, 0.3);
+    --pencil: #a9aba4;
+    --route: #8faed6;
+    --mark-fold0: #3a5a86;
+    --mark-fold1: #5c7daa;
+    --mark-fold2: #cfc4ad;
+    --mark-route-folded: #ece6da;
+    --mark-route-open: #3a5a86;
+    --shadow-shot: 0 0 0 1px rgba(236, 230, 218, 0.1), 0 28px 64px -28px rgba(0, 0, 0, 0.7);
+    --shadow-card: 0 0 0 1px var(--line);
   }
-}
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #171716; --surface: #201f1e; --sunken: #1b1b1a; --control: #2a2927; --line: #2f2e2c;
-  --ink: #ecebe8; --ink2: #c9c7c2; --muted: #a09e98; --link: #b8cbe4;
-  --primary: #ecebe8; --on-primary: #171716; --strong: #ecebe8; --on-strong: #171716;
-  --ask: #252422; --ask-line: #393735; --scrim: rgba(0, 0, 0, 0.6); --empty: #2a2927;
-  --health: #6dba8a;  --health-tint: #203a2b;  --health-ink: #a2d9b6;
-  --doing: #93adcb;   --doing-tint: #263243;   --doing-ink: #bfd0e4;
-  --explore: #8faed6; --explore-tint: #242e3e; --explore-ink: #b8cbe4; --on-explore: #16243a;
-  --news: #ddaa5e;    --news-tint: #43331e;    --news-ink: #f0ca8f;
-  --finance: #a9b86a; --finance-tint: #2f3420; --finance-ink: #cbd69a;
-  --me: #dc92ae;      --me-tint: #452b36;      --me-ink: #f1bbcf;      --on-me: #361525;
-  --confirm-bg: #263348; --confirm-bg-hover: #31415a; --confirm-ink: #b8cbe4;
-  --confirm-line: #3c506d; --confirm-line-hover: #3c506d;
-  --heat-1: #374e3e; --heat-2: #4e7c5f;
-  --mark-fold0: #3a5a86; --mark-fold1: #5c7daa; --mark-fold2: #cfc4ad;
-  --mark-route-folded: #ece6da; --mark-route-open: #3a5a86;
 }

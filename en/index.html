@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kaitu · Every AI knows you at first read</title>
-<meta name="description" content="Kaitu is a life map that belongs only to you: who you are, where you come from, what you want, what you’re good at. Switch models, AIs or computers and it stays. Every agent that reads it understands you better. Open source, for macOS.">
+<meta name="description" content="Kaitu is a life map that belongs only to you: who you are, where you come from, what you want, what you're working on. Switch models, AIs or computers and it stays. Open source, macOS.">
 <link rel="canonical" href="https://kaitu.si/en/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/">
@@ -12,23 +12,23 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Kaitu">
 <meta property="og:title" content="Kaitu · Every AI knows you at first read">
-<meta property="og:description" content="Kaitu is a life map that belongs only to you: who you are, where you come from, what you want, what you’re good at. Switch models, AIs or computers and it stays. Every agent that reads it understands you better.">
+<meta property="og:description" content="Kaitu is a life map that belongs only to you: who you are, where you come from, what you want, what you're working on. Switch models, AIs or computers and it stays. Open source, macOS.">
 <meta property="og:url" content="https://kaitu.si/en/">
+<meta property="og:image" content="https://kaitu.si/og-en.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f1ed" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1916" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=d42dd90b">
-<link rel="stylesheet" href="/style.css?v=61a374f1">
-<link rel="stylesheet" href="/mock/mock.css?v=9954b9ff">
-<script src="/mock/persona.js?v=ddadd7d1" defer></script>
-<script src="/mock/mock.js?v=c411fc6e" defer></script>
-<script src="/mock/lifemap.js?v=8313b27b" defer></script>
+<link rel="stylesheet" href="/tokens.css?v=01476f1a">
+<link rel="stylesheet" href="/style.css?v=a355c55f">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=205c3cab" defer></script>
+<script src="/app.js?v=ce44c161" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -36,209 +36,140 @@
   <div class="wrap">
     <a class="brand" href="/en/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>Kaitu</span></a>
     <a class="lang" href="/" hreflang="zh-CN" lang="zh-CN" data-lang-switch="zh">中文</a>
-    <nav class="site-nav" aria-label="Site"><a href="/en/#tour">Product</a><a href="/en/vision/">Vision</a><a href="/en/docs/">Docs</a><a href="/en/download/">Download</a><a href="/en/#inspiration">Inspiration</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+    <nav class="site-nav" aria-label="Site"><a href="/en/download/">Download</a><a href="/en/docs/">Docs</a><a href="/en/developers/">Developers</a><a href="/en/vision/">Vision</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
   </div>
 </header>
 <main id="main" tabindex="-1">
 <section class="hero" aria-labelledby="hero-title">
-  <div class="wrap">
-    <div>
-      <p class="eyebrow">Kaitu</p>
-      <h1 id="hero-title">Every AI knows you at first read</h1>
-      <p class="lead">Kaitu is a life map that belongs only to you: who you are, where you come from, what you want, what you’re good at. Switch models, AIs or computers and it stays. Every agent that reads it understands you better.</p>
+  <div class="wrap hero-grid">
+    <h1 class="display" id="hero-title">Every AI knows you <mark>at first read.</mark></h1>
+    <div class="hero-side">
+      <p class="lead">Kaitu is a life map that belongs only to you: who you are, where you come from, what you want, what you're working on.<br>Switch models, AIs or computers and it stays.</p>
       <div class="cta">
-        <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for macOS</a>
-        <a class="btn btn-big btn-quiet" href="/testsite/?lang=en">Try the browser demo</a>
-        <a class="btn btn-big btn-quiet" href="/en/docs/">Read the docs</a>
+        <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for Mac</a>
+        <a class="btn btn-big" href="/testsite/?lang=en">Try it in your browser</a>
       </div>
-      <p class="meta"><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
-      <div class="hero-dev">
-        <p><strong>Developers</strong>: already using Claude Code, Codex or Cursor? Give it this sentence to get a private Kaitu workspace in your GitHub.</p>
-        <div class="codeblock"><pre><code>Set up my Kaitu memory by following https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md. Do it end to end, don't just give me instructions.</code></pre><button type="button" class="copy">Copy</button></div>
-        <a class="more" href="/en/developers/">For developers →</a>
-      </div>
+      <p class="meta"><span class="now-dot" aria-hidden="true"></span><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.4-rc.2"><span data-rel="version">0.1.4-rc.2</span></a> · <span data-dl-meta>macOS on Apple silicon</span> · Free and open source</p>
     </div>
-    <svg class="hero-mark" viewBox="0 0 48 48" role="img" aria-label="Kaitu mark: a three-fold map unfolding">
-      <defs>
-        <clipPath id="hm-folded"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath>
-        <clipPath id="hm-open"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath>
-      </defs>
-      <g class="hm-fold hm-f0"><path class="hm-face" d="M4 10L17.33 6L17.33 38L4 42Z"/></g>
-      <g class="hm-fold hm-f1"><path class="hm-face" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="hm-shade" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></g>
-      <g class="hm-fold hm-f2"><path class="hm-face" d="M30.67 10L44 6L44 38L30.67 42Z"/><path class="hm-shade" d="M30.67 10L44 6L44 38L30.67 42Z"/></g>
-      <g clip-path="url(#hm-folded)"><path class="hm-route hm-route-folded" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g>
-      <g clip-path="url(#hm-open)"><path class="hm-route hm-route-open" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g>
-      <circle class="hm-ring" cx="39.5" cy="16" r="2.2"/>
-    </svg>
   </div>
-</section>
-
-<section class="sec strip" aria-labelledby="swap-title">
-  <div class="wrap">
-    <div data-reveal>
-      <p class="eyebrow">The AI can change</p>
-      <h2 class="h2" id="swap-title">Switch AIs and keep going from the same progress.</h2>
-      <p class="prose" style="margin-top:12px">Your notes live in your own folder. Use ChatGPT today and Claude, Codex, Grok or DeepSeek tomorrow; each one continues from the same place.</p>
-    </div>
-    <figure class="swap" data-swap data-reveal aria-label="Illustration: the AI changes, the progress keeps growing">
-      <div class="swap-head">
-        <span>AI in use</span>
-        <span class="swap-chip"><span class="swap-name">ChatGPT</span><span class="swap-name">Claude</span><span class="swap-name">Codex</span><span class="swap-name">Grok</span><span class="swap-name">DeepSeek</span></span>
-        <span class="chip tag">Illustration</span>
-      </div>
-      <ol class="swap-card card">
-        <li class="swap-row"><i></i><span>See your options</span><time>Week 1</time></li>
-        <li class="swap-row"><i></i><span>Plan a next step</span><time>Week 2</time></li>
-        <li class="swap-row"><i></i><span>Log what actually happened</span><time>Week 3</time></li>
-        <li class="swap-row"><i></i><span>Adjust from the result</span><time>Week 4</time></li>
-        <li class="swap-row"><i></i><span>Plan a next step</span><time>Week 5</time></li>
-      </ol>
-    </figure>
+  <figure class="shot"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/today-en-dark-m.webp" width="1200" height="1053"><source media="(max-width: 600px)" srcset="/shots/today-en-light-m.webp" width="1200" height="1053"><source media="(prefers-color-scheme: dark)" srcset="/shots/today-en-dark.webp" width="2400" height="1417"><img src="/shots/today-en-light.webp" width="2400" height="1417" alt="Kaitu's Today page: the one thing that matters, “Book a 20-minute user interview for the side project”, is highlighted; below are next steps, goals and body stats, and on the right a quick note and today's schedule." decoding="async" fetchpriority="high"></picture></figure>
+  <div class="wrap pillars" role="list" aria-label="What Kaitu does">
+    <div role="listitem"><h2>See it</h2><p>Goals, projects and directions scattered across your AIs, on one map, with their sources.</p></div>
+    <div role="listitem"><h2>Pick it up</h2><p>Switch AIs or come back a week later and continue from the latest progress. Results land on the same map.</p></div>
+    <div role="listitem"><h2>Move forward</h2><p>Every goal comes down to a next step and a real result.</p></div>
   </div>
 </section>
 
 <section class="sec" id="tour" aria-labelledby="tour-title">
   <div class="wrap">
-    <div class="sec-head" data-reveal>
-      <p class="eyebrow">Product</p>
-      <h2 id="tour-title">Open it and see where you are.</h2>
-      <p class="prose" data-persona>Lin, 29, a product manager in Shanghai, has talked to ChatGPT and Claude about getting back into training, a side project, and whether to move to Hangzhou.</p>
-      <p class="tour-meta"><span class="chip chip-pre">Fictional example person; all data is synthetic</span><span class="chip">Sample data · nothing you do here is saved</span></p>
-    </div>
-    <ol class="walk" data-walk aria-label="Walk through Lin's first two weeks"></ol>
-    <p class="walk-cap" data-walk-cap aria-live="polite">Pick a step to see what Kaitu did that day, or click around the app below.</p>
-    <div class="mock" data-mock data-lang="en">
-      <div class="m-chrome"><span class="m-dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="m-badge">Sample data</span></div>
-      <div class="m-fallback">
-        <div><h3>Today</h3><p>The one thing to do now, the plans you brought, up to three next steps, and what needs your review.</p></div>
-        <div><h3>Explore</h3><p>Health, Footprints, News and Directions. It opens on Health.</p></div>
-        <div><h3>Library</h3><p>Schedule, projects, health, finance, notes and decisions, and the inbox.</p></div>
-        <div><h3>Ask</h3><p>A built-in AI chat. Add an AI service and it answers from your notes.</p></div>
-        <p class="fb-note">With JavaScript on, this is a clickable Kaitu example.</p>
-      </div>
-    </div>
-    <div class="entry-caps" data-reveal-group>
-      <div data-reveal><h3>Health</h3><p>Goals, this week's training and meals, and your health next steps.</p></div>
-      <div data-reveal><h3>Footprints</h3><p>Start from your hometown and connect the cities and chapters of your life on a map.</p></div>
-      <div data-reveal><h3>News</h3><p>News on topics you follow. Mark items Useful or Not relevant.</p></div>
-      <div data-reveal><h3>Directions</h3><p>One line each: why it matters and the first step; then log attempts and evidence for and against.</p></div>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="how" aria-labelledby="how-title">
-  <div class="wrap">
-    <div class="sec-head" data-reveal>
-      <p class="eyebrow">How it works</p>
-      <h2 id="how-title">Keep the record. Keep things moving.</h2>
-    </div>
-    <ol class="steps" data-reveal-group>
-      <li class="card" data-reveal><span class="n">1</span><h3>Bring it in and see it</h3><p>First choose where your notes live: this Mac, iCloud, Google Drive or Nutstore. Then bring memories over from ChatGPT, Claude, Gemini, Doubao or another AI you use, or paste a conversation. After you review each item, your goals appear on Today with their source. No API key needed.</p></li>
-      <li class="card" data-reveal><span class="n">2</span><h3>One step forward each week</h3><p>Give every goal one next step. When it's done, write one line about how it went. If it can't happen, move it to later or note why it's paused.</p></li>
-      <li class="card" data-reveal><span class="n">3</span><h3>Any AI can pick it up</h3><p>Copy a context pack to the AI you use, paste its answer back, review, then update. Ask keeps every AI service you add, so you can switch any time. Local clients like Claude and Codex read and write over MCP; AIs that can open Google Drive, such as Grok, can take over from there.</p></li>
-    </ol>
-    <div class="weekly">
-      <div data-reveal>
-        <h3>A step forward every week</h3>
-        <p>Every goal comes down to a next step and a real result. The "Last 5 weeks" grid on the Health page lays out your training day by day, so you can see at a glance when you trained and how much.</p>
-        <p class="small" style="margin-top:12px">Illustration from Lin's sample data, not real user data.</p>
-      </div>
-      <figure class="card weeks-card" data-reveal>
-        <div class="wk-head"><b>Last 5 weeks</b><span class="small">Darker means more training that day</span></div>
-        <div class="weeks wk-anim" data-reveal aria-label="Training grid for the last 5 weeks (illustration)" role="img"><span class="wd">M</span><span class="wd">T</span><span class="wd">W</span><span class="wd">T</span><span class="wd">F</span><span class="wd">S</span><span class="wd">S</span><i style="--w:0;--d:0" data-l="0"></i><i style="--w:0;--d:1" data-l="0"></i><i style="--w:0;--d:2" data-l="0"></i><i style="--w:0;--d:3" data-l="0"></i><i style="--w:0;--d:4" data-l="0"></i><i style="--w:0;--d:5" data-l="1"></i><i style="--w:0;--d:6" data-l="0"></i><i style="--w:1;--d:0" data-l="0"></i><i style="--w:1;--d:1" data-l="0"></i><i style="--w:1;--d:2" data-l="0"></i><i style="--w:1;--d:3" data-l="0"></i><i style="--w:1;--d:4" data-l="1"></i><i style="--w:1;--d:5" data-l="0"></i><i style="--w:1;--d:6" data-l="0"></i><i style="--w:2;--d:0" data-l="0"></i><i style="--w:2;--d:1" data-l="0"></i><i style="--w:2;--d:2" data-l="1"></i><i style="--w:2;--d:3" data-l="0"></i><i style="--w:2;--d:4" data-l="0"></i><i style="--w:2;--d:5" data-l="0"></i><i style="--w:2;--d:6" data-l="0"></i><i style="--w:3;--d:0" data-l="3"></i><i style="--w:3;--d:1" data-l="0"></i><i style="--w:3;--d:2" data-l="0"></i><i style="--w:3;--d:3" data-l="3"></i><i style="--w:3;--d:4" data-l="0"></i><i style="--w:3;--d:5" data-l="2"></i><i style="--w:3;--d:6" data-l="0"></i><i style="--w:4;--d:0" data-l="0"></i><i style="--w:4;--d:1" data-l="3"></i><i style="--w:4;--d:2" data-l="0"></i><i style="--w:4;--d:3" data-l="2"></i><i style="--w:4;--d:4" data-l="0"></i><i style="--w:4;--d:5" data-l="0"></i><i style="--w:4;--d:6" data-future></i></div>
+    <div class="sec-head"><h2 class="h2" id="tour-title">Open it and see where you are.</h2></div>
+    <div class="tabs" data-tabs data-tabs-label="Pages in Kaitu">
+      <figure class="panel shot" id="tour-footprints" aria-label="Footprints">
+        <h3>Footprints</h3>
+        <p>Start from your hometown and connect the cities and chapters of your life on a map.</p>
+        <picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/footprints-en-dark-m.webp" width="1200" height="1210"><source media="(max-width: 600px)" srcset="/shots/footprints-en-light-m.webp" width="1200" height="1210"><source media="(prefers-color-scheme: dark)" srcset="/shots/footprints-en-dark.webp" width="2400" height="1500"><img src="/shots/footprints-en-light.webp" width="2400" height="1500" alt="Footprints: a map marks “I am here · Shanghai”; on the right, 8 cities and the chapters of a life: Chengdu, Hangzhou, Shenzhen, Shanghai." decoding="async" loading="lazy"></picture>
+      </figure>
+      <figure class="panel shot" id="tour-health" aria-label="Health">
+        <h3>Health</h3>
+        <p>Training, sleep, weight and meals, from Apple Health and your own notes.</p>
+        <picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/health-en-dark-m.webp" width="1200" height="1276"><source media="(max-width: 600px)" srcset="/shots/health-en-light-m.webp" width="1200" height="1276"><source media="(prefers-color-scheme: dark)" srcset="/shots/health-en-dark.webp" width="2400" height="1500"><img src="/shots/health-en-light.webp" width="2400" height="1500" alt="Health: weight 71.5 kg with a two-month trend, today's steps, 7.8 hours of sleep and the training grid." decoding="async" loading="lazy"></picture>
+      </figure>
+      <figure class="panel shot" id="tour-directions" aria-label="Directions">
+        <h3>Directions</h3>
+        <p>What you want, what you're doing and the next step, on one line.</p>
+        <picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/directions-en-dark-m.webp" width="1200" height="915"><source media="(max-width: 600px)" srcset="/shots/directions-en-light-m.webp" width="1200" height="915"><source media="(prefers-color-scheme: dark)" srcset="/shots/directions-en-dark.webp" width="2400" height="1500"><img src="/shots/directions-en-light.webp" width="2400" height="1500" alt="Directions: two goals, the interview notes tool in progress, and the next step, a 20-minute user interview, linked in one line." decoding="async" loading="lazy"></picture>
+      </figure>
+      <figure class="panel shot" id="tour-library" aria-label="Library">
+        <h3>Library</h3>
+        <p>Schedule, projects, health, finance, notes and decisions, all in one place.</p>
+        <picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/library-en-dark-m.webp" width="1200" height="883"><source media="(max-width: 600px)" srcset="/shots/library-en-light-m.webp" width="1200" height="883"><source media="(prefers-color-scheme: dark)" srcset="/shots/library-en-dark.webp" width="2400" height="1500"><img src="/shots/library-en-light.webp" width="2400" height="1500" alt="Library: schedule, projects, health, finance, notes and decisions, with the inbox and recent changes on the right." decoding="async" loading="lazy"></picture>
       </figure>
     </div>
   </div>
 </section>
 
-<section class="sec" id="folder" aria-labelledby="folder-title">
-  <div class="wrap folder">
-    <div data-reveal>
-      <p class="eyebrow">Your notes</p>
-      <h2 class="h2" id="folder-title">Your notes live in your own folder.</h2>
-      <div class="prose" style="margin-top:12px">
-        <p>Everything is Markdown and JSON that any editor can open. Every write saves a version, so mistakes can be undone.</p>
-        <p>Keep your notes on this computer only, or sync them with iCloud, Google Drive, Nutstore or another sync app. Version history and keys always stay on this computer.</p>
+<section class="sec" id="folder" aria-labelledby="relay-title">
+  <div class="wrap relay">
+    <div>
+      <h2 class="h2" id="relay-title">Switch AIs and keep going<br>from the same progress.</h2>
+      <p class="prose">Your notes live in your own folder. Use ChatGPT today and Claude, Codex or DeepSeek tomorrow; each one reads the same notes. Local clients like Claude and Codex can read and write over MCP.</p>
+      <ul class="ai-list" aria-label="AIs that can pick it up"><li>ChatGPT</li><li>Claude</li><li>Gemini</li><li>DeepSeek</li><li>Kimi</li><li>Doubao</li><li>Grok</li><li>Codex</li><li>Cursor</li></ul>
+      <div class="dev">
+        <p>Already using Claude Code, Codex or Cursor? Give it this sentence to get a private Kaitu workspace in your GitHub:</p>
+        <div class="codeblock"><pre><code>Set up my Kaitu memory by following https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md. Do it end to end, don't just give me instructions.</code></pre><button type="button" class="copy">Copy</button></div>
+        <a class="more" href="/en/developers/">For developers →</a>
       </div>
-      <p class="links-row"><a href="/en/privacy/">Where your data goes →</a><a href="/en/docs/#folder">About the folder →</a></p>
     </div>
-    <figure class="card tree" data-reveal aria-label="Notes folder illustration">
-      <div class="tree-head"><code>kaitu/</code><span class="small">your notes folder</span></div>
-      <ul>
-        <li><code>AGENTS.md</code><span>Where an AI starts reading</span></li>
-        <li><code>NOW.md</code><span>Today's plan</span></li>
-        <li><code>me/</code><span>Profile, goals and rules</span></li>
-        <li><code>health/</code><span>Training, meals, sleep</span></li>
-        <li><code>projects/</code><span>What you're working on</span></li>
-        <li><code>explore/</code><span>Footprints and directions</span></li>
-        <li><code>memory/</code><span>Memories</span></li>
-        <li><code>inbox/</code><span>Originals and inbox</span></li>
-      </ul>
-      <figcaption class="tree-foot small">People can read it, and any AI can carry on from it.</figcaption>
-    </figure>
+    <figure class="tree" aria-label="Your notes folder"><ul><li><span>kaitu-ai-memory/</span></li><li><span><mark>AGENTS.md</mark></span><span class="note-text">every AI starts here</span></li><li><span>NOW.md</span><span class="note-text">today</span></li><li><span>me/profile.md</span><span class="note-text">who you are</span></li><li><span>me/goals.json</span><span class="note-text">what you want</span></li><li><span>memory/MEMORY.md</span><span class="note-text">what to remember</span></li><li><span>health/data/</span><span class="note-text">training, sleep, meals</span></li><li><span>explore/data/</span><span class="note-text">footprints, directions</span></li><li><span>projects/</span><span class="note-text">what you're doing</span></li></ul></figure>
   </div>
 </section>
 
-<section class="sec" id="inspiration" aria-labelledby="insp-title">
+<section class="sec" id="privacy" aria-labelledby="keep-title">
   <div class="wrap">
-    <div class="sec-head" data-reveal>
-      <p class="eyebrow">Inspiration</p>
-      <h2 id="insp-title">Where the idea came from</h2>
-    </div>
-    <div class="insp-grid">
-      <div>
-    <div class="prose" data-reveal>
-      <p>“Sun-ology”, “thin muscle”, the “yellow-hair theory”… In the widely debated four-hour interview between Allen Shao and Justin Sun, three cryptic-sounding ideas were stitched together into a life philosophy about the mind, the body and action.</p>
-      <p>Interestingly, the most concrete part of the interview is exactly how many of us have already started using AI in everyday life.</p>
-      <p>Handing before-and-after meal photos to Claude to count calories, tracking sleep with an Oura ring, letting AI sort training videos and log weights and sets, getting a report every day. Every record is kept in local Markdown files, so you can switch to another agent and keep going.</p>
-      <p>We have grown used to handing more and more to AI: talking through a plot while writing, weighing options when changing jobs, planning a route before a trip, working through a hard problem together.</p>
-      <p>The more we talk, the more AI knows about what we have done, what we want to do and what we have hesitated over. But all of that is scattered across separate chat histories. What happened to last month’s plan? Why did we turn down that opportunity? What has stayed stuck lately? Finding out usually means digging through old chats again.</p>
-      <p>So we wondered: if we gathered those scattered pieces together, could we get a life progress map of our own?</p>
-      <p>You can look back on the road behind you. Where to go next is yours to decide, like opening up the map in a game.</p>
-    </div>
-    <p class="disclaimer" data-reveal>Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
+    <div class="sec-head"><h2 class="h2" id="keep-title">Your notes stay yours.</h2></div>
+    <dl class="facts">
+      <div><dt>Where</dt><dd>On this computer, or in the iCloud, Google Drive or Nutstore folder you choose.</dd></div>
+      <div><dt>What</dt><dd>Markdown and JSON any editor can open. Take the whole folder with you any time.</dd></div>
+      <div><dt>Undo</dt><dd>Every write saves a version, so mistakes can be rolled back.</dd></div>
+      <div><dt>Who sees it</dt><dd>Kaitu has no server and can't see your notes. You choose which AI gets what.</dd></div>
+    </dl>
+    <a class="more" href="/en/privacy/">Where your data goes →</a>
+  </div>
+</section>
+
+<section class="sec" id="download" aria-labelledby="get-title">
+  <div class="wrap">
+    <div class="sec-head"><h2 class="h2" id="get-title">Download</h2></div>
+    <div class="get">
+      <article class="get-main">
+        <div>
+          <span class="app-tile" aria-hidden="true"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="dl-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="dl-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#dl-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#dl-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg></span>
+          <h3>Mac</h3>
+          <p class="facts-line"><span class="now-dot" aria-hidden="true"></span><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.4-rc.2"><span data-rel="version">0.1.4-rc.2</span></a> <span data-rel="pre">Preview</span> · Apple silicon · <time data-rel="date" datetime="2026-11-21">November 21, 2026</time> · <span data-rel="size">446 MB</span></p>
+        </div>
+        <div class="cta">
+          <a class="btn btn-big btn-primary" data-rel="dmg" href="https://github.com/Stahl-G/rensheng-kaitu/releases/download/v0.1.4-rc.2/Kaitu.dmg">Download Kaitu.dmg</a>
+          <a class="btn btn-big btn-quiet" data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.4-rc.2">Release notes ↗</a>
+        </div>
+      </article>
+      <div class="get-more">
+      <article><h3>Windows, Linux, Intel Mac</h3><p>The Kaitu plugin for DeepSeek Harness.</p><a href="/en/download/#windows">Install guide →</a></article>
+      <article><h3>CLI and web</h3><p>Needs Node.js 22.19+ or 24+.</p><a href="/en/download/#cli">Install commands →</a></article>
+      <article class="planned"><h3>iPhone</h3><p>Getting ready for the App Store.</p></article>
+      <article><h3>Browser</h3><p>Lin's sample notes, nothing to install.</p><a href="/testsite/?lang=en">Open the demo →</a></article>
       </div>
-      <div class="lifemap" data-lifemap data-lang="en"></div>
     </div>
   </div>
 </section>
 
-<section class="sec band" aria-labelledby="band-title">
+<section class="sec origin" id="inspiration" aria-label="Where the idea came from">
   <div class="wrap">
-    <div class="band-box" data-reveal>
-      <div>
-        <h2 id="band-title">Download Kaitu.app</h2>
-        <p><a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a><span data-rel="pre"> preview</span> · <span data-dl-meta>macOS on Apple silicon</span> · Open source (MIT)</p>
-      </div>
-      <div class="cta" style="margin-top:0">
-        <a class="btn btn-big btn-primary" href="/en/download/" data-dl>Download for macOS</a>
-        <a class="btn btn-big btn-quiet" href="/en/download/#other">CLI and web version</a>
-      </div>
-    </div>
+    <blockquote>You can look back on the road behind you. Where to go next is yours to decide, like opening up the map in a game.</blockquote>
+    <p>Inspired by an interview between Allen Shao and Justin Sun. <a href="/en/vision/#inspiration">Where the idea came from →</a></p>
   </div>
 </section>
 
 <section class="sec" id="faq" aria-labelledby="faq-title">
   <div class="wrap">
-    <div class="sec-head"><h2 id="faq-title">FAQ</h2></div>
+    <div class="sec-head"><h2 class="h2" id="faq-title">FAQ</h2></div>
     <div class="faq">
-      <details><summary>Does this website read my notes?</summary><div><p>No. This is the project website. The app on this page shows sample data and isn't connected to your notes folder. There are no analytics or third-party scripts; only the download page asks GitHub for the latest version.</p></div></details>
+      <details><summary>Does this website read my notes?</summary><div><p>No. This is the project website. The screenshots and the browser demo use synthetic notes for a fictional person, Lin, and aren't connected to your notes folder. There are no analytics or third-party scripts; only the download details ask GitHub for the latest version.</p></div></details>
       <details><summary>Do I have to use a particular AI?</summary><div><p>No. Add a key for DeepSeek, OpenAI, Claude, Gemini, Kimi, Zhipu or another service to use Ask; every service you add is kept, so you can switch. Or skip keys entirely: copy a context pack to the AI you already use and paste its answer back.</p></div></details>
       <details><summary>Is it free? Is it open source?</summary><div><p>Free. The code is open source under the MIT License, on <a href="https://github.com/Stahl-G/rensheng-kaitu">GitHub</a>.</p></div></details>
-      <details><summary>Is this a stable release?</summary><div><p data-rel="pre">Not yet. The current version is <span data-rel="version">0.1.0-rc.4</span>, a release candidate marked as a pre-release on GitHub.</p><p data-rel="stable" hidden>Yes. The current version is <span data-rel="version">0.1.0-rc.4</span>.</p></div></details>
+      <details><summary>Is this a stable release?</summary><div><p data-rel="pre">Not yet. The current version is <span data-rel="version">0.1.4-rc.2</span>, a release candidate marked as a pre-release on GitHub.</p><p data-rel="stable" hidden>Yes. The current version is <span data-rel="version">0.1.4-rc.2</span>.</p></div></details>
       <details><summary>Is there a Windows version?</summary><div><p>On Windows, install the Kaitu plugin in DeepSeek Harness (DSH). Linux and Intel Macs use the same plugin. See the <a href="/en/download/#windows">download page</a>.</p></div></details>
-      <details><summary>Is the app available in English?</summary><div><p>Yes. The interface follows your system language by default, and you can switch between 中文 and English in Settings (avatar menu, top right). Some pages are still partly in Chinese.</p></div></details>
-      <details><summary>Where are my notes stored?</summary><div><p>The first time you open Kaitu, you choose where your notes live: this computer (<code>~/kaitu</code> by default), iCloud, Google Drive, Nutstore, or a folder another sync app syncs. Nothing syncs unless you pick a cloud drive, and version history and keys always stay on this computer. For what is sent to an AI, see <a href="/en/privacy/">Where your data goes</a>.</p></div></details>
+      <details><summary>Is there an iPhone app?</summary><div><p>It's getting ready for the App Store.</p></div></details>
+      <details><summary>Is the app available in English?</summary><div><p>Yes. The interface follows your system language by default, and you can switch between 中文 and English in Settings (avatar menu, top right).</p></div></details>
+      <details><summary>Where are my notes stored?</summary><div><p>The first time you open Kaitu, you choose where your notes live: this computer (<code>~/kaitu-ai-memory</code> by default), iCloud, Google Drive, Nutstore, or a folder another sync app syncs. Nothing syncs unless you pick a cloud drive, and version history and keys always stay on this computer. For what is sent to an AI, see <a href="/en/privacy/">Where your data goes</a>.</p></div></details>
     </div>
   </div>
 </section>
-
 </main>
 <footer class="site-foot">
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
     <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/developers/">For developers</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a><a href="/en/support/">Support</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
-    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
+    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.4-rc.2"><span data-rel="version">0.1.4-rc.2</span></a></p>
     <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
   </div>
 </footer>
