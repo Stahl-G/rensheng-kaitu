@@ -25,10 +25,14 @@
 <meta name="theme-color" content="#1a1916" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=01476f1a">
-<link rel="stylesheet" href="/style.css?v=a355c55f">
+<link rel="stylesheet" href="/tokens.css?v=95e81d85">
+<link rel="stylesheet" href="/style.css?v=056a89e2">
+<link rel="preload" as="image" href="/shots/today-en-light.webp" media="(min-width: 601px) and (prefers-color-scheme: light)">
+<link rel="preload" as="image" href="/shots/today-en-dark.webp" media="(min-width: 601px) and (prefers-color-scheme: dark)">
+<link rel="preload" as="image" href="/shots/today-en-light-m.webp" media="(max-width: 600px) and (prefers-color-scheme: light)">
+<link rel="preload" as="image" href="/shots/today-en-dark-m.webp" media="(max-width: 600px) and (prefers-color-scheme: dark)">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=ce44c161" defer></script>
+<script src="/app.js?v=f6718613" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -53,7 +57,7 @@
     </div>
   </div>
   <figure class="shot"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/today-en-dark-m.webp" width="1200" height="1053"><source media="(max-width: 600px)" srcset="/shots/today-en-light-m.webp" width="1200" height="1053"><source media="(prefers-color-scheme: dark)" srcset="/shots/today-en-dark.webp" width="2400" height="1417"><img src="/shots/today-en-light.webp" width="2400" height="1417" alt="Kaitu's Today page: the one thing that matters, “Book a 20-minute user interview for the side project”, is highlighted; below are next steps, goals and body stats, and on the right a quick note and today's schedule." decoding="async" fetchpriority="high"></picture></figure>
-  <div class="wrap pillars" role="list" aria-label="What Kaitu does">
+  <div class="wrap pillars" data-anim role="list" aria-label="What Kaitu does">
     <div role="listitem"><h2>See it</h2><p>Goals, projects and directions scattered across your AIs, on one map, with their sources.</p></div>
     <div role="listitem"><h2>Pick it up</h2><p>Switch AIs or come back a week later and continue from the latest progress. Results land on the same map.</p></div>
     <div role="listitem"><h2>Move forward</h2><p>Every goal comes down to a next step and a real result.</p></div>
@@ -90,24 +94,34 @@
 
 <section class="sec" id="folder" aria-labelledby="relay-title">
   <div class="wrap relay">
-    <div>
+    <div class="relay-text">
       <h2 class="h2" id="relay-title">Switch AIs and keep going<br>from the same progress.</h2>
       <p class="prose">Your notes live in your own folder. Use ChatGPT today and Claude, Codex or DeepSeek tomorrow; each one reads the same notes. Local clients like Claude and Codex can read and write over MCP.</p>
       <ul class="ai-list" aria-label="AIs that can pick it up"><li>ChatGPT</li><li>Claude</li><li>Gemini</li><li>DeepSeek</li><li>Kimi</li><li>Doubao</li><li>Grok</li><li>Codex</li><li>Cursor</li></ul>
-      <div class="dev">
-        <p>Already using Claude Code, Codex or Cursor? Give it this sentence to get a private Kaitu workspace in your GitHub:</p>
-        <div class="codeblock"><pre><code>Set up my Kaitu memory by following https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md. Do it end to end, don't just give me instructions.</code></pre><button type="button" class="copy">Copy</button></div>
-        <a class="more" href="/en/developers/">For developers →</a>
-      </div>
     </div>
-    <figure class="tree" aria-label="Your notes folder"><ul><li><span>kaitu-ai-memory/</span></li><li><span><mark>AGENTS.md</mark></span><span class="note-text">every AI starts here</span></li><li><span>NOW.md</span><span class="note-text">today</span></li><li><span>me/profile.md</span><span class="note-text">who you are</span></li><li><span>me/goals.json</span><span class="note-text">what you want</span></li><li><span>memory/MEMORY.md</span><span class="note-text">what to remember</span></li><li><span>health/data/</span><span class="note-text">training, sleep, meals</span></li><li><span>explore/data/</span><span class="note-text">footprints, directions</span></li><li><span>projects/</span><span class="note-text">what you're doing</span></li></ul></figure>
+    <figure class="swap" data-swap aria-label="Illustration: switch AIs and the progress keeps going">
+      <div class="swap-head"><span>AI in use</span><span class="swap-chip"><span>Codex</span></span></div>
+      <ol class="swap-rows">
+        <li class="done" data-ai="ChatGPT"><i></i><span>See your options</span><b>ChatGPT</b><time>Week 1</time></li>
+        <li class="done" data-ai="Claude"><i></i><span>Plan a first step</span><b>Claude</b><time>Week 2</time></li>
+        <li class="done" data-ai="DeepSeek"><i></i><span>Log what happened</span><b>DeepSeek</b><time>Week 3</time></li>
+        <li class="done now" data-ai="Codex"><i></i><span>Adjust from the result</span><b>Codex</b><time>Week 4</time></li>
+        <li class="next"><i></i><span>Next step</span><b></b><time>Week 5</time></li>
+      </ol>
+    </figure>
+    <figure class="tree" data-anim aria-label="Your notes folder"><ul><li><span>kaitu-ai-memory/</span></li><li><span><mark>AGENTS.md</mark></span><span class="note-text">every AI starts here</span></li><li><span>NOW.md</span><span class="note-text">today</span></li><li><span>me/profile.md</span><span class="note-text">who you are</span></li><li><span>me/goals.json</span><span class="note-text">what you want</span></li><li><span>memory/MEMORY.md</span><span class="note-text">what to remember</span></li><li><span>health/data/</span><span class="note-text">training, sleep, meals</span></li><li><span>explore/data/</span><span class="note-text">footprints, directions</span></li><li><span>projects/</span><span class="note-text">what you're doing</span></li></ul></figure>
+    <div class="dev">
+      <p>Already using Claude Code, Codex or Cursor? Give it this sentence to get a private Kaitu workspace in your GitHub:</p>
+      <div class="codeblock"><pre><code>Set up my Kaitu memory by following https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md. Do it end to end, don't just give me instructions.</code></pre><button type="button" class="copy">Copy</button></div>
+      <a class="more" href="/en/developers/">For developers →</a>
+    </div>
   </div>
 </section>
 
 <section class="sec" id="privacy" aria-labelledby="keep-title">
   <div class="wrap">
     <div class="sec-head"><h2 class="h2" id="keep-title">Your notes stay yours.</h2></div>
-    <dl class="facts">
+    <dl class="facts" data-anim>
       <div><dt>Where</dt><dd>On this computer, or in the iCloud, Google Drive or Nutstore folder you choose.</dd></div>
       <div><dt>What</dt><dd>Markdown and JSON any editor can open. Take the whole folder with you any time.</dd></div>
       <div><dt>Undo</dt><dd>Every write saves a version, so mistakes can be rolled back.</dd></div>
@@ -143,9 +157,12 @@
 </section>
 
 <section class="sec origin" id="inspiration" aria-label="Where the idea came from">
-  <div class="wrap">
-    <blockquote>You can look back on the road behind you. Where to go next is yours to decide, like opening up the map in a game.</blockquote>
-    <p>Inspired by an interview between Allen Shao and Justin Sun. <a href="/en/vision/#inspiration">Where the idea came from →</a></p>
+  <div class="wrap origin-grid">
+    <div class="unfold" data-anim aria-hidden="true"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="or-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="or-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#or-a)"><path class="mk-route mk-rf" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#or-b)"><path class="mk-route mk-ro" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg></div>
+    <div>
+      <blockquote>You can look back on the road behind you. Where to go next is yours to decide, like opening up the map in a game.</blockquote>
+      <p>Inspired by an interview between Allen Shao and Justin Sun. <a href="/en/vision/#inspiration">Where the idea came from →</a></p>
+    </div>
   </div>
 </section>
 

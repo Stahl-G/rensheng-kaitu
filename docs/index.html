@@ -22,10 +22,10 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<link rel="stylesheet" href="/tokens.css?v=01476f1a">
-<link rel="stylesheet" href="/style.css?v=a355c55f">
+<link rel="stylesheet" href="/tokens.css?v=95e81d85">
+<link rel="stylesheet" href="/style.css?v=056a89e2">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=ce44c161" defer></script>
+<script src="/app.js?v=f6718613" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -76,7 +76,7 @@
 </ol>
 <h3 id="first-run">第一次打开<a class="anchor" href="#first-run" aria-label="#">#</a></h3>
 <ul>
-  <li><strong>先选资料放哪</strong>：这台电脑（不同步）、iCloud 云盘、Google Drive、坚果云，或其他同步盘的文件夹。旁边会标出这台电脑上找没找到对应的同步文件夹。选本机时默认是 <code>~/kaitu</code>，空文件夹会自动建好。以后随时能换，见<a href="#storage">存放位置与同步</a>。</li>
+  <li><strong>先选资料放哪</strong>：这台电脑（不同步）、iCloud 云盘、Google Drive、坚果云，或其他同步盘的文件夹。旁边会标出这台电脑上找没找到对应的同步文件夹。选本机时默认是 <code>~/kaitu-ai-memory</code>（已有 <code>~/kaitu</code> 时沿用它），空文件夹会自动建好。以后随时能换，见<a href="#storage">存放位置与同步</a>。</li>
   <li><strong>带来一件事</strong>：写下想改变的事，或粘贴一段和 AI 聊过的对话。点「保存并整理」时，开图先原样保存原文，再整理出「当前目标」「已知现状」「一个下一步」草稿，每项都能改。只有你点「采纳这个下一步」的那一条会变成待办，目标同时记进目标列表；其他建议留在原文里。一条都不想采纳，就点「只保存原文」。</li>
   <li>AI 给出几条「可能的路径」时，先选一条，才能把它的小实验改成你的下一步。</li>
   <li>没连开图里的 AI 也能整理：在「用你常用的 AI 整理」里点「1 · 复制整理提示词」，发给豆包、Kimi、DeepSeek、ChatGPT 等任何 AI，把回答原样贴回，点「3 · 读取回答」。也可以自己填那三项。</li>
@@ -302,7 +302,7 @@
 <h2 id="updates">更新<a class="anchor" href="#updates" aria-label="#">#</a></h2>
 <ul>
   <li><strong>功能包</strong>：界面、资料服务、工具和技能。「设置 → 关于 → 开图功能更新」：检查更新 → 下载更新 → 重启应用。更新包要通过签名和内核版本检查，不通过就继续用当前版本。有问题可以「恢复上一版功能」；这不会恢复你的资料，资料回退用版本历史。</li>
-  <li><strong>App 本身</strong>：DSH 内核（当前固定 0.2.1-rc.2）、Electron 或启动器有变化时，需要下载新的 Kaitu.app。</li>
+  <li><strong>App 本身</strong>：DSH 内核（当前固定 0.2.2-rc.4）、Electron 或启动器有变化时，需要下载新的 Kaitu.app。</li>
 </ul>
 <p>设置里显示「未配置更新源」时，不能在应用内检查更新，到<a href="/download/">下载</a>页下载新版。新版 App 打开时会自动升级资料文件夹里的内置模板和技能，保留你的配置。只用命令行时，旧资料文件夹先运行 <code>kaitu upgrade</code>（<code>--dry-run</code> 预览）。</p>
 
@@ -365,7 +365,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <h3 id="faq-export">怎么把资料全部带走？<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
 <p>「设置 → 导出全部资料」得到一个 zip；或者直接复制资料文件夹。</p>
 <h3 id="faq-dsh">和 DeepSeek Harness 是什么关系？<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
-<p>Kaitu.app 基于 DeepSeek Harness（DSH）0.2.1-rc.2 打包，问问用的是它的引擎。已经在用 DSH，也可以只把开图装成插件（见<a href="#dsh">装进 DeepSeek Harness</a>）。</p>
+<p>Kaitu.app 基于 DeepSeek Harness（DSH）0.2.2-rc.4 打包，问问用的是它的引擎。已经在用 DSH，也可以只把开图装成插件（见<a href="#dsh">装进 DeepSeek Harness</a>）。</p>
 <h3 id="faq-engine">问问页显示「问问引擎没有载入」？<a class="anchor" href="#faq-engine" aria-label="#">#</a></h3>
 <p>重新安装完整的命令行与网页版安装包，再重启工作台。在那之前，仍可以在「AI 与连接」复制资料包，带到你常用的 AI。</p>
 <h3 id="faq-update-source">设置里显示「未配置更新源」？<a class="anchor" href="#faq-update-source" aria-label="#">#</a></h3>

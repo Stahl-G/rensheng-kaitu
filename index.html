@@ -25,11 +25,15 @@
 <meta name="theme-color" content="#1a1916" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=01476f1a">
-<link rel="stylesheet" href="/style.css?v=a355c55f">
+<link rel="stylesheet" href="/tokens.css?v=95e81d85">
+<link rel="stylesheet" href="/style.css?v=056a89e2">
+<link rel="preload" as="image" href="/shots/today-zh-light.webp" media="(min-width: 601px) and (prefers-color-scheme: light)">
+<link rel="preload" as="image" href="/shots/today-zh-dark.webp" media="(min-width: 601px) and (prefers-color-scheme: dark)">
+<link rel="preload" as="image" href="/shots/today-zh-light-m.webp" media="(max-width: 600px) and (prefers-color-scheme: light)">
+<link rel="preload" as="image" href="/shots/today-zh-dark-m.webp" media="(max-width: 600px) and (prefers-color-scheme: dark)">
 <script>document.documentElement.classList.add("js")</script>
 <script>try{if(!localStorage.getItem("kaitu-lang")){var l=navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||""];if(!l.some(function(x){return /^zh/i.test(x)})){location.replace("/en"+location.pathname+location.search+location.hash)}}}catch(e){}</script>
-<script src="/app.js?v=ce44c161" defer></script>
+<script src="/app.js?v=f6718613" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">跳到正文</a>
@@ -54,7 +58,7 @@
     </div>
   </div>
   <figure class="shot"><picture><source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="/shots/today-zh-dark-m.webp" width="1200" height="1053"><source media="(max-width: 600px)" srcset="/shots/today-zh-light-m.webp" width="1200" height="1053"><source media="(prefers-color-scheme: dark)" srcset="/shots/today-zh-dark.webp" width="2400" height="1417"><img src="/shots/today-zh-light.webp" width="2400" height="1417" alt="开图的今天页：最重要的一件事「给业余项目约一次 20 分钟的用户访谈」用荧光笔标出，下面是下一步、目标和身体数据，右边是记一条和今天的日程。" decoding="async" fetchpriority="high"></picture></figure>
-  <div class="wrap pillars" role="list" aria-label="开图做什么">
+  <div class="wrap pillars" data-anim role="list" aria-label="开图做什么">
     <div role="listitem"><h2>看得见</h2><p>散在各个 AI 里的目标、在做的事和在考虑的方向，排在同一张图上，标明来源。</p></div>
     <div role="listitem"><h2>接得上</h2><p>换一个 AI、隔一周，都能带着最新进度接着聊，结果回到同一张图。</p></div>
     <div role="listitem"><h2>往前走</h2><p>每个目标都落到一个下一步和一条真实结果。</p></div>
@@ -91,24 +95,34 @@
 
 <section class="sec" id="folder" aria-labelledby="relay-title">
   <div class="wrap relay">
-    <div>
+    <div class="relay-text">
       <h2 class="h2" id="relay-title">换一个 AI，<br>从同一份进度接着做。</h2>
       <p class="prose">资料放在你自己的文件夹里。今天用 ChatGPT，明天换 Claude、Codex 或 DeepSeek，读的都是同一份；Claude、Codex 这类本机客户端还能通过 MCP 直接读写。</p>
       <ul class="ai-list" aria-label="可以接着用的 AI"><li>ChatGPT</li><li>Claude</li><li>Gemini</li><li>DeepSeek</li><li>Kimi</li><li>豆包</li><li>Grok</li><li>Codex</li><li>Cursor</li></ul>
-      <div class="dev">
-        <p>已经在用 Claude Code、Codex 或 Cursor？把这句话交给它，在你的 GitHub 上建好私有的开图工作区：</p>
-        <div class="codeblock"><pre><code>帮我按 https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md 建立我的开图记忆，直接做完。</code></pre><button type="button" class="copy">复制</button></div>
-        <a class="more" href="/developers/">开发者指南 →</a>
-      </div>
     </div>
-    <figure class="tree" aria-label="资料文件夹"><ul><li><span>kaitu-ai-memory/</span></li><li><span><mark>AGENTS.md</mark></span><span class="note-text">每个 AI 先读这里</span></li><li><span>NOW.md</span><span class="note-text">今天</span></li><li><span>me/profile.md</span><span class="note-text">我是谁</span></li><li><span>me/goals.json</span><span class="note-text">想达成的事</span></li><li><span>memory/MEMORY.md</span><span class="note-text">记住的事</span></li><li><span>health/data/</span><span class="note-text">训练、睡眠、饮食</span></li><li><span>explore/data/</span><span class="note-text">足迹与方向</span></li><li><span>projects/</span><span class="note-text">在做的事</span></li></ul></figure>
+    <figure class="swap" data-swap aria-label="示意：换了 AI，进度接着往下记">
+      <div class="swap-head"><span>现在用的 AI</span><span class="swap-chip"><span>Codex</span></span></div>
+      <ol class="swap-rows">
+        <li class="done" data-ai="ChatGPT"><i></i><span>看清选项</span><b>ChatGPT</b><time>第 1 周</time></li>
+        <li class="done" data-ai="Claude"><i></i><span>定下第一步</span><b>Claude</b><time>第 2 周</time></li>
+        <li class="done" data-ai="DeepSeek"><i></i><span>记下实际结果</span><b>DeepSeek</b><time>第 3 周</time></li>
+        <li class="done now" data-ai="Codex"><i></i><span>根据结果调整</span><b>Codex</b><time>第 4 周</time></li>
+        <li class="next"><i></i><span>下一步</span><b></b><time>第 5 周</time></li>
+      </ol>
+    </figure>
+    <figure class="tree" data-anim aria-label="资料文件夹"><ul><li><span>kaitu-ai-memory/</span></li><li><span><mark>AGENTS.md</mark></span><span class="note-text">每个 AI 先读这里</span></li><li><span>NOW.md</span><span class="note-text">今天</span></li><li><span>me/profile.md</span><span class="note-text">我是谁</span></li><li><span>me/goals.json</span><span class="note-text">想达成的事</span></li><li><span>memory/MEMORY.md</span><span class="note-text">记住的事</span></li><li><span>health/data/</span><span class="note-text">训练、睡眠、饮食</span></li><li><span>explore/data/</span><span class="note-text">足迹与方向</span></li><li><span>projects/</span><span class="note-text">在做的事</span></li></ul></figure>
+    <div class="dev">
+      <p>已经在用 Claude Code、Codex 或 Cursor？把这句话交给它，在你的 GitHub 上建好私有的开图工作区：</p>
+      <div class="codeblock"><pre><code>帮我按 https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/guides/agent-memory/INSTALL.md 建立我的开图记忆，直接做完。</code></pre><button type="button" class="copy">复制</button></div>
+      <a class="more" href="/developers/">开发者指南 →</a>
+    </div>
   </div>
 </section>
 
 <section class="sec" id="privacy" aria-labelledby="keep-title">
   <div class="wrap">
     <div class="sec-head"><h2 class="h2" id="keep-title">资料一直是你的。</h2></div>
-    <dl class="facts">
+    <dl class="facts" data-anim>
       <div><dt>放在哪</dt><dd>这台电脑，或你选的 iCloud、Google Drive、坚果云。</dd></div>
       <div><dt>什么样</dt><dd>Markdown 和 JSON，任何编辑器都能打开，随时整份带走。</dd></div>
       <div><dt>改错了</dt><dd>每次写入都存一个版本，能退回。</dd></div>
@@ -144,9 +158,12 @@
 </section>
 
 <section class="sec origin" id="inspiration" aria-label="灵感来源">
-  <div class="wrap">
-    <blockquote>走过的路可以回看，接下来要去哪里，则像游戏里开地图一样，由自己决定。</blockquote>
-    <p>灵感来自邵艾伦 × 孙宇晨的访谈。 <a href="/vision/#inspiration">灵感来源 →</a></p>
+  <div class="wrap origin-grid">
+    <div class="unfold" data-anim aria-hidden="true"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="or-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="or-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#or-a)"><path class="mk-route mk-rf" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#or-b)"><path class="mk-route mk-ro" pathLength="1" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg></div>
+    <div>
+      <blockquote>走过的路可以回看，接下来要去哪里，则像游戏里开地图一样，由自己决定。</blockquote>
+      <p>灵感来自邵艾伦 × 孙宇晨的访谈。 <a href="/vision/#inspiration">灵感来源 →</a></p>
+    </div>
   </div>
 </section>
 

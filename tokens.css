@@ -66,3 +66,31 @@
     --shadow-card: 0 0 0 1px var(--line);
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1a1916;
+  --surface: #22201c;
+  --sunken: #1e1d1a;
+  --control: #2a2723;
+  --line: #34312c;
+  --line-strong: #4a463f;
+  --ink: #ece6da;
+  --ink2: #c2bbae;
+  --muted: #9e978a;
+  --link: #a3b9dd;
+  --link-soft: rgba(163, 185, 221, 0.12);
+  --primary: #a9bedf;
+  --primary-hover: #bfd0ea;
+  --on-primary: #16202e;
+  --now: #e8705a;
+  --mark: rgba(255, 230, 107, 0.3);
+  --pencil: #a9aba4;
+  --route: #8faed6;
+  --mark-fold0: #3a5a86;
+  --mark-fold1: #5c7daa;
+  --mark-fold2: #cfc4ad;
+  --mark-route-folded: #ece6da;
+  --mark-route-open: #3a5a86;
+  --shadow-shot: 0 0 0 1px rgba(236, 230, 218, 0.1), 0 28px 64px -28px rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 0 0 1px var(--line);
+}

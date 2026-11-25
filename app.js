@@ -1,6 +1,49 @@
-/* Kaitu site: language switch, tabs, copy buttons, docs TOC, latest release, OS-aware download link. Every page works without this file. */
+/* Kaitu site: language switch, motion, tabs, copy buttons, docs TOC, latest release, OS-aware download link. Every page works without this file. */
 (() => {
   const en = document.documentElement.lang === "en";
+
+  /* sticky header gets a hairline once the page moves */
+  const top = document.querySelector(".site-top");
+  if (top) {
+    const stuck = () => top.classList.toggle("is-stuck", scrollY > 8);
+    addEventListener("scroll", stuck, { passive: true });
+    stuck();
+  }
+
+  /* motion: decorative lines, dots and marks draw in when seen; text is readable before, during and after */
+  const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches && "IntersectionObserver" in window;
+  const seen = new Map();
+  const io = motion && new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target);
+      seen.get(e.target)?.();
+    }
+  }, { rootMargin: "0px 0px -18% 0px" });
+  const onSeen = (el, fn) => { if (!io) return; seen.set(el, fn); io.observe(el); };
+  if (motion) {
+    document.documentElement.classList.add("motion");
+    for (const el of document.querySelectorAll("[data-anim]")) onSeen(el, () => el.classList.add("is-in"));
+    addEventListener("beforeprint", () => document.querySelectorAll("[data-anim]").forEach((el) => el.classList.add("is-in")));
+  }
+
+  /* swap: the AI changes, the list keeps going; it rests on the finished list */
+  const swap = document.querySelector("[data-swap]");
+  if (swap && motion) {
+    const rows = [...swap.querySelectorAll("li[data-ai]")];
+    const chip = swap.querySelector(".swap-chip");
+    const label = chip?.firstElementChild;
+    const step = (i) => {
+      rows.forEach((row, j) => {
+        row.classList.toggle("done", j <= i);
+        row.classList.toggle("now", j === i);
+        row.classList.toggle("lit", j === i);
+      });
+      if (label) { label.textContent = rows[i].dataset.ai; chip.classList.remove("flip"); void chip.offsetWidth; chip.classList.add("flip"); }
+      if (i + 1 < rows.length) setTimeout(() => step(i + 1), 1150);
+    };
+    onSeen(swap, () => setTimeout(() => step(0), 250));
+  }
 
   /* language switch: remember the choice, keep the hash */
   for (const a of document.querySelectorAll("[data-lang-switch]")) {
@@ -23,6 +66,10 @@
     const caption = document.createElement("p");
     caption.className = "tab-caption";
     caption.setAttribute("aria-live", "polite");
+    const pill = document.createElement("span");
+    pill.className = "tab-pill";
+    pill.setAttribute("aria-hidden", "true");
+    list.append(pill);
     const tabs = panels.map((panel, i) => {
       const tab = document.createElement("button");
       tab.type = "button";
@@ -36,7 +83,14 @@
       list.append(tab);
       return tab;
     });
+    let current = 0;
+    const place = () => {
+      const tab = tabs[current];
+      pill.style.width = `${tab.offsetWidth}px`;
+      pill.style.transform = `translateX(${tab.offsetLeft}px)`;
+    };
     const select = (i, focus) => {
+      current = i;
       tabs.forEach((tab, j) => {
         const on = i === j;
         tab.setAttribute("aria-selected", String(on));
@@ -44,9 +98,14 @@
         panels[j].toggleAttribute("data-on", on);
       });
       caption.textContent = panels[i].querySelector("p")?.textContent ?? "";
+      place();
       if (focus) tabs[i].focus();
     };
-    tabs.forEach((tab, i) => tab.addEventListener("click", () => select(i)));
+    tabs.forEach((tab, i) => tab.addEventListener("click", () => {
+      select(i);
+      try { history.replaceState(null, "", `#${panels[i].id}`); } catch {}
+    }));
+    if ("ResizeObserver" in window) new ResizeObserver(place).observe(list);
     list.addEventListener("keydown", (e) => {
       const i = tabs.indexOf(document.activeElement);
       if (i < 0) return;
