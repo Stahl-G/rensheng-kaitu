@@ -1,6 +1,7 @@
-import type { DirectionMapState, DirectionQuote } from "@kaitu/core";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { DirectionMapState, DirectionQuote, PlanGoal } from "@kaitu/core";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import css from "./DirectionMap.module.css";
+import { type GoalPlanActions, useGoalPlanning } from "./Plans.js";
 import { ReadWarnings } from "./ReadWarnings.js";
 import { type Locale, useLocale, useT } from "./i18n.js";
 import { plainStamp } from "./next-presentation.js";
@@ -21,7 +22,11 @@ export function DirectionMap({
   openProject,
   openGoal,
   openDirection,
+  planGoals,
+  planActions,
 }: {
+  planGoals?: PlanGoal[];
+  planActions: GoalPlanActions;
   load: (locale: Locale) => Promise<DirectionMapState>;
   generate: (locale: Locale) => Promise<DirectionMapState>;
   dismiss: (goal: string, project: string) => Promise<DirectionMapState>;
@@ -32,6 +37,7 @@ export function DirectionMap({
 }) {
   const t = useT();
   const locale = useLocale();
+  const { feedback, renderGoal } = useGoalPlanning(planActions, "map");
   const [state, setState] = useState<DirectionMapState | null>(null);
   const [error, setError] = useState("");
   const board = useRef<HTMLDivElement>(null);
@@ -59,7 +65,13 @@ export function DirectionMap({
   const map = state?.map;
   const input = state?.input;
   const links = map?.links ?? [];
-  const goals = input?.goals ?? [];
+  // The overview supplies live results and next steps, including older goals without a status.
+  const goals = useMemo(() => {
+    const facts = new Map(input?.goals.map((goal) => [goal.id, goal]));
+    return planGoals
+      ? planGoals.map((plan) => ({ id: plan.id, title: plan.title, why: facts.get(plan.id)?.why, plan }))
+      : (input?.goals.map((goal) => ({ ...goal, plan: undefined })) ?? []);
+  }, [input, planGoals]);
   const toneOf = (goal: string): string =>
     tones[
       Math.max(
@@ -105,8 +117,9 @@ export function DirectionMap({
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(root);
+    for (const card of Array.from(root.querySelectorAll("[data-node]"))) observer.observe(card);
     return () => observer.disconnect();
-  }, [map, input, state?.next]);
+  }, [map, input, state?.next, goals]);
 
   const projects = input?.projects ?? [];
   // 还没有目标和项目时没有可看的，不放「让开图看一看」。
@@ -158,6 +171,7 @@ export function DirectionMap({
   };
   return (
     <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
+      {feedback}
       {header}
       <ReadWarnings warnings={input?.warnings} />
       {state.stale && (
@@ -210,6 +224,7 @@ export function DirectionMap({
                   <strong>{goal.title}</strong>
                 )}
                 {goal.why && <p>{goal.why}</p>}
+                {goal.plan && renderGoal(goal.plan)}
               </div>
             ))}
             {!!input?.directions.length && (

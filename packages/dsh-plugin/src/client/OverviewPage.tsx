@@ -1,5 +1,5 @@
 import type { OnboardingMatter as Matter, OnboardingStatus } from "@kaitu/core";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CalendarData, InboxEntry, LibraryData, MeData, OverviewData } from "../types.js";
 import { KaituMark } from "./Brand.js";
 import { CalendarPage, type CalendarPageProps } from "./CalendarPage.js";
@@ -49,6 +49,7 @@ import {
 import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 import type { OnboardingServices } from "./onboarding-services.js";
+import { createOverviewRefresh } from "./overview-refresh.js";
 import { type PanelNavigation, type View, usePanelNavigation } from "./panel-navigation.js";
 import type { RecordTarget } from "./progress-map.js";
 
@@ -112,6 +113,7 @@ export interface OverviewPageProps
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
     onOrganize?: (source: string, draft?: string) => Promise<void>,
+    workspace?: string,
   ) => ReactNode;
 }
 const modules = [
@@ -311,7 +313,6 @@ function Overview({
   } | null>(null);
   const [exploreError, setExploreError] = useState("");
   const [exploreAttempt, setExploreAttempt] = useState(0);
-  const planning = useRef<HTMLDivElement>(null);
   // Read only on entering Explore or an explicit retry, never on unrelated workspace notifications.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Explicit retry refreshes failed projections.
   useEffect(() => {
@@ -643,18 +644,26 @@ function Overview({
   const [configureRequest, setConfigureRequest] = useState(0);
   const [configureBuiltin, setConfigureBuiltin] = useState(false);
   const [theme, setTheme] = useState("light");
-  const sequence = useRef(0);
+  const overviewReads = useRef<ReturnType<typeof createOverviewRefresh> | null>(null);
   const writing = useRef(false);
   const refreshPending = useRef(false);
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => overviewReads.current?.refresh() ?? Promise.resolve(), []);
+  const refreshWorkspace = useCallback(() => {
+    overviewReads.current?.invalidate();
+    return refresh();
+  }, [refresh]);
+  useLayoutEffect(() => {
     if (!locale) return;
-    const seq = ++sequence.current;
-    try {
+    const reads = createOverviewRefresh(async (current) => {
       setError("");
-      const update = <T,>(load: () => Promise<T>, apply: (value: T) => void) =>
-        load().then((value) => {
-          if (seq === sequence.current) apply(value);
-        });
+      const update = async <T,>(load: () => Promise<T>, apply: (value: T) => void) => {
+        try {
+          const value = await load();
+          if (current()) apply(value);
+        } catch (err) {
+          if (current()) setError(err instanceof Error ? err.message : String(err));
+        }
+      };
       await Promise.all([
         update(props.load, setData),
         update(props.loadCalendar, setCalendar),
@@ -667,19 +676,16 @@ function Overview({
           },
         ),
       ]);
-    } catch (err) {
-      if (seq === sequence.current) setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [locale, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding]);
-  useEffect(() => {
-    if (!homeReady) return;
+    });
+    overviewReads.current = reads;
     // The first screen uses its own projection; unrelated reads start after React can paint it.
-    const timer = setTimeout(() => void refresh(), 0);
+    const timer = homeReady ? setTimeout(() => void reads.refresh(), 0) : undefined;
     return () => {
       clearTimeout(timer);
-      sequence.current++;
+      reads.invalidate();
+      overviewReads.current = null;
     };
-  }, [refresh, homeReady]);
+  }, [locale, homeReady, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding]);
   useEffect(
     () =>
       homeReady
@@ -1046,15 +1052,18 @@ function Overview({
     if (todaySession.current.root === root) void refresh();
     return response;
   };
+  const planActions = {
+    resultSession: todaySession.current.board,
+    resultAction,
+    addGoalNext: props.addGoalNext,
+    changeNext: props.changeOnboardingNext,
+    refresh,
+  };
   const plansCard = data?.plans && (
     <PlansCard
+      {...planActions}
       plans={data.plans}
-      resultSession={todaySession.current.board}
-      resultAction={resultAction}
       goalId={view === "records" && record === "projects" ? libraryGoal : undefined}
-      addGoalNext={props.addGoalNext}
-      changeNext={props.changeOnboardingNext}
-      refresh={refresh}
       open={(section) => (section === "projects" ? openRecord("projects") : openSection("directions"))}
     />
   );
@@ -1313,11 +1322,11 @@ function Overview({
         onConnect={() => openAskSettings("ai")}
         planningContent={
           <>
-            <div ref={planning} id="direction-plans" tabIndex={-1}>
-              {plansCard}
-            </div>
             {props.loadDirectionMap && props.generateDirectionMap && props.dismissDirectionLink ? (
               <DirectionMap
+                key={workspaceRoot}
+                planGoals={data?.plans.goals}
+                planActions={planActions}
                 load={props.loadDirectionMap}
                 generate={props.generateDirectionMap}
                 dismiss={props.dismissDirectionLink}
@@ -1329,13 +1338,16 @@ function Overview({
                 openDirection={(id) => openTarget({ kind: "direction", id }, "directions")}
               />
             ) : (
-              <ProgressMap
-                plans={data?.plans}
-                projects={data?.projects ?? []}
-                loadExploration={props.loadExploration}
-                subscribe={props.subscribe}
-                open={(target) => openTarget(target, "directions")}
-              />
+              <>
+                {plansCard}
+                <ProgressMap
+                  plans={data?.plans}
+                  projects={data?.projects ?? []}
+                  loadExploration={props.loadExploration}
+                  subscribe={props.subscribe}
+                  open={(target) => openTarget(target, "directions")}
+                />
+              </>
             )}
             {!data?.plans.goals.length && (
               <button type="button" className={css.btn} onClick={() => startMatter("")}>
@@ -2130,6 +2142,7 @@ function Overview({
                 setReviewClipboard(true);
                 setReviewMatter(matter);
               },
+              workspaceRoot,
             )}
           </div>
         )}
@@ -2141,10 +2154,10 @@ function Overview({
             navigate={setView}
             restartGuide={() => startGuide()}
             onImportMemory={() => startGuide(5)}
-            refreshWorkspace={refresh}
+            refreshWorkspace={refreshWorkspace}
             onWorkspaceCreated={async () => {
               await props.chooseOnboarding({ storage: true });
-              await refresh();
+              await refreshWorkspace();
               startGuide();
             }}
             channelSettings={props.channelSettings}
