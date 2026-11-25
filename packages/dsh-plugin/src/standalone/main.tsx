@@ -18,6 +18,7 @@ const route = new URLSearchParams(window.location.hash.slice(1));
 const initialChatDraft = route.get("kaitu-chat-draft") ?? "";
 if (initialChatDraft)
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
+
 const props: OverviewPageProps = {
   speech: (action, locale) => call("speech", action, locale),
   initialChatDraft,
@@ -75,10 +76,12 @@ const props: OverviewPageProps = {
     newConversation,
     autoSubmit,
     onOrganize,
-    workspace = "",
+    context,
   ) => (
     <AskPage
-      workspace={workspace}
+      key={context?.workspace}
+      workspace={context?.workspace ?? ""}
+      portraitDraft={context?.portrait}
       active={active}
       autoSubmit={autoSubmit}
       onOrganize={onOrganize}
@@ -160,6 +163,7 @@ const props: OverviewPageProps = {
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),
   loadHome: () => call("home"),
+  openLifePortrait: (root, file) => call("openLifePortrait", root, file),
   // 服务端签名和插件一样收发 JSON 字符串。
   resultDraft: async (root, value, expected) =>
     JSON.parse(await call<string>("resultDraft", root, JSON.stringify(value), JSON.stringify(expected))),

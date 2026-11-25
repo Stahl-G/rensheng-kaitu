@@ -214,7 +214,7 @@ export function createHomeCache(
     clearTimeout(timer);
     timer = setTimeout(rebuild, 100);
   }
-  if (!cached) timer = setTimeout(rebuild, 0);
+  if (cached?.value.data?.portrait?.root !== ws.root) timer = setTimeout(rebuild, 0);
   const check = setInterval(() => {
     if (paused || closed || pending !== null) return;
     try {

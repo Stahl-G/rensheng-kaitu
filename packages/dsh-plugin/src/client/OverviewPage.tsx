@@ -22,7 +22,7 @@ import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryP
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { LifeAtlasPage, type LifeAtlasPageProps } from "./LifeAtlasPage.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
-import type { MePageProps } from "./MePage.js";
+import { ExhibitionEntry, type MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
@@ -39,6 +39,7 @@ import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
 import { WorkPage } from "./WorkPage.js";
+import { type PortraitDraft, lifePortraitPrompt } from "./ask-handoff.js";
 import {
   type ExploreModule,
   defaultExploreEntries,
@@ -90,6 +91,7 @@ export interface OverviewPageProps
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
   resultDraft?: import("./result-session.js").DraftTransport;
   resultAction?: import("./result-session.js").ResultTransport;
+  openLifePortrait?: (root: string, file: string) => Promise<{ opened: boolean }>;
   loadHome?: () => Promise<import("@kaitu/core").HomeState>;
   subscribeHome?: (update: (state: import("@kaitu/core").HomeState) => void) => () => void;
   load: () => Promise<OverviewData>;
@@ -113,7 +115,7 @@ export interface OverviewPageProps
     newConversation: boolean,
     autoSubmit?: import("./ask-handoff.js").AskAutoSubmit,
     onOrganize?: (source: string, draft?: string) => Promise<void>,
-    workspace?: string,
+    context?: { workspace: string; portrait?: PortraitDraft },
   ) => ReactNode;
 }
 const modules = [
@@ -530,13 +532,15 @@ function Overview({
     const loadHome = props.loadHome;
     if (!loadHome) return;
     let live = true;
+    let revision = 0;
     const refresh = () => {
+      const request = ++revision;
       void loadHome()
         .then((value) => {
-          if (live) setHomeState(value);
+          if (live && revision === request) setHomeState(value);
         })
         .catch(() => {
-          if (live)
+          if (live && revision === request)
             setHomeState((current) => ({
               data: current?.data ?? null,
               loading: false,
@@ -547,6 +551,7 @@ function Overview({
     refresh();
     const unsubscribe = props.subscribeHome
       ? props.subscribeHome((value) => {
+          revision++;
           if (live) setHomeState(value);
         })
       : props.subscribe?.(refresh);
@@ -555,6 +560,7 @@ function Overview({
       unsubscribe?.();
     };
   }, [props.loadHome, props.subscribe, props.subscribeHome]);
+  const openLifePortrait = props.openLifePortrait;
   const homeReady = !props.loadHome || !!homeState?.data || !!homeState?.error;
   const homePresentation = data ?? homeState?.presentation;
   const readWarnings = data?.warnings ?? homeState?.presentation?.warnings ?? [];
@@ -615,11 +621,13 @@ function Overview({
   const [receipt, setReceipt] = useState("");
   const [busy, setBusy] = useState(false);
   const [askVisited, setAskVisited] = useState(false);
+  const [portraitDraft, setPortraitDraft] = useState<PortraitDraft>();
   const [inlineAsk, setInlineAsk] = useState(false);
   const askOrigin = useRef<HTMLElement | null>(null);
   const askLauncher = useRef<HTMLButtonElement>(null);
   const restoreAskFocus = useRef(false);
   const openInlineAsk = () => {
+    setPortraitDraft(undefined);
     if (!inlineAsk) askOrigin.current = document.activeElement as HTMLElement | null;
     setAskVisited(true);
     setInlineAsk(true);
@@ -634,13 +642,23 @@ function Overview({
     }
   }, [inlineAsk]);
   const closeInlineAsk = () => {
+    setPortraitDraft(undefined);
     restoreAskFocus.current = true;
     setInlineAsk(false);
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: navigation dismisses the contextual panel.
   useEffect(() => {
     setInlineAsk(false);
+    setPortraitDraft(undefined);
   }, [view]);
+  const askWorkspace = useRef(workspaceRoot);
+  useEffect(() => {
+    if (askWorkspace.current && askWorkspace.current !== workspaceRoot) {
+      setInlineAsk(false);
+      setPortraitDraft(undefined);
+    }
+    askWorkspace.current = workspaceRoot;
+  }, [workspaceRoot]);
   const [configureRequest, setConfigureRequest] = useState(0);
   const [configureBuiltin, setConfigureBuiltin] = useState(false);
   const [theme, setTheme] = useState("light");
@@ -2142,7 +2160,10 @@ function Overview({
                 setReviewClipboard(true);
                 setReviewMatter(matter);
               },
-              workspaceRoot,
+              {
+                workspace: workspaceRoot ?? "",
+                portrait: inlineAsk && portraitDraft?.root === workspaceRoot ? portraitDraft : undefined,
+              },
             )}
           </div>
         )}
@@ -2154,6 +2175,22 @@ function Overview({
             navigate={setView}
             restartGuide={() => startGuide()}
             onImportMemory={() => startGuide(5)}
+            exhibition={
+              openLifePortrait &&
+              props.renderAsk &&
+              workspaceRoot &&
+              homeState?.data?.portrait?.root === workspaceRoot ? (
+                <ExhibitionEntry
+                  key={JSON.stringify([workspaceRoot, homeState.data.portrait.file])}
+                  file={homeState.data.portrait.file}
+                  open={(file) => openLifePortrait(workspaceRoot, file)}
+                  generate={() => {
+                    openInlineAsk();
+                    setPortraitDraft({ root: workspaceRoot, text: lifePortraitPrompt(t) });
+                  }}
+                />
+              ) : undefined
+            }
             refreshWorkspace={refreshWorkspace}
             onWorkspaceCreated={async () => {
               await props.chooseOnboarding({ storage: true });

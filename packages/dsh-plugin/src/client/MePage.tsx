@@ -1,10 +1,65 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { MeData, MeRules } from "../types.js";
 import { AvatarCropDialog } from "./AvatarCropDialog.js";
 import css from "./Prototype.module.css";
 import { ReadWarnings } from "./ReadWarnings.js";
 import { useT } from "./i18n.js";
 import { memoryDisplayText } from "./memory-presentation.js";
+
+/** 人生展览是关于你自己的作品，入口放在个人档案的操作里，不占今天页。 */
+export function ExhibitionEntry({
+  file,
+  open,
+  generate,
+}: {
+  file: string | null;
+  open: (file: string) => Promise<{ opened: boolean }>;
+  generate: () => void;
+}) {
+  const t = useT();
+  const opening = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const openFile = async () => {
+    if (!file || opening.current) return;
+    opening.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await open(file);
+      if (!result.opened) setError(t("展览文件已变更", "The exhibition file has changed"));
+    } catch {
+      setError(t("未能打开展览，请重试", "Couldn’t open the exhibition. Try again."));
+    } finally {
+      setBusy(false);
+      opening.current = false;
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        className={`${css.btn} ${css["btn-quiet"]}`}
+        disabled={busy}
+        onClick={(event) => {
+          if (event.detail > 1) return;
+          if (file) void openFile();
+          else generate();
+        }}
+      >
+        {file
+          ? t("打开人生展览", "Open life exhibition")
+          : t("生成我的人生展览", "Create my life exhibition")}
+      </button>
+      {file && (
+        <button type="button" className={`${css.btn} ${css["btn-quiet"]}`} disabled={busy} onClick={generate}>
+          {t("重新生成", "Create again")}
+        </button>
+      )}
+      {error && <output className={css.small}>{error}</output>}
+    </>
+  );
+}
 
 const GOAL_SOURCES: Record<string, [string, string]> = {
   chatgpt: ["从 ChatGPT 搬来", "From ChatGPT"],
@@ -42,6 +97,7 @@ export interface MePageProps {
   removeAvatar: () => Promise<void>;
   onPrompt: (text: string) => void;
   onImportMemory: () => void;
+  exhibition?: ReactNode;
 }
 const areas: Record<string, string> = {
   today: "今天",
@@ -135,6 +191,7 @@ export function MePage({
   removeAvatar,
   onPrompt,
   onImportMemory,
+  exhibition,
 }: MePageProps) {
   const t = useT();
   const [data, setData] = useState<MeData | null>(null);
@@ -303,6 +360,7 @@ export function MePage({
               <b>{data.name ?? "还没有填写名字"}</b>
               <span className={css.small}>{data.bio}</span>
             </span>
+            {exhibition}
             <button type="button" className={`${css.btn} ${css["btn-quiet"]}`} onClick={onImportMemory}>
               {t("从 AI 搬来记忆", "Bring memories from your AI")}
             </button>
