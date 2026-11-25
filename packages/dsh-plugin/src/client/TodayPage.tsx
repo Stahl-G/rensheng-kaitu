@@ -21,63 +21,8 @@ import {
   todaySourceGroups,
 } from "./next-presentation.js";
 
-export function ExhibitionEntry({
-  file,
-  open,
-  generate,
-}: {
-  file: string | null;
-  open: (file: string) => Promise<{ opened: boolean }>;
-  generate: () => void;
-}) {
-  const t = useT();
-  const opening = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const openFile = async () => {
-    if (!file || opening.current) return;
-    opening.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await open(file);
-      if (!result.opened) setError(t("展览文件已变更", "The exhibition file has changed"));
-    } catch {
-      setError(t("未能打开展览，请重试", "Couldn’t open the exhibition. Try again."));
-    } finally {
-      setBusy(false);
-      opening.current = false;
-    }
-  };
-  return (
-    <div className={todayCss.exhibition}>
-      <button
-        type="button"
-        className={todayCss.exhibitionPrimary}
-        disabled={busy}
-        onClick={(event) => {
-          if (event.detail > 1) return;
-          if (file) void openFile();
-          else generate();
-        }}
-      >
-        {file
-          ? t("打开人生展览", "Open life exhibition")
-          : t("生成我的人生展览", "Create my life exhibition")}
-      </button>
-      {file && (
-        <button type="button" className={todayCss.regenerate} onClick={generate}>
-          {t("重新生成", "Create again")}
-        </button>
-      )}
-      {error && <output>{error}</output>}
-    </div>
-  );
-}
-
 export function LifeHome({
   home,
-  exhibition,
   save,
   data,
   firstVisit,
@@ -111,7 +56,6 @@ export function LifeHome({
   reviewLinks,
   session,
 }: {
-  exhibition?: ReactNode;
   session?: TodayBoardSession;
   resultAction?: import("./result-session.js").ResultTransport;
   schedule?: ReactNode;
@@ -330,12 +274,7 @@ export function LifeHome({
       <header className={todayCss.homeHeading}>
         <div className={todayCss.dateWeather}>
           <p className={css.eyebrow}>{todayDate(data.today, locale)}</p>
-          {home && (
-            <div className={todayCss.todayTitle}>
-              <h1>{t("今天", "Today")}</h1>
-              {exhibition}
-            </div>
-          )}
+          {home && <h1>{t("今天", "Today")}</h1>}
           {weather && <div className={todayCss.weatherSlot}>{weather}</div>}
         </div>
         {!home && !firstVisit && (

@@ -902,47 +902,6 @@
   gap: 16px;
   position: relative;
 }
-.todayTitle {
-  order: 2;
-  flex-basis: 100%;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-}
-.savepointHome .todayTitle h1 {
-  order: 0;
-  flex-basis: auto;
-  margin: 0;
-}
-.exhibition {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.exhibitionPrimary,
-.regenerate {
-  font: inherit;
-  cursor: pointer;
-}
-.exhibitionPrimary {
-  border: 1px solid var(--ink);
-  border-radius: 6px;
-  background: var(--paper);
-  color: var(--ink);
-  padding: 6px 12px;
-  font-size: 14px;
-  font-weight: 600;
-}
-.regenerate {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 .resultWeek {
   display: flex;
   gap: 7px;

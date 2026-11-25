@@ -22,7 +22,7 @@ import { InboxPage, LibraryPage, type LibraryProps, NotesPage } from "./LibraryP
 import { HealthLibrary, ProjectsLibrary } from "./LibrarySummaries.js";
 import { LifeAtlasPage, type LifeAtlasPageProps } from "./LifeAtlasPage.js";
 import { MapPage, type MapPageProps } from "./MapPage.js";
-import type { MePageProps } from "./MePage.js";
+import { ExhibitionEntry, type MePageProps } from "./MePage.js";
 import { NavigationIcon, SettingsIcon } from "./NavigationIcon.js";
 import { NewsPage, type NewsPageProps } from "./NewsPage.js";
 import { OnboardingMatter, OnboardingNextCard } from "./OnboardingMatter.js";
@@ -35,7 +35,7 @@ import css from "./Prototype.module.css";
 import { WarningText } from "./ReadWarnings.js";
 import type { ResumeServices } from "./ResumeImport.js";
 import { createTodayBoardSession } from "./TodayBoard.js";
-import { ExhibitionEntry, LifeHome, TodayTasks } from "./TodayPage.js";
+import { LifeHome, TodayTasks } from "./TodayPage.js";
 import todayCss from "./TodayPage.module.css";
 import { TodayWeather } from "./Weather.js";
 import { WorkPage } from "./WorkPage.js";
@@ -1571,22 +1571,6 @@ function Overview({
             <>
               <LifeHome
                 home={homeState}
-                exhibition={
-                  openLifePortrait &&
-                  props.renderAsk &&
-                  workspaceRoot &&
-                  homeState?.data?.portrait?.root === workspaceRoot ? (
-                    <ExhibitionEntry
-                      key={JSON.stringify([workspaceRoot, homeState.data.portrait.file])}
-                      file={homeState.data.portrait.file}
-                      open={(file) => openLifePortrait(workspaceRoot, file)}
-                      generate={() => {
-                        openInlineAsk();
-                        setPortraitDraft({ root: workspaceRoot, text: lifePortraitPrompt(t) });
-                      }}
-                    />
-                  ) : undefined
-                }
                 session={todaySession.current.board}
                 resultAction={resultAction}
                 schedule={
@@ -2191,6 +2175,22 @@ function Overview({
             navigate={setView}
             restartGuide={() => startGuide()}
             onImportMemory={() => startGuide(5)}
+            exhibition={
+              openLifePortrait &&
+              props.renderAsk &&
+              workspaceRoot &&
+              homeState?.data?.portrait?.root === workspaceRoot ? (
+                <ExhibitionEntry
+                  key={JSON.stringify([workspaceRoot, homeState.data.portrait.file])}
+                  file={homeState.data.portrait.file}
+                  open={(file) => openLifePortrait(workspaceRoot, file)}
+                  generate={() => {
+                    openInlineAsk();
+                    setPortraitDraft({ root: workspaceRoot, text: lifePortraitPrompt(t) });
+                  }}
+                />
+              ) : undefined
+            }
             refreshWorkspace={refreshWorkspace}
             onWorkspaceCreated={async () => {
               await props.chooseOnboarding({ storage: true });
