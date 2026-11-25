@@ -1485,6 +1485,24 @@
   justify-content: flex-end;
   gap: 4px 12px;
 }
+.mapGoalPlan {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.mapGoalPlan .planNext {
+  justify-content: flex-start;
+}
+.mapGoalPlan .chip {
+  display: inline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.mapGoalPlan + form {
+  padding: 12px 0 0;
+}
 .handover h2 {
   margin: 0;
   font-size: 19px;

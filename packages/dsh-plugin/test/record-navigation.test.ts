@@ -112,7 +112,7 @@ async function setup(extra: Partial<OverviewPageProps> = {}) {
     app = create(createElement(OverviewPage, props));
   });
   await vi.waitFor(() => expect(app.root.findByType(LifeHome).props.home?.data).toBeTruthy());
-  return { ws, app, project, direction };
+  return { ws, app, project, direction, props };
 }
 async function click(app: ReactTestRenderer, text: string) {
   const button = app.root
@@ -185,6 +185,12 @@ test("map record actions open the matching saved goal, project and direction", a
     await click(app, "方向");
     const goal = (await readOverviewPage(ws)).plans.goals[0];
     if (!goal) throw new Error("Goal missing");
+    await vi.waitFor(() => {
+      const card = app.root.findByType(DirectionMap).findByProps({ "data-node": `goal:${goal.id}` });
+      expect(card.findAllByType("button").map((button) => button.children)).toContainEqual(["完成"]);
+      expect(card.findAllByType("button").map((button) => button.children)).toContainEqual(["改期"]);
+    });
+    expect(app.root.findAllByType(PlansCard)).toHaveLength(0);
     await click(app, "合成导航目标");
     expect(app.root.findByType(PlansCard).findByProps({ id: `plan-${goal.id}` })).toBeTruthy();
     expect(app.root.findByType(PlansCard).props.plans.projects).toBeGreaterThan(0);
@@ -363,6 +369,54 @@ test("global shortcuts follow the selected step but never take native text undo 
         .findAllByType("button")
         .some((button) => button.children.includes("撤销")),
     ).toBe(false);
+  } finally {
+    await act(async () => app.unmount());
+    rmSync(ws.root, { recursive: true, force: true });
+  }
+});
+
+test("a workspace event and a goal save refresh the latest plan even after leaving the map", async () => {
+  const listeners = new Set<() => void>();
+  const { ws, app, props } = await setup({
+    subscribe: (callback) => {
+      listeners.add(callback);
+      return () => listeners.delete(callback);
+    },
+  });
+  try {
+    await navigate(app, "开图");
+    await click(app, "方向");
+    const before = await readOverviewPage(ws);
+    const read = Promise.withResolvers<typeof before>();
+    const afterWrite = Promise.withResolvers<typeof before>();
+    const latest = {
+      ...before,
+      plans: {
+        ...before.plans,
+        goals: before.plans.goals.map((goal) => ({ ...goal, title: "合成同步目标" })),
+      },
+    };
+    const load = vi
+      .fn<OverviewPageProps["load"]>()
+      .mockReturnValueOnce(read.promise)
+      .mockReturnValueOnce(afterWrite.promise)
+      .mockResolvedValue(latest);
+    await act(async () => app.update(createElement(OverviewPage, { ...props, load })));
+    await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    let saved!: Promise<void>;
+    await act(async () => {
+      for (const notify of listeners) notify();
+      saved = app.root.findByType(DirectionMap).props.planActions.refresh();
+    });
+    expect(load).toHaveBeenCalledTimes(1);
+    await navigate(app, "今天");
+    await act(async () => read.resolve(before));
+    expect(load).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      afterWrite.resolve(latest);
+      await saved;
+    });
+    expect(app.root.findByType(LifeHome).props.data.plans.goals[0].title).toBe("合成同步目标");
   } finally {
     await act(async () => app.unmount());
     rmSync(ws.root, { recursive: true, force: true });
