@@ -1,0 +1,44 @@
+name: Windows relocation evidence (temporary branch)
+on:
+  push:
+    branches: [codex/diagnose-windows-sync-400-1125]
+permissions:
+  contents: read
+jobs:
+  relocation:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @kaitu/core build
+      - name: Instrument synthetic HTTP errors and repeat the three existing tests
+        shell: python
+        run: |
+          import pathlib
+          src=pathlib.Path('packages/cli/src/ui/server.ts')
+          t=src.read_text('utf-8')
+          needle='    } catch (error) {\n      const locale ='
+          assert t.count(needle)==1
+          src.write_text(t.replace(needle,'    } catch (error) {\n      console.error("SYNTHETIC_HTTP", req.url, error);\n      const locale ='),'utf-8')
+          for path, title in [
+              ('packages/cli/test/ui.test.ts','开启同步后用原来的'),
+              ('packages/cli/test/ui-watchers.test.ts','closes old directory listeners'),
+              ('packages/core/test/note-search.test.ts','正文索引支持中英文'),
+          ]:
+              p=pathlib.Path(path)
+              t=p.read_text('utf-8')
+              start=t.index('it("'+title)
+              end=t.index(' => {',start)
+              header=t[start:end]
+              header=header.replace('it("', 'it.each(Array.from({length:50}, (_,i)=>i+1))("stress %i ')
+              header=header.replace('async ()','async (_run)').replace('async (context)','async (_run, context)')
+              p.write_text(t[:start]+header+t[end:],'utf-8')
+      - run: pnpm exec vitest run packages/cli/test/ui.test.ts packages/cli/test/ui-watchers.test.ts packages/core/test/note-search.test.ts -t "stress " --reporter=verbose --silent=false
