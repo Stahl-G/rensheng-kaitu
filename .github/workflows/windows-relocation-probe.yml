@@ -31,17 +31,33 @@ jobs:
           needle='    } catch (error) {\n      const locale ='
           assert t.count(needle)==1
           src.write_text(t.replace(needle,'    } catch (error) {\n      console.error("SYNTHETIC_HTTP", req.url, error);\n      const locale ='),'utf-8')
+          core=pathlib.Path('packages/core/src/drive.ts')
+          old='    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;'
+          probe='''
+              if ((error as NodeJS.ErrnoException).code === "EPERM" && target.endsWith(".kaitu")) {
+                const info: Record<string, unknown> = {stage:"restore-private-state", targetExists:existsSync(target), sourceExists:existsSync(source)};
+                // Synthetic runner ONLY: try the untouched source under a fresh sibling name;
+                // this distinguishes a still-busy source from reuse of the just-removed destination.
+                const alt=source+".probe-private-state";
+                let moved=false;
+                try { renameSync(source,alt); moved=true; info.sourceSibling="ok"; }
+                catch(e) {info.sourceSibling=(e as NodeJS.ErrnoException).code}
+                if (moved) renameSync(alt,source);
+                try {mkdirSync(target); info.newTargetDirectory="ok"; rmSync(target)}
+                catch(e){info.newTargetDirectory=(e as NodeJS.ErrnoException).code; if (info.newTargetDirectory==="ERR_FS_EISDIR") rmSync(target,{recursive:true})}
+                console.error("SYNTHETIC_SOURCE_TARGET", JSON.stringify(info));
+              }
+          '''
+          c=core.read_text('utf-8');assert c.count(old)==1; core.write_text(c.replace(old,probe+old),'utf-8')
           for path, title in [
               ('packages/cli/test/ui.test.ts','开启同步后用原来的'),
-              ('packages/cli/test/ui-watchers.test.ts','closes old directory listeners'),
-              ('packages/core/test/note-search.test.ts','正文索引支持中英文'),
           ]:
               p=pathlib.Path(path)
               t=p.read_text('utf-8')
               start=t.index('it("'+title)
               end=t.index(' => {',start)
               header=t[start:end]
-              header=header.replace('it("', 'it.for(Array.from({length:50}, (_,i)=>i+1))("stress %i ')
+              header=header.replace('it("', 'it.for(Array.from({length:120}, (_,i)=>i+1))("stress %i ')
               header=header.replace('async ()','async (_run)').replace('async (context)','async (_run, context)')
               p.write_text(t[:start]+header+t[end:],'utf-8')
-      - run: pnpm exec vitest run packages/cli/test/ui.test.ts packages/cli/test/ui-watchers.test.ts packages/core/test/note-search.test.ts -t "stress " --reporter=verbose --silent=false
+      - run: pnpm exec vitest run packages/cli/test/ui.test.ts -t "stress " --reporter=verbose --silent=false
