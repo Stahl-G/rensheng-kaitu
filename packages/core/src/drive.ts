@@ -4,11 +4,13 @@ import {
   accessSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
   renameSync,
   rmSync,
+  rmdirSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -104,6 +106,59 @@ function move(source: string, target: string) {
       throw copyError;
     }
     rmSync(source, { recursive: true });
+  }
+}
+
+/** NTFS refuses to rename a directory with an open descendant even when that
+ * file itself is share-delete and can be renamed. Split only the refused
+ * directories, keeping the normal and cross-volume move paths unchanged. */
+function restoreLocalState(source: string, target: string) {
+  const refused = (error: unknown) => {
+    const io = error as NodeJS.ErrnoException;
+    return (
+      process.platform === "win32" && io.syscall === "rename" && (io.code === "EPERM" || io.code === "EBUSY")
+    );
+  };
+  try {
+    move(source, target);
+    return;
+  } catch (error) {
+    if (!refused(error) || existsSync(target) || !lstatSync(source).isDirectory()) throw error;
+  }
+  const undo: (() => void)[] = [];
+  function split(from: string, to: string) {
+    mkdirSync(to, { mode: 0o700 });
+    undo.push(() => rmdirSync(to));
+    for (const entry of readdirSync(from, { withFileTypes: true })) {
+      const a = join(from, entry.name);
+      const b = join(to, entry.name);
+      if (existsSync(b)) throw new KaituError("状态迁移目标已有文件，未覆盖", "TARGET_EXISTS");
+      try {
+        renameSync(a, b);
+      } catch (error) {
+        if (!entry.isDirectory() || !refused(error)) throw error;
+        split(a, b);
+        continue;
+      }
+      undo.push(() => move(b, a));
+    }
+    rmdirSync(from);
+    undo.push(() => mkdirSync(from, { mode: 0o700 }));
+  }
+  try {
+    split(source, target);
+  } catch (error) {
+    const failures: unknown[] = [];
+    for (const revert of undo.reverse()) {
+      try {
+        revert();
+      } catch (rollbackError) {
+        failures.push(rollbackError);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError([error, ...failures], "本机状态迁移和回滚均未完成", { cause: error });
+    throw error;
   }
 }
 
@@ -287,21 +342,31 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
   }
   const extras = readdirSync(join(old, ".kaitu")).filter((file) => file !== "config.json");
   if (extras.length) throw new KaituError("同步文件夹的 .kaitu/ 有额外文件，请先核对再迁移", "CONFLICT");
-  moveWithStateBinding(target, join(target, ".kaitu"), "local", stateBinding(old).id, () =>
-    move(old, target),
-  );
+  const localState = join(target, ".kaitu");
+  const stub = readFileSync(join(old, ".kaitu/config.json"));
+  moveWithStateBinding(target, localState, "local", stateBinding(old).id, () => {
+    move(old, target);
+    try {
+      rmSync(localState, { recursive: true });
+      restoreLocalState(state, localState);
+    } catch (error) {
+      // Never move partially restored private state (credentials/history) to cloud storage.
+      if (
+        error instanceof AggregateError ||
+        (existsSync(localState) && readdirSync(localState).some((file) => file !== "config.json"))
+      )
+        throw error;
+      try {
+        mkdirSync(localState, { recursive: true });
+        writeFileSync(join(localState, "config.json"), stub);
+        move(target, old);
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], "迁移失败，未能恢复同步文件夹", { cause: error });
+      }
+      throw error;
+    }
+  });
   ws.root = target;
-  try {
-    rmSync(join(target, ".kaitu"), { recursive: true });
-    move(state, join(target, ".kaitu"));
-  } catch (error) {
-    mkdirSync(join(target, ".kaitu"), { recursive: true });
-    ws.writeJson(".kaitu/config.json", config, { internal: true });
-    move(target, old);
-    setStateBinding(old, state, syncMode(old));
-    ws.root = old;
-    throw error;
-  }
   const { state_dir: _state, ...local } = config;
   ws.writeJson(".kaitu/config.json", local, { internal: true });
   rmSync(join(target, ".kaitu/sync-location.json"), { force: true });

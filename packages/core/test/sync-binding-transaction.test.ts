@@ -1,4 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { expect, it, vi } from "vitest";
 import { currentWorkspace, disableSync, enableSync } from "../src/drive.js";
@@ -147,6 +158,74 @@ it("restores prior registration after a failed move and preserves both errors if
       expect(currentWorkspace()).toBe(pointer);
     }
   } finally {
+    rename.mockImplementation(originalFs.renameSync);
+    vi.unstubAllEnvs();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+it("returns private state to the local workspace while a descendant has a shared reader", async () => {
+  const { home, ws, source, token } = await fixture();
+  const target = join(home, "returned");
+  const state = stateBinding(source).state;
+  const dir = join(state, "synthetic-private", "nested");
+  mkdirSync(dir, { recursive: true });
+  const original = join(dir, "held.txt");
+  writeFileSync(original, "synthetic private bytes");
+  const reader = openSync(original, "r");
+  try {
+    await disableSync(ws, { to: target });
+    expect(ws.root).toBe(target);
+    expect(stateBinding(target).mode).toBe("local");
+    expect(stateBinding(target).state).toBe(join(target, ".kaitu"));
+    expect(readFileSync(reader, "utf8")).toBe("synthetic private bytes");
+    expect(readFileSync(join(target, ".kaitu/synthetic-private/nested/held.txt"), "utf8")).toBe(
+      "synthetic private bytes",
+    );
+    expect(mcpToken(ws)).toBe(token);
+    expect(existsSync(join(source, ".kaitu"))).toBe(false);
+    expect(existsSync(state)).toBe(false);
+  } finally {
+    closeSync(reader);
+    vi.unstubAllEnvs();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+it("rolls back a blocked private file without sending any private entries back to the sync folder", async () => {
+  const { home, ws, source, token } = await fixture();
+  const target = join(home, "returned");
+  const state = stateBinding(source).state;
+  const before = bytes(source);
+  const bindings = registry();
+  const pointer = currentWorkspace();
+  writeFileSync(join(state, "sentinel-private"), "private marker");
+  const original = bytes(state);
+  const platform = Object.getOwnPropertyDescriptor(process, "platform");
+  if (!platform) throw new Error("missing platform descriptor");
+  const failure = Object.assign(new Error("synthetic locked private file"), {
+    code: "EBUSY",
+    syscall: "rename",
+  });
+  let movedPrivateEntries = 0;
+  try {
+    Object.defineProperty(process, "platform", { value: "win32" });
+    rename.mockImplementation((from, to) => {
+      if (String(from) === state || String(from) === join(state, "sentinel-private")) throw failure;
+      originalFs.renameSync(from, to);
+      if (dirname(String(from)) === state) movedPrivateEntries++;
+    });
+    await expect(disableSync(ws, { to: target })).rejects.toBe(failure);
+    expect(movedPrivateEntries).toBeGreaterThan(0);
+    expect(ws.root).toBe(source);
+    expect(bytes(source)).toEqual(before);
+    expect(bytes(state)).toEqual(original);
+    expect(registry()).toEqual(bindings);
+    expect(currentWorkspace()).toBe(pointer);
+    expect(existsSync(target)).toBe(false);
+    expect(mcpToken(ws)).toBe(token);
+  } finally {
+    Object.defineProperty(process, "platform", platform);
     rename.mockImplementation(originalFs.renameSync);
     vi.unstubAllEnvs();
     rmSync(home, { recursive: true, force: true });

@@ -1012,12 +1012,23 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
       const locale =
         resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ?? "zh-CN";
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
-      if (req.url === "/api/product/moveStorage" && (error as NodeJS.ErrnoException).code === "EBUSY")
-        return json(res, 400, {
+      const io = error as NodeJS.ErrnoException;
+      if (
+        [
+          "/api/product/moveStorage",
+          "/api/drive/enable",
+          "/api/drive/disable",
+          "/api/sync/enable",
+          "/api/sync/disable",
+        ].includes(req.url ?? "") &&
+        (io.code === "EBUSY" || (io.syscall === "rename" && (io.code === "EPERM" || io.code === "EACCES")))
+      )
+        return json(res, 409, {
+          code: "RELOCATION_BLOCKED",
           error: pick(
             locale,
-            "资料文件夹正在被其他程序占用，请关闭占用它的窗口后重试",
-            "The Kaitu folder is open in another app. Close it there and try again.",
+            "无法移动资料文件夹。请关闭正在使用它的程序，并检查源目录和目标目录的写入权限。",
+            "Kaitu could not move the folder. Close apps using it and check write access to the source and destination.",
           ),
         });
       const known =
