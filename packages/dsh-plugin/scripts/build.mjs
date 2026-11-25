@@ -4,10 +4,8 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  readdirSync,
   realpathSync,
   rmSync,
-  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -18,21 +16,12 @@ import { fileURLToPath } from "node:url";
 import { WorkspaceTypertGenerator } from "@deepseek-ai/dsh-typert-generator";
 import { build } from "esbuild";
 import { clientStyles } from "./client-styles.mjs";
+import { linkNodeModules } from "./link-node-modules.mjs";
 
 const root = fileURLToPath(new URL("../../..", import.meta.url));
 const pkg = resolve(root, "packages/dsh-plugin");
+const clientId = process.argv[2] ?? "@kaitu/dsh-plugin";
 const tsc = createRequire(import.meta.url).resolve("typescript/bin/tsc");
-// Link each dependency to its real directory: Windows resolves pnpm's relative workspace links
-// against the link path, so a single junction to node_modules would point them outside the repo.
-function linkNodeModules(from, to) {
-  mkdirSync(to, { recursive: true });
-  for (const entry of readdirSync(from, { withFileTypes: true })) {
-    const source = resolve(from, entry.name);
-    if (entry.name.startsWith("@")) linkNodeModules(source, resolve(to, entry.name));
-    else if (statSync(source).isDirectory())
-      symlinkSync(realpathSync(source), resolve(to, entry.name), "junction");
-  }
-}
 // Typert recognizes merged protocol declarations inside its workspace inventory. Give the
 // published declarations a temporary workspace identity, without importing DSH source.
 const analysis = realpathSync(mkdtempSync(join(tmpdir(), "kaitu-typert-")));
@@ -167,7 +156,7 @@ await build({
   external: ["react", "react/*", "@deepseek-ai/cordis", "@deepseek-ai/dsh-client-ui-primitives"],
   plugins: [styles.plugin],
   banner: {
-    js: 'window.__ModuleLoader__.load({id:"@kaitu/dsh-plugin",factory:(require)=>{var module={exports:{}};var exports=module.exports;',
+    js: `window.__ModuleLoader__.load({id:${JSON.stringify(clientId)},factory:(require)=>{var module={exports:{}};var exports=module.exports;`,
   },
   footer: { js: "return module.exports;}});" },
   write: false,
@@ -175,7 +164,7 @@ await build({
   // Styles belong to this plugin's lifetime; dsh removes these tags on unload.
   const style = [
     'const style=document.createElement("style");',
-    'style.dataset.plugin="@kaitu/dsh-plugin";',
+    `style.dataset.plugin=${JSON.stringify(clientId)};`,
     'style.dataset.pluginCss="overview";',
     `style.textContent=${JSON.stringify(styles.css())};`,
     "document.head.appendChild(style);",
@@ -186,4 +175,4 @@ await build({
   );
 });
 
-await import("./build-standalone.mjs");
+if (!process.argv[2]) await import("./build-standalone.mjs");

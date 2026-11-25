@@ -1,3 +1,4 @@
+import type { Context } from "@deepseek-ai/cordis";
 import type {
   ISessions,
   SessionReference,
@@ -10,6 +11,7 @@ import type {
 } from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-session/client";
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from "@deepseek-ai/dsh-client-ui-slots";
+import type {} from "@deepseek-ai/dsh-client-ui-workspace/client";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "./i18n.js";
 import type { PluginAskSession } from "./plugin-ask-session.js";
@@ -41,16 +43,20 @@ export function AskChat({
   useSession,
   useConversation,
   renderFactorySlot,
-}: PropsRuntime<"kaitu.ask.chat"> & PropsRenderFactories) {
+  openWorkspace,
+}: PropsRuntime<"kaitu.ask.chat"> &
+  PropsRenderFactories & { openWorkspace: Context["uiWorkspace"]["openWorkspace"] }) {
   const session = useSession((v: SessionSnapshot) => v);
   const conversation = useConversation((v: ConversationSnapshot) => v);
   const active =
     conversation.activeTargets.size > 0 || (!session.blank && !session.awaitingFirstTurn) || session.running;
-  return renderFactorySlot(
-    "conversation.content",
-    { variant: "embedded", phase: active ? "active" : "hero", hero: !active },
-    { slots: { views: ChatView } },
-  );
+  const content = {
+    variant: "embedded" as const,
+    phase: active ? ("active" as const) : ("hero" as const),
+    hero: !active,
+    onWorkspaceSelected: openWorkspace,
+  };
+  return renderFactorySlot("conversation.content", content, { slots: { views: ChatView } });
 }
 
 /** 插件版的问问：在开图工作区开一个 DSH 会话，就地显示，不跳去 DSH 的对话页。 */

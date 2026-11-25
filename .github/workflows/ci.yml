@@ -26,6 +26,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm build
+      - run: node scripts/package-dsh-plugin.mjs
       - run: pnpm --filter @kaitu/dsh-plugin build:testsite
       - run: pnpm typecheck
       - id: tests
