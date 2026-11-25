@@ -18,7 +18,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @kaitu/core build
+      - run: pnpm build
       - name: Instrument synthetic HTTP errors and repeat the three existing tests
         shell: python
         run: |
