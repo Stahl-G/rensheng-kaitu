@@ -185,6 +185,15 @@ it("returns private state to the local workspace while a descendant has a shared
     expect(mcpToken(ws)).toBe(token);
     expect(existsSync(join(source, ".kaitu"))).toBe(false);
     expect(existsSync(state)).toBe(false);
+    // The same reader stays open while Settings moves the workspace back to a sync folder.
+    await enableSync(ws, "drive", { dir: dirname(source), name: "second-sync", provider: "folder" });
+    const newState = stateBinding(ws.root).state;
+    expect(stateBinding(ws.root).mode).toBe("drive");
+    expect(readdirSync(join(ws.root, ".kaitu"))).toEqual(["config.json"]);
+    expect(readFileSync(join(newState, "synthetic-private/nested/held.txt"), "utf8")).toBe(
+      "synthetic private bytes",
+    );
+    expect(mcpToken(ws)).toBe(token);
   } finally {
     closeSync(reader);
     vi.unstubAllEnvs();
@@ -199,6 +208,7 @@ it("rolls back a blocked private file without sending any private entries back t
   const before = bytes(source);
   const bindings = registry();
   const pointer = currentWorkspace();
+  writeFileSync(join(state, "00-private"), "never send to sync");
   writeFileSync(join(state, "sentinel-private"), "private marker");
   const original = bytes(state);
   const platform = Object.getOwnPropertyDescriptor(process, "platform");
@@ -207,11 +217,14 @@ it("rolls back a blocked private file without sending any private entries back t
     code: "EBUSY",
     syscall: "rename",
   });
+  const undo = Object.assign(new Error("synthetic locked undo"), { code: "EBUSY", syscall: "rename" });
+  let blockUndo = false;
   let movedPrivateEntries = 0;
   try {
     Object.defineProperty(process, "platform", { value: "win32" });
     rename.mockImplementation((from, to) => {
       if (String(from) === state || String(from) === join(state, "sentinel-private")) throw failure;
+      if (blockUndo && String(to) === join(state, "00-private")) throw undo;
       originalFs.renameSync(from, to);
       if (dirname(String(from)) === state) movedPrivateEntries++;
     });
@@ -224,6 +237,19 @@ it("rolls back a blocked private file without sending any private entries back t
     expect(currentWorkspace()).toBe(pointer);
     expect(existsSync(target)).toBe(false);
     expect(mcpToken(ws)).toBe(token);
+
+    // Even when undo itself is refused, never carry the private remainder back into the sync folder.
+    blockUndo = true;
+    const error = await disableSync(ws, { to: target }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AggregateError);
+    expect((error as AggregateError).cause).toBe(failure);
+    expect((error as AggregateError).errors).toContain(undo);
+    expect(existsSync(join(source, ".kaitu"))).toBe(false);
+    expect(readFileSync(join(target, ".kaitu/00-private"), "utf8")).toBe("never send to sync");
+    expect(readFileSync(join(state, "sentinel-private"), "utf8")).toBe("private marker");
+    expect(readFileSync(join(target, "inbox/notes/2026-10-31/original.md"), "utf8")).toContain(
+      "Synthetic original",
+    );
   } finally {
     Object.defineProperty(process, "platform", platform);
     rename.mockImplementation(originalFs.renameSync);

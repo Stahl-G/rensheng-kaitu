@@ -112,7 +112,7 @@ function move(source: string, target: string) {
 /** NTFS refuses to rename a directory with an open descendant even when that
  * file itself is share-delete and can be renamed. Split only the refused
  * directories, keeping the normal and cross-volume move paths unchanged. */
-function restoreLocalState(source: string, target: string) {
+function moveLocalState(source: string, target: string) {
   const refused = (error: unknown) => {
     const io = error as NodeJS.ErrnoException;
     return (
@@ -272,7 +272,7 @@ export async function enableSync(
   separate(state, old);
   const config = ws.readJson<Record<string, unknown>>(".kaitu/config.json");
   refreshOverview(ws);
-  move(join(old, ".kaitu"), state);
+  moveLocalState(join(old, ".kaitu"), state);
   try {
     setStateBinding(old, state, mode);
     mkdirSync(join(old, ".kaitu"));
@@ -284,7 +284,7 @@ export async function enableSync(
     move(old, target);
   } catch (error) {
     rmSync(join(old, ".kaitu"), { recursive: true, force: true });
-    move(state, join(old, ".kaitu"));
+    moveLocalState(state, join(old, ".kaitu"));
     setStateBinding(old, join(old, ".kaitu"), "local");
     ws.writeJson(".kaitu/config.json", config, { internal: true });
     refreshOverview(ws);
@@ -348,7 +348,7 @@ export async function disableSync(ws: Workspace, options: { to?: string } = {}) 
     move(old, target);
     try {
       rmSync(localState, { recursive: true });
-      restoreLocalState(state, localState);
+      moveLocalState(state, localState);
     } catch (error) {
       // Never move partially restored private state (credentials/history) to cloud storage.
       if (

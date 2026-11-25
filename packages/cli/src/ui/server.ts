@@ -1013,14 +1013,24 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         resolvePreferences(ws, options.systemLocale ?? req.headers["accept-language"]).locale ?? "zh-CN";
       // 独立引擎是另一个 bundle，按约定的错误名称保留它的可操作提示。
       const io = error as NodeJS.ErrnoException;
+      const relocating = [
+        "/api/product/moveStorage",
+        "/api/drive/enable",
+        "/api/drive/disable",
+        "/api/sync/enable",
+        "/api/sync/disable",
+      ].includes(req.url ?? "");
+      if (relocating && error instanceof AggregateError)
+        return json(res, 409, {
+          code: "RELOCATION_INCOMPLETE",
+          error: pick(
+            locale,
+            "资料搬移未完成，也未能完全撤销。请保留原目录、目标目录和本机状态，不要覆盖，先核对备份。",
+            "The move could not be fully undone. Keep the original folder, destination and local state; check your backup before overwriting anything.",
+          ),
+        });
       if (
-        [
-          "/api/product/moveStorage",
-          "/api/drive/enable",
-          "/api/drive/disable",
-          "/api/sync/enable",
-          "/api/sync/disable",
-        ].includes(req.url ?? "") &&
+        relocating &&
         (io.code === "EBUSY" || (io.syscall === "rename" && (io.code === "EPERM" || io.code === "EACCES")))
       )
         return json(res, 409, {
