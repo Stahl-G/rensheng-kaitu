@@ -15,8 +15,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          ref: d15e3e7380c0c91cc850d29103c40e1d55d070f7
-          fetch-depth: 2
+          ref: 1fe0db08bccb4973b3238768872959136dcd5003
+          fetch-depth: 3
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -27,7 +27,7 @@ jobs:
       - name: Require an actual Windows native held-reader failure on unmodified main
         shell: pwsh
         run: |
-          git restore --source=HEAD^ -- packages/core/src/drive.ts
+          git restore --source=fe5ffb0b9a313e36f67c9c39d7e9d28ded760ccb -- packages/core/src/drive.ts
           try {
             $lines = @(pnpm exec vitest run packages/core/test/sync-binding-transaction.test.ts -t "returns private state" --reporter=verbose 2>&1)
             $code = $LASTEXITCODE
