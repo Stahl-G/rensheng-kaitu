@@ -101,8 +101,7 @@ function children(input: ProjectionInputs, path: string) {
   return readdirSync(path, { withFileTypes: true }).filter((entry) => {
     if ([".git", "node_modules", ".DS_Store"].includes(entry.name) || entry.name.endsWith(".tmp"))
       return false;
-    if (path === input.root && [".kaitu", "phone", "OVERVIEW.md", "USER.md"].includes(entry.name))
-      return false;
+    if (path === input.root && [".kaitu", "phone", "OVERVIEW.md"].includes(entry.name)) return false;
     return (
       path !== input.state ||
       (![

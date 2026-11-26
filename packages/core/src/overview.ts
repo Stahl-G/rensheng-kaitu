@@ -1,21 +1,26 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
+import { agentPathResolver } from "./agent-file-policy.js";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { agentReadFilter } from "./exposure.js";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { listRecordTypes, recordFilePattern } from "./modules.js";
+import { containsKey } from "./redact.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
-import { timeZoneNotice } from "./time.js";
-import { prepareUserProfile, publishUserProfile } from "./user-profile.js";
+import { localDate, timeZoneNotice } from "./time.js";
 import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
-export function renderAgentReadme(ws: Workspace, now = new Date()): string {
+export function renderAgentReadme(ws: Workspace, now: Date, page: UserPage): string {
   return `# 开图云端 Agent：任务入口
 
 ${timeZoneNotice(ws.timeZone(), now)}
+
+${userPageLine(page)}
 
 按根目录 \`AGENTS.md\` 的路由选择当前任务，只读相关摘要、技能和必要格式；外部 Agent 从文件读取入口。接续任务才读相关交接，整理员按 \`ORGANIZER.md\` 执行。
 
@@ -30,7 +35,7 @@ ${timeZoneNotice(ws.timeZone(), now)}
 - 交新文件，不建收件箱子目录、不覆盖已有文件。只更新自己做过的项目 STATUS.md 与 log.md；项目链接目录只读。
 - 档案、偏好、目标、规则保留原内容，建议交到收件箱；用户明确授权的修改按确认范围执行。收件箱不接受删除、恢复、规则或目标修改。
 - 日程建议等待用户确认；敏感记忆须用户明确要求。记忆替换只交 replaces 候选，用户确认前保留旧条。
-- \`.kaitu/\`、版本库、密钥由程序管理。RECORDS.md、ORGANIZER.md、AGENT-README.md、AGENTS.md、OVERVIEW.md 与 RECORDS.md由本机维护；手机文件只按 ORGANIZER.md 的授权范围更新。
+- \`.kaitu/\`、版本库、密钥由程序管理。RECORDS.md、ORGANIZER.md、AGENT-README.md、AGENTS.md 与 OVERVIEW.md 由本机维护；USER.md 与手机文件只由整理员按 ORGANIZER.md 更新。
 - 密钥保留在本机，不写入投递文件或日志。健康只做记录、趋势与提醒。
 
 ${AI_NETWORK_RULES}
@@ -70,6 +75,201 @@ function recentHandoffs(ws: Workspace) {
   return entries
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || b.file.localeCompare(a.file))
     .slice(0, 3);
+}
+
+const userPageEnd = "用户近况到此结束";
+const userPageLimit = 1500;
+
+export type UserPage = {
+  state: "ok" | "stale" | "invalid" | "missing";
+  organizer?: string;
+  date?: string;
+  problems: string[];
+};
+
+const dataEnd = String.raw`\.(?:md|jsonl?)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
+const fileEnd = String.raw`\.[A-Za-z0-9]{1,10}(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
+const stops = String.raw`\s\x60'"<>()（）【】「」『』《》、，。；：！？,;!?|`;
+const escapeName = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const dataFile = /\.(?:md|jsonl?)$/i;
+
+/**
+ * 近况里引用的路径，统一成工作区相对路径：反引号里的整段、以现有顶层目录开头的文件或目录（含中文、任意扩展名）、
+ * 根目录现有的文件名，以及其余 ASCII 的 Markdown / JSON 路径。
+ */
+function citedPaths(ws: Workspace, body: string, canRead: (path: string) => boolean): Set<string> {
+  const paths = new Set<string>();
+  const add = (path: string) => paths.add(posix.normalize(path).replace(/(.)\/$/, "$1"));
+  const exists = (path: string) => {
+    try {
+      return ws.exists(path);
+    } catch {
+      return false;
+    }
+  };
+  const entries = readdirSync(ws.root, { withFileTypes: true });
+  const names = (keep: (entry: (typeof entries)[number]) => boolean) =>
+    entries.filter(keep).map((entry) => escapeName(entry.name));
+  const dirs = names((entry) => entry.isDirectory() || entry.isSymbolicLink());
+  const files = names((entry) => !entry.isDirectory());
+  const top = dirs.length ? `(?:\\./)?(?:${dirs.join("|")})/` : undefined;
+  let rest = body.replace(/\\/g, "/").replace(/`([^`\n]+)`/g, (_, value: string) => {
+    // #片段、?查询和 :行号指向的还是同一个文件。
+    const path = value.trim().replace(/(?:[#?].*|:\d+(?::\d+)?)$/, "");
+    const cited =
+      !path.includes("://") &&
+      !/[、，。；：！？,;|]/.test(path) &&
+      (path.includes("/")
+        ? (top && new RegExp(`^${top}`, "iu").test(path)) || dataFile.test(path)
+        : /^[^\s:*?"<>]+$/.test(path) && (dataFile.test(path) || exists(path) || !canRead(path)));
+    if (!cited) return ` ${value} `;
+    add(path);
+    return " ";
+  });
+  // 没有扩展名的末段紧挨着中文正文时（「见 health/data里」），在字母与汉字交界处断开。
+  const proseEnd = (path: string) =>
+    /\.[A-Za-z0-9]{1,10}$/.test(path) || exists(path)
+      ? path
+      : (/^(.*\/[A-Za-z0-9_.-]+)\P{ASCII}[^/]*$/u.exec(path)?.[1] ?? path);
+  const scan = (pattern: string, toPath = (path: string) => path) => {
+    rest = rest.replace(new RegExp(`(?<![A-Za-z0-9_./-])(${pattern})`, "giu"), (_, path: string) => {
+      add(toPath(path));
+      return " ";
+    });
+  };
+  if (top) scan(`${top}(?:[^${stops}/]+/)*(?:[^${stops}/]+?${fileEnd}|[^${stops}/]+)?`, proseEnd);
+  if (files.length) scan(`(?:\\./)?(?:${files.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`);
+  for (const match of rest.matchAll(
+    new RegExp(`(?<![\\w./-])((?:\\./)?(?:[\\w.-]+/)*[\\w.-]+${dataEnd})`, "g"),
+  ))
+    add(match[1] as string);
+  return paths;
+}
+
+/** 以 / 开头的两段以上路径或带扩展名的文件、~/、盘符与 UNC；前面紧挨文字、点或斜杠的（早/午/晚、./、https://）不算。 */
+const absolutePath =
+  /(?<![\p{L}\p{N}_.~:/\\-])(?:~[/\\]|[A-Za-z]:[/\\]|\\\\[^\s/\\]+[/\\]|\/[^\s/`'"<>()（）]+(?:\/|\.[A-Za-z0-9]{1,10}(?![A-Za-z0-9])))/u;
+
+/** 健康模块的原始记录与附件：按 module.json 找到模块的实际目录，挡住 files、记录所在的子目录和直接放在模块目录下的记录文件。 */
+function rawHealthCheck(ws: Workspace) {
+  const roots = new Set(["health/data", "health/files"]);
+  const files: { dir: string; match: RegExp }[] = [];
+  for (const ref of listRecordTypes(ws)) {
+    if (ref.module.def.id !== "health") continue;
+    const { dir } = ref.module;
+    roots.add(`${dir}/files`.toLowerCase());
+    const [first, rest] = ref.def.path.split(/\/(.*)/s);
+    if (rest !== undefined) roots.add(`${dir}/${first}`.toLowerCase());
+    else files.push({ dir: dir.toLowerCase(), match: recordFilePattern(ref).match });
+  }
+  return (path: string) => {
+    const lower = path.toLowerCase();
+    return (
+      [...roots].some((root) => lower === root || lower.startsWith(`${root}/`)) ||
+      files.some(({ dir, match }) => posix.dirname(lower) === dir && match.test(posix.basename(path)))
+    );
+  };
+}
+
+/** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。字数与结尾只看正文，其余连 frontmatter 一起查。 */
+function checkUserPage(ws: Workspace, body: string, text: string): string[] {
+  const problems: string[] = [];
+  const size = [...body.trim()].length;
+  if (size > userPageLimit) problems.push(`超过 ${userPageLimit} 字（${size} 字）`);
+  if (!body.includes(userPageEnd)) problems.push("缺少结尾一行，可能没写完");
+  if (absolutePath.test(text)) problems.push("写了本机绝对路径");
+  if (containsKey(text)) problems.push("写了密钥");
+  const canRead = agentReadFilter(ws, { id: "handover", finance: false });
+  const physical = agentPathResolver(ws.root);
+  const rawHealth = rawHealthCheck(ws);
+  for (const path of citedPaths(ws, text, canRead)) {
+    let real: string | undefined;
+    try {
+      real = physical(path);
+    } catch {
+      // 越出工作区或指向程序目录。
+    }
+    if (real === undefined || rawHealth(path) || rawHealth(real) || !canRead(path))
+      problems.push(`引用了不对外的 ${path}`);
+    else if (!ws.exists(real) && !ws.isUnavailable(path)) problems.push(`引用的 ${path} 不存在`);
+  }
+  return problems;
+}
+
+function userPageSection(body: string): string | undefined {
+  const section = body.split(/^## 用户近况[^\S\n]*\r?\n/m)[1];
+  return section?.split(/^## /m)[0]?.trim();
+}
+
+function previousDay(date: string): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
+function judgeUserPage(
+  ws: Workspace,
+  now: Date,
+  organizer: string,
+  date: string,
+  body: string,
+  text: string,
+): UserPage {
+  const problems = checkUserPage(ws, body, text);
+  if (problems.length) return { state: "invalid", organizer, date, problems };
+  const fresh = date >= previousDay(localDate(now, ws.timeZone()));
+  return { state: fresh ? "ok" : "stale", organizer, date, problems };
+}
+
+export function readUserPage(ws: Workspace, now = new Date()): UserPage {
+  if (!ws.exists("USER.md")) return { state: "missing", problems: [] };
+  let text: string | undefined;
+  try {
+    text = ws.scanText("USER.md");
+  } catch {
+    // 权限不够或同名目录占着：近况是可选的，不能挡住工作区打开。
+    return { state: "missing", problems: ["无法读取"] };
+  }
+  if (text === undefined) return { state: "missing", problems: ["还没从云盘下载"] };
+  try {
+    const { data, body } = parseFrontmatter<{ organizer: string; date: string }>(text);
+    if (schemas().builtin("daily.schema.json")(data))
+      return judgeUserPage(ws, now, data.organizer, data.date, body, text);
+  } catch {
+    // 下面按缺 frontmatter 报告。
+  }
+  return { state: "invalid", problems: ["frontmatter 缺 organizer 或 date"] };
+}
+
+/** 电脑开着时，把比 USER.md 新的每日整理里的「用户近况」复制过去；只能新建文件的整理员靠它更新。 */
+function prepareUserPage(ws: Workspace, now: Date, daily: ReturnType<typeof latestDaily>) {
+  const current = readUserPage(ws, now);
+  const section = daily && userPageSection(daily.body);
+  // 在但读不到的 USER.md（云盘占位、读不了）写不进去，照实报告，不宣称已复制。
+  const unreadable = current.state === "missing" && current.problems.length > 0;
+  if (
+    !daily ||
+    section === undefined ||
+    unreadable ||
+    (current.date !== undefined && current.date >= daily.date)
+  )
+    return { page: current };
+  const body = `# 用户近况\n\n${section.replace(/^###(?=[^\S\n])/gm, "##")}\n`;
+  const text = stringifyFrontmatter({ organizer: daily.organizer, date: daily.date }, body);
+  const page = judgeUserPage(ws, now, daily.organizer, daily.date, body, text);
+  if (page.state === "invalid")
+    return { page: { ...page, problems: page.problems.map((problem) => `${daily.file}：${problem}`) } };
+  return { page, text };
+}
+
+export function userPageLine(page: UserPage): string {
+  if (page.state === "ok")
+    return `先读 \`USER.md\`：${page.organizer} 在 ${page.date} 写的用户近况，电脑已核对。`;
+  if (page.state === "stale")
+    return `先读 \`USER.md\`：${page.organizer} 在 ${page.date} 写的，已超过一天，读后用最新每日整理和 \`NOW.md\` 核对。`;
+  const reason =
+    page.state === "missing" && !page.problems.length
+      ? "还没有整理员写的 `USER.md`"
+      : `\`USER.md\` 未通过核对（${page.problems.join("；")}）`;
+  return `${reason}：改读 \`me/goals.json\`、\`me/profile.md\` 与 \`memory/MEMORY.md\`。`;
 }
 
 export function latestDaily(ws: Workspace) {
@@ -114,13 +314,7 @@ export async function batchOverview<T>(ws: Workspace, operation: () => Promise<T
 
 export function prepareOverview(ws: Workspace, now = new Date()) {
   const documents: { file: string; text: string; previous: string | undefined }[] = [];
-  let profile: ReturnType<typeof prepareUserProfile> | undefined;
-  try {
-    profile = prepareUserProfile(ws, now);
-  } catch {
-    /* Derived output cannot block original writes. */
-  }
-  const result = { root: ws.root, documents, profile };
+  const result = { root: ws.root, documents };
   function put(file: string, text: string) {
     const exists = ws.exists(file);
     const previous = exists ? ws.scanText(file) : undefined;
@@ -166,6 +360,8 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
   lines.push("", "## 最新每日整理", "");
   const daily = latestDaily(ws);
   lines.push(daily ? `- ${daily.date}（${daily.file}）` : "暂无每日整理。");
+  const user = prepareUserPage(ws, now, daily);
+  lines.push(`- ${userPageLine(user.page)}`);
   lines.push("", "## 最近交接", "");
   const handoffs = recentHandoffs(ws);
   for (const handoff of handoffs) {
@@ -219,8 +415,9 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
     "",
   );
   // 接力说明与整理规则随版本维护，GitHub 与同步盘使用同一份入口。
+  if (user.text) put("USER.md", user.text);
   if (syncMode(ws.root) === "drive" || workspaceBackupEnabled(ws))
-    put("AGENT-README.md", renderAgentReadme(ws, now));
+    put("AGENT-README.md", renderAgentReadme(ws, now, user.page));
   put("ORGANIZER.md", renderOrganizer());
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。
@@ -235,13 +432,6 @@ export function publishOverview(ws: Workspace, prepared: ReturnType<typeof prepa
   if (prepared.root !== ws.root) return false;
   for (const { file, previous } of prepared.documents) {
     if ((ws.exists(file) ? ws.scanText(file) : undefined) !== previous) return false;
-  }
-  if (prepared.profile?.change) {
-    try {
-      publishUserProfile(ws, prepared.profile.change);
-    } catch {
-      /* Preserve original-write availability. */
-    }
   }
   for (const { file, text } of prepared.documents) ws.writeText(file, text);
   return true;

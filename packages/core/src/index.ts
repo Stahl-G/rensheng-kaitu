@@ -35,7 +35,7 @@ export * from "./secrets.js";
 
 export * from "./drive.js";
 export * from "./overview.js";
-export * from "./user-profile.js";
+export * from "./navigation.js";
 export * from "./inbox.js";
 
 export * from "./projects.js";
@@ -81,6 +81,7 @@ export * from "./locale.js";
 export { localStateRoot } from "./local-state.js";
 export * from "./plans.js";
 export * from "./handover.js";
+export * from "./redact.js";
 export * from "./reading-pack.js";
 
 export * from "./agent-file-policy.js";

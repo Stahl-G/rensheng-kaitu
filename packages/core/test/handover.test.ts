@@ -27,7 +27,6 @@ import {
   stringifyFrontmatter,
   ulid,
   updateRecord,
-  userProfileSections,
   validateWorkspace,
 } from "../src/index.js";
 import { clonedWorkspace } from "./helpers.js";
@@ -56,8 +55,6 @@ it("项目下一步的结果随资料包接续，撤销后从资料包移除", a
     const results = () =>
       handoverPack(ws, "zh-CN").sections.find((section) => section.id === "results")?.lines;
     expect(results()).toEqual([expect.stringContaining("访谈完成，笔记在 （本机路径已去掉）")]);
-    const profile = userProfileSections(ws, "zh-CN", new Date()).find((section) => section.id === "results");
-    expect(profile?.lines[0]).toContain(`(${file}#${next.id})`);
     await applyResultAction(ws, { client_id: ulid(), op: "restore_next", args: effect });
     expect(results()).toEqual([]);
   } finally {
@@ -304,7 +301,7 @@ it("最近 30 天的结果按完成时间算：两个月前定下、今天完成
   }
 });
 
-it("项目结果按完成时间筛选，缓存命中后撤销仍从画像中移除", async () => {
+it("项目结果按完成时间筛选，缓存命中后撤销仍从资料包中移除", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-handover-window-"));
   try {
     const ws = await clonedWorkspace("Asia/Shanghai", join(root, "ws"));
@@ -334,7 +331,7 @@ it("项目结果按完成时间筛选，缓存命中后撤销仍从画像中移�
     const old = new Date(Date.now() - 10000);
     utimesSync(ws.resolve(file), old, old);
     const results = () =>
-      userProfileSections(ws, "zh-CN", now).find((section) => section.id === "results")?.lines;
+      handoverPack(ws, "zh-CN", now).sections.find((section) => section.id === "results")?.lines;
     expect(results()).toEqual([expect.stringContaining("近期结果")]);
     expect(results()).toEqual([expect.stringContaining("近期结果")]);
     const next = data.next[0];
@@ -371,7 +368,7 @@ it.skipIf(process.platform === "win32")(
         mkdirSync(join(ws.root, "projects", slug), { recursive: true });
         symlinkSync(target, join(ws.root, "projects", slug, "STATUS.md"));
       }
-      const results = userProfileSections(ws, "zh-CN", now).find(
+      const results = handoverPack(ws, "zh-CN", now).sections.find(
         (section) => section.id === "results",
       )?.lines;
       expect(results).toEqual([expect.stringContaining("可见结果")]);

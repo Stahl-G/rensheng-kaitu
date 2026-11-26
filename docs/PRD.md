@@ -140,6 +140,7 @@
 ├─ CLAUDE.md                 # 一行：指向 AGENTS.md
 ├─ NOW.md                    # 今天的计划（见 §6.4）
 ├─ ORGANIZER.md              # 自动生成：夜间整理员规则
+├─ USER.md                   # 整理员每晚写的一页用户近况，frontmatter: organizer、date
 ├─ handoffs/                 # 交接记录平铺，frontmatter: agent、at，可选 follows
 │  ├─ <YYYYMMDDTHHMM>-<agent>.md
 │  ├─ daily/<YYYY-MM-DD>.md   # 每日整理，frontmatter: organizer、date
