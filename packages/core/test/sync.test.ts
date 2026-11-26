@@ -158,7 +158,14 @@ it("doctor 报出冲突与未下载文件，扫描跳过且不覆盖原件或生
     expect(existsSync(join(ws.root, healthPlaceholder))).toBe(true);
     expect(readRecords(ws, "workout")).toEqual([]);
     expect(readStatus(ws).recent7.workouts).toBe(0);
+    writeFileSync(join(ws.root, ".USER.md.icloud"), "");
+    ws.writeText(
+      "handoffs/daily/2026-10-15.md",
+      "---\norganizer: muse\ndate: 2026-10-15\n---\n## 用户近况\n\n- 合成近况\n\n用户近况到此结束。\n",
+    );
     refreshOverview(ws);
+    expect(existsSync(join(ws.root, "USER.md"))).toBe(false);
+    expect(ws.readText("OVERVIEW.md")).toContain("`USER.md` 未通过核对（还没从云盘下载）：改读");
     expect(ws.readText("OVERVIEW.md")).toContain("retained-agent");
     expect(ws.readText("OVERVIEW.md")).not.toContain("conflict-agent");
     expect(ws.readText("OVERVIEW.md")).not.toContain("offline-agent");

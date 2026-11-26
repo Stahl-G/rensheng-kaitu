@@ -18,7 +18,8 @@
 |---|---|---|
 | `inbox/agents/*` | 接力者 | 记录、记忆、简报、笔记、日程建议，格式不变。由本机 `kaitu` 导入 `data/` |
 | `handoffs/<YYYYMMDDTHHMM>-<agent>.md` | 接力者 | 交接记录，平铺存放，不建子目录（两个 Agent 同时建子目录会在 Drive 上产生同名文件夹） |
-| `handoffs/daily/<YYYY-MM-DD>.md` | 整理员 | 每日整理，是新一天的起点 |
+| `handoffs/daily/<YYYY-MM-DD>.md` | 整理员 | 每日整理，是新一天的起点；第一节是「用户近况」 |
+| `USER.md` | 整理员；电脑开着时从每日整理复制 | 一页用户近况，任何 Agent 先读（见 [user-profile.md](user-profile.md)） |
 | `handoffs/archive/<YYYY-MM-DD>/` | 整理员 | 已整理的交接记录移到这里，不删除 |
 | `<模块>/STATUS.md` | 整理员（只改 `next`、`updated`）；本机 `kaitu` | 白天接力者不改 |
 | `NOW.md` | 本机 `kaitu`、早间计划 | 云端只读 |
@@ -46,11 +47,12 @@ follows: handoffs/20261016T0830-dot.md
 
 ## 3. 接手顺序（`AGENT-README.md`）
 
-1. `AGENT-README.md`
-2. `handoffs/daily/` 里最新的一份每日整理；没有就读 `OVERVIEW.md`
-3. `handoffs/` 根目录下比它新的交接记录，按时间排序
-4. `inbox/agents/` 里比它新的文件
-5. 需要细节时再读 `NOW.md`、`<模块>/STATUS.md`、`me/`、`memory/`
+1. `AGENT-README.md`，开头一行说 `USER.md` 能不能直接读
+2. `USER.md`；只想了解用户、不接续任务时读到这里就够
+3. `handoffs/daily/` 里最新的一份每日整理；没有就读 `OVERVIEW.md`
+4. `handoffs/` 根目录下比它新的交接记录，按时间排序
+5. `inbox/agents/` 里比它新的文件
+6. 需要细节时再读 `NOW.md`、`<模块>/STATUS.md`、`me/`、`memory/`
 
 结束前，只要做过任何事，就新建一份交接记录。如果同时有两份交接都接续同一份（说明有人并行），就把两份都读，在自己的交接里合并它们的「当前下一步」。
 
@@ -62,7 +64,7 @@ follows: handoffs/20261016T0830-dot.md
 2. 读最新的每日整理，再读它之后的全部交接记录和收件箱文件。
 3. 把交接合并进各模块 `STATUS.md` 的 `next`，不整份照抄交接：改之前先重读，以现在的 `next` 为起点；只应用交接明确写出的变化（完成、新增、改期、取消），交接没提到的条目原样保留。`STATUS.md` 的 `updated` 晚于最新一份交接的 `at`，说明用户在交接之后改过，这个文件的 `next` 不动，把差异写进「未决事项」。只改 `next`、`updated` 两个字段，不动其他字段和正文。
 4. 整理用户随手记下的原文（`inbox/notes/` 里 kind 为 capture 的笔记），要用开图工具（Kaitu.app 或 DSH 里的 `kaitu_inbox`、`kaitu_onboarding`，或命令行 `kaitu inbox`、`kaitu onboarding matter-read / matter-draft`）：想推进的事用 `matter-draft` 存成待核对草稿，其他内容只在每日整理里写一句可以怎么记；处理完一条用 `inbox done` 归档，不再算等待整理。不创建待办、记录或记忆，不替用户采纳。没有这些工具的云端 Agent 不动原文，只写还有几条待整理。
-5. 写 `handoffs/daily/<今天>.md`，内容是：昨天做了什么（附来源文件）、当前下一步、原文整理、未决事项、收件箱里还没导入的记录。
+5. 写 `handoffs/daily/<今天>.md`，内容是：用户近况、昨天做了什么（附来源文件）、当前下一步、原文整理、未决事项、收件箱里还没导入的记录。能覆盖文件的整理员再把用户近况写成 `USER.md`。
 6. 把已整理的交接记录移到 `handoffs/archive/<今天>/`。不删除任何文件，`inbox/agents/` 也不动，留给本机导入。
 7. 有拿不准的地方（例如两份交接互相矛盾），就写进每日整理的「未决」，不要猜。
 
@@ -72,6 +74,7 @@ follows: handoffs/20261016T0830-dot.md
 
 - 开机时照常处理收件箱：记录进 `data/`，存版本，刷新 `OVERVIEW.md`。
 - `OVERVIEW.md` 增加两节：最新一份每日整理的路径，以及最近 3 份交接记录。
+- 每日整理比 `USER.md` 新时，把其中的「用户近况」复制成 `USER.md`；核对结论写进 `OVERVIEW.md` 和 `AGENT-README.md` 开头。
 - 生成 `ORGANIZER.md`。
 - `kaitu doctor` 报告 Drive 冲突副本（例如 `STATUS (1).md`）和同名子目录。
 - `upgrade` 补建 `handoffs/daily/`、`handoffs/archive/` 并生成 `ORGANIZER.md`。第一版留下的 `LOCK.json` 已经没有程序读取，可以手动删除。

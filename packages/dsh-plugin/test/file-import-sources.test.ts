@@ -2,11 +2,18 @@ import { readFileSync, rmSync } from "node:fs";
 import { dirname } from "node:path";
 import { Context } from "@deepseek-ai/cordis";
 import { history, readRecords } from "@kaitu/core";
-import { expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { freshWorkspace } from "../../core/test/helpers.js";
 import { KaituOverviewService } from "../src/overview-service.js";
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 it("日历和 Nut AI 沿同一用户确认服务完成预览、取消、确认及重复跳过", async () => {
+  // 日历只导入今天前 30 天到后 180 天；示例日历的事件在 2026 年 10 月。
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-15T12:00:00+08:00"));
   for (const [source, name, types] of [
     ["ics", "calendar.ics", ["event"]],
     ["nut-ai", "nut-ai-backup.json", ["meal", "metric"]],
