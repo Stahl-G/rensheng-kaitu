@@ -25,7 +25,6 @@ export async function organizeOnboardingMatter(
   if (!ask) return matter;
   const settings = await ask.settings();
   if (!settings.configured) return matter;
-  await write(async () => recordOnboardingAiConnection(ws, "问问"));
   // The managed model only needs this submission. Do not inject workspace instructions or grant tools.
   // A local Agent is explicitly connected as a full Agent and keeps its existing permission flow.
   const textOnly = !settings.fullOnly;
@@ -33,6 +32,19 @@ export async function organizeOnboardingMatter(
   let stop = () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    // The background lease blocks changes while preparing/sending the first turn.
+    const selected = await service.settings();
+    if (!selected.configured || Boolean(selected.fullOnly) !== Boolean(settings.fullOnly)) {
+      throw new KaituError(
+        pick(
+          locale,
+          "AI 连接已变化，原文已保存，请重试",
+          "The AI connection changed. Your text is saved; try again",
+        ),
+        "AI_CONNECTION",
+      );
+    }
+    await write(async () => recordOnboardingAiConnection(ws, "问问"));
     const thread = await service.create();
     const response = new Promise<string>((resolve, reject) => {
       timer = setTimeout(
