@@ -116,7 +116,7 @@ export function workspaceAgentGuide(): string {
 
 先读 USER.md（整理员每晚写的一页近况，核对 date）→ NOW.md（核对计划日期）；其余按当前任务取。
 USER.md 缺失、没有 organizer 与 date 或 date 早于昨天时，先看 handoffs/daily/ 最新一份开头的「用户近况」；AGENT-README.md 写着未通过核对或仍没有近况时，读 me/goals.json、me/profile.md 与 memory/MEMORY.md，再取必要的非敏感、未归档记忆；不把缺失当作没有资料。
-有 reading_pack 工具或支持的 kaitu reading-pack 命令时，按当前连接权限现取近况；没有时直接读正本。USER.md 不含财务，财务只经有权限的工具取得。
+有 reading_pack 工具或支持的 kaitu reading-pack 命令时，按当前连接权限现取近况；没有时直接读正本。USER.md 里健康和财务只有一句不带数字的概括，财务明细只经有权限的工具取得。
 没有工具时，只往 inbox/agents/ 新建唯一命名的文件。普通原文用 <agent>-<唯一时间>.note.md；改画像、目标、规则或替换记忆都写成提议，等待用户处理，不直接改正本。
 三条边界：① 不改 USER.md（整理员按 ORGANIZER.md 写）、生成指南或数据 JSONL；② 不把 AI 建议标成用户确认，纠正记忆用自动记录入口关联原条；③ 不写工作区之外、程序状态、版本库或密钥。
 
