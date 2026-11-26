@@ -108,6 +108,7 @@ test.each(["library", "today"])(
   async (entry) => {
     vi.stubGlobal("window", new EventTarget());
     vi.stubGlobal("document", {
+      documentElement: {},
       body: { hasAttribute: () => false },
       addEventListener() {},
       removeEventListener() {},

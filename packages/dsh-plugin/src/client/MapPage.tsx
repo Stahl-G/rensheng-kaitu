@@ -621,8 +621,17 @@ export function MapPage({
           pending={data?.importsPending ?? 0}
           reviewPending={data?.review.length ?? 0}
         />
-        <button type="button" className={css.control} onClick={() => setEditingHome(true)}>
-          {home ? `⌂ ${t("家乡", "Hometown")}${t("：", ": ")}${home.name}` : t("设置家乡", "Set hometown")}
+        <button
+          type="button"
+          className={css.control}
+          aria-expanded={editingHome}
+          onClick={() => setEditingHome((value) => !value)}
+        >
+          {editingHome
+            ? t("收起", "Close")
+            : home
+              ? `⌂ ${t("家乡", "Hometown")}${t("：", ": ")}${home.name}`
+              : t("设置家乡", "Set hometown")}
         </button>
         {data && (
           <details className={css.review}>
@@ -755,7 +764,7 @@ export function MapPage({
             setEditingHome(false);
             setNotice(t("家乡已保存", "Hometown saved"));
           }}
-          cancel={home ? () => setEditingHome(false) : undefined}
+          cancel={() => setEditingHome(false)}
         />
       )}
       {error && (
@@ -990,7 +999,7 @@ export function MapPage({
                         type="button"
                         className={css.chapter}
                         aria-pressed={selected === homeId}
-                        onClick={() => setSelected(homeId)}
+                        onClick={() => setSelected((current) => (current === homeId ? null : homeId))}
                       >
                         <span>{label("人生起点")}</span>
                         <strong>
@@ -1006,7 +1015,7 @@ export function MapPage({
                         data-status={item.fact_status}
                         key={item.id}
                         aria-pressed={selected === city.id}
-                        onClick={() => setSelected(city.id)}
+                        onClick={() => setSelected((current) => (current === city.id ? null : city.id))}
                       >
                         <span>{dateLabel(item.start, item.time_precision, locale)}</span>
                         <strong>
@@ -1045,7 +1054,7 @@ export function MapPage({
                       key={item.id}
                       aria-expanded={city?.id === item.id}
                       aria-controls={city?.id === item.id ? "city-details" : undefined}
-                      onClick={() => setSelected(item.id)}
+                      onClick={() => setSelected((current) => (current === item.id ? null : item.id))}
                     >
                       <span>
                         <strong>

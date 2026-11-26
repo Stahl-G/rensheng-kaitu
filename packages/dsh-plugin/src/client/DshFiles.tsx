@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import filesCss from "./DshFiles.module.css";
 import css from "./Prototype.module.css";
+import { useT } from "./i18n.js";
 
 export interface FileCandidate {
   path: string;
@@ -31,6 +32,7 @@ export function FolderButton({
   onSelect,
   disabled = false,
 }: { onSelect(path: string): void; disabled?: boolean }) {
+  const t = useT();
   const services = useContext(FileServicesContext);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -53,7 +55,7 @@ export function FolderButton({
           }
         }}
       >
-        {busy ? "正在选择…" : "选择文件夹…"}
+        {busy ? t("正在选择…", "Choosing…") : t("选择文件夹…", "Choose folder…")}
       </button>
       {error && <p role="alert">{error}</p>}
     </>
@@ -71,6 +73,7 @@ export function FilePicker({
   query?: string;
   filesOnly?: boolean;
 }) {
+  const t = useT();
   const services = useContext(FileServicesContext);
   const [typedQuery, setQuery] = useState("");
   const query = givenQuery ?? typedQuery;
@@ -104,31 +107,42 @@ export function FilePicker({
     };
   }, [query, services]);
   return (
-    <section className={filesCss.picker} aria-label="选择开图资料">
+    <section
+      className={filesCss.picker}
+      aria-label={t("选择开图资料", "Choose Kaitu files")}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          close();
+        }
+      }}
+    >
       <header className={filesCss.header}>
-        <span>开图资料</span>
-        <button type="button" onClick={close} aria-label="关闭资料选择">
+        <span>{t("开图资料", "Kaitu files")}</span>
+        <button type="button" onClick={close} aria-label={t("关闭资料选择", "Close file picker")}>
           ×
         </button>
       </header>
       {givenQuery === undefined && (
         <label className={filesCss.search}>
-          <span className={filesCss.srOnly}>查找资料</span>
+          <span className={filesCss.srOnly}>{t("查找资料", "Find files")}</span>
           <input
             ref={search}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="文件名或文件夹"
+            placeholder={t("文件名或文件夹", "File or folder name")}
           />
         </label>
       )}
-      {loading && <output className={filesCss.notice}>正在查找…</output>}
+      {loading && <output className={filesCss.notice}>{t("正在查找…", "Searching…")}</output>}
       {error && (
         <p className={filesCss.notice} role="alert">
           {error}
         </p>
       )}
-      {!loading && !error && !items.length && <p className={filesCss.notice}>没有找到资料</p>}
+      {!loading && !error && !items.length && (
+        <p className={filesCss.notice}>{t("没有找到资料", "No matching files")}</p>
+      )}
       <div className={filesCss.list}>
         {items.map((item) => (
           <button
@@ -141,7 +155,9 @@ export function FilePicker({
                 : select(item.path, item.kind)
             }
           >
-            <span className={filesCss.kind}>{item.kind === "directory" ? "文件夹" : "文件"}</span>
+            <span className={filesCss.kind}>
+              {item.kind === "directory" ? t("文件夹", "Folder") : t("文件", "File")}
+            </span>
             <span className={filesCss.path} title={item.path}>
               {item.path}
             </span>
@@ -153,6 +169,7 @@ export function FilePicker({
 }
 
 export function OpenPath({ path }: { path: string }) {
+  const t = useT();
   const services = useContext(FileServicesContext);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -174,7 +191,7 @@ export function OpenPath({ path }: { path: string }) {
       </button>
       {" · "}
       <button type="button" className={css.link} disabled={busy} onClick={() => void open("reveal")}>
-        显示位置
+        {t("显示位置", "Reveal")}
       </button>
       {error && <span role="alert">{error}</span>}
     </span>

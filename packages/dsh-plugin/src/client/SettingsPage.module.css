@@ -40,6 +40,14 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.navigation button:hover:not([aria-current]) {
+  background: var(--surface);
+}
+.navigation button:active {
+  transform: scale(0.98);
 }
 .navigation button[aria-current] {
   background: var(--link-soft);
@@ -67,7 +75,7 @@
   margin: 16px 0 24px;
 }
 .cards button {
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 16px;
   padding: 20px;
   background: var(--surface);
@@ -78,6 +86,14 @@
   flex-direction: column;
   gap: 12px;
   cursor: pointer;
+  transition: border-color var(--kt-dur-fast) var(--kt-ease-out), background-color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.cards button:hover {
+  border-color: var(--line-strong);
+}
+.cards button:active {
+  transform: scale(0.985);
 }
 .cards span {
   color: var(--muted);

@@ -242,11 +242,14 @@ export function NewsPage(props: NewsPageProps) {
     <section className={css.sideCard} aria-label={t("你关注的", "Your interests")}>
       <div className={css.heading}>
         <h2>{t("你关注的", "Your interests")}</h2>
-        {!rules && (
-          <button type="button" className={css.link} onClick={() => setRules(true)}>
-            {keywords.length ? t("编辑", "Edit") : t("添加", "Add")}
-          </button>
-        )}
+        <button
+          type="button"
+          className={css.link}
+          aria-expanded={rules}
+          onClick={() => setRules((value) => !value)}
+        >
+          {rules ? t("收起", "Close") : keywords.length ? t("编辑", "Edit") : t("添加", "Add")}
+        </button>
       </div>
       {keywords.length > 0 && (
         <div className={css.tags}>

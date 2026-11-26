@@ -103,6 +103,52 @@
 .dialog::backdrop {
   background: #0006;
 }
+.dialog[open] {
+  animation: previewDialogIn var(--kt-dur-normal) var(--kt-ease-out);
+}
+.dialog[open]::backdrop {
+  animation: previewBackdropIn var(--kt-dur-fast) var(--kt-ease-out);
+}
+.banner,
+.notice {
+  animation: previewReveal var(--kt-dur-normal) var(--kt-ease-out);
+}
+@keyframes previewDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes previewBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes previewReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open],
+  .dialog[open]::backdrop,
+  .banner,
+  .notice {
+    animation: none !important;
+  }
+}
 .dialogHead {
   display: flex;
   align-items: center;

@@ -44,14 +44,21 @@ function Entry({
   const t = useT();
   const title = t(entry.title[0], entry.title[1]);
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id: entry.id, disabled: busy });
+    useSortable({
+      id: entry.id,
+      disabled: busy,
+      transition: { duration: 200, easing: "cubic-bezier(0.32, 0.72, 0, 1)" },
+    });
   return (
     <div
       ref={setNodeRef}
       className={css.exploreEntry}
       data-dragging={isDragging}
       data-current={current === entry.id}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition: isDragging ? "none" : transition,
+      }}
     >
       <button type="button" className={css.exploreOpen} aria-pressed={current === entry.id} onClick={open}>
         <svg
@@ -67,7 +74,7 @@ function Entry({
         </svg>
         <span>
           <strong>{title}</strong>
-          <small>{t(entry.description[0], entry.description[1])}</small>
+          {entry.description[0] && <small>{t(entry.description[0], entry.description[1])}</small>}
           {first && <small>{t("打开开图时先到这里", "Opens first")}</small>}
         </span>
       </button>
@@ -123,6 +130,12 @@ export function ExploreModulesPage({
   const available = new Map(modules.map((entry) => [entry.id as string, entry]));
   const visible = (entries ?? []).flatMap((id) => available.get(id) ?? []);
   const hidden = modules.filter((entry) => !entries?.includes(entry.id));
+  const defaultOrder = [
+    ...defaultExploreEntries,
+    ...modules.filter(({ id }) => id.startsWith("plugin:")).map(({ id }) => id),
+  ];
+  const isDefault =
+    entries?.length === defaultOrder.length && entries.every((id, index) => id === defaultOrder[index]);
   const change = async (next: string[]) => {
     setBusy(true);
     setError("");
@@ -168,7 +181,7 @@ export function ExploreModulesPage({
                   ...entry,
                   description: summaries[entry.id]
                     ? [summaries[entry.id] ?? "", summaries[entry.id] ?? ""]
-                    : entry.description,
+                    : ["", ""],
                 }}
                 current={current}
                 busy={busy}
@@ -180,20 +193,13 @@ export function ExploreModulesPage({
           </nav>
         </SortableContext>
       </DndContext>
-      <div className={css.exploreManage}>
-        <button
-          type="button"
-          disabled={entries === null || busy}
-          onClick={() =>
-            void change([
-              ...defaultExploreEntries,
-              ...modules.filter(({ id }) => id.startsWith("plugin:")).map(({ id }) => id),
-            ])
-          }
-        >
-          {t("恢复默认布局", "Restore default layout")}
-        </button>
-      </div>
+      {entries && !isDefault && (
+        <div className={css.exploreManage}>
+          <button type="button" disabled={entries === null || busy} onClick={() => void change(defaultOrder)}>
+            {t("恢复默认布局", "Restore default layout")}
+          </button>
+        </div>
+      )}
       {hidden.length > 0 && (
         <section className={css.explorePicker} aria-label={t("还可以添加", "Add more")}>
           <h2>{t("还可以添加", "Add more")}</h2>

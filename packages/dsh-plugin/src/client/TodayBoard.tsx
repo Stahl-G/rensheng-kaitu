@@ -13,6 +13,13 @@ import {
   resultId,
 } from "./result-session.js";
 export { createTodayBoardSession, type TodayBoardSession } from "./result-session.js";
+const metricEnglish: Record<string, { label: string; unit?: string }> = {
+  "metric:workouts": { label: "Workouts", unit: "" },
+  "metric:sleep": { label: "Avg sleep", unit: "h" },
+  "metric:protein": { label: "Avg protein", unit: "g" },
+  "metric:weight": { label: "Weight" },
+};
+
 export function TodayBoard({
   data,
   resultAction,
@@ -52,6 +59,7 @@ export function TodayBoard({
     board.subscribe,
     board.read,
   );
+  const canEdit = !!resultAction && !pending;
   const setSelected = (value: string | undefined) => board.set("selected", value);
   const setDrafts = (
     value: Record<string, string> | ((current: Record<string, string>) => Record<string, string>),
@@ -97,6 +105,7 @@ export function TodayBoard({
     return () => window.removeEventListener("kaitu:complete-current", focusCurrent);
   }, []);
   const finish = async () => {
+    if (!canEdit) return;
     if (operation.current) return board.send(resultAction);
     if (!focus?.precondition || !focus.file) return;
     if (/[\r\n\u2028\u2029]/u.test(result) || Array.from(result).length > 2000) {
@@ -180,7 +189,7 @@ export function TodayBoard({
       {showLatest && operation.current && (
         <section className={styles.stepList} aria-label={t("上次结果待核实", "Previous result unconfirmed")}>
           <strong>{operation.current.step.title}</strong>
-          <button type="button" className={css.btn} disabled={pending} onClick={() => void finish()}>
+          <button type="button" className={css.btn} disabled={!canEdit} onClick={() => void finish()}>
             {t("核对上次结果", "Check previous result")}
           </button>
         </section>
@@ -201,7 +210,7 @@ export function TodayBoard({
           {receipt ? (
             <div className={styles.completionReceipt} aria-live="polite">
               <span>{receipt.text || t("已完成", "Completed")}</span>
-              <button type="button" className={css.btn} disabled={pending} onClick={() => void reverse()}>
+              <button type="button" className={css.btn} disabled={!canEdit} onClick={() => void reverse()}>
                 {t("撤销", "Undo")}
               </button>
               <button type="button" className={css.link} onClick={() => setReceipt()}>
@@ -222,7 +231,7 @@ export function TodayBoard({
                     <textarea
                       aria-label={t("结果", "Result")}
                       value={result}
-                      disabled={pending || !!operation.current}
+                      disabled={!canEdit || !!operation.current}
                       onChange={(event) => {
                         if (focus) setDrafts((current) => ({ ...current, [focus.key]: event.target.value }));
                       }}
@@ -264,7 +273,7 @@ export function TodayBoard({
                       aria-label={t("结果", "Result")}
                       placeholder={t("结果", "Result")}
                       value={result}
-                      disabled={pending || !!operation.current}
+                      disabled={!canEdit || !!operation.current}
                       onChange={(event) => {
                         const value = event.target.value;
                         if (focus) setDrafts((current) => ({ ...current, [focus.key]: value }));
@@ -273,7 +282,7 @@ export function TodayBoard({
                   )}
                   <button
                     className={`${css.btn} ${css["btn-strong"]}`}
-                    disabled={pending || (showLatest && !!operation.current)}
+                    disabled={!canEdit || (showLatest && !!operation.current)}
                     type="submit"
                   >
                     {pending
@@ -344,7 +353,7 @@ export function TodayBoard({
                 <button
                   type="button"
                   className={styles.stepCircle}
-                  disabled={pending}
+                  disabled={!canEdit}
                   aria-label={t(`完成并记结果：${step.title}`, `Complete and record result: ${step.title}`)}
                   onClick={() => {
                     setSelected(step.key);
@@ -356,6 +365,7 @@ export function TodayBoard({
                 <button
                   type="button"
                   className={styles.stepTitle}
+                  disabled={!canEdit}
                   onClick={() => {
                     setSelected(step.key);
                     if (operation.current) board.set("showLatest", true);
@@ -376,7 +386,7 @@ export function TodayBoard({
               <button
                 type="button"
                 className={css.btn}
-                disabled={busy || pending || !!operation.current}
+                disabled={busy || !canEdit || !!operation.current}
                 onClick={() => void decide(item, true)}
               >
                 {t("采纳", "Adopt")}
@@ -384,7 +394,7 @@ export function TodayBoard({
               <button
                 type="button"
                 className={css.link}
-                disabled={busy || pending || !!operation.current}
+                disabled={busy || !canEdit || !!operation.current}
                 aria-label={t(`不要这条建议：${item.title}`, `Dismiss suggestion: ${item.title}`)}
                 onClick={() => void decide(item, false)}
               >
@@ -414,17 +424,21 @@ export function TodayBoard({
       )}
       {!!data.data?.traces.length && (
         <section className={styles.traceCards} aria-label={t("最近的痕迹", "Recent traces")}>
-          {data.data.traces.slice(0, 3).map((trace) => (
-            <article key={trace.key}>
-              <strong>
-                {trace.label}
-                {trace.value !== null
-                  ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)} ${trace.unit ?? ""}`
-                  : ""}
-              </strong>
-              <time dateTime={trace.date}>{todayProjectDate(trace.date, today, locale)}</time>
-            </article>
-          ))}
+          {data.data.traces.slice(0, 3).map((trace) => {
+            const metric = locale === "en" ? metricEnglish[trace.key] : undefined;
+            const unit = metric?.unit ?? trace.unit;
+            return (
+              <article key={trace.key}>
+                <strong>
+                  {metric?.label ?? trace.label}
+                  {trace.value !== null
+                    ? ` ${trace.estimated ? "≈" : ""}${todayNumber(trace.value, locale)}${unit ? ` ${unit}` : ""}`
+                    : ""}
+                </strong>
+                <time dateTime={trace.date}>{todayProjectDate(trace.date, today, locale)}</time>
+              </article>
+            );
+          })}
         </section>
       )}
       {data.error && <p role="alert">{data.error}</p>}

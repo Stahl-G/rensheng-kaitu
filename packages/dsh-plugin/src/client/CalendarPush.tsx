@@ -105,6 +105,12 @@ export function CalendarSlotForm({
   return (
     <form
       className={`${css.card} ${css["sub-form"]}`}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing && !busy) {
+          event.preventDefault();
+          close();
+        }
+      }}
       onSubmit={async (event) => {
         event.preventDefault();
         setBusy(true);
@@ -125,7 +131,22 @@ export function CalendarSlotForm({
       <div className={css.fields}>
         <label>
           {t("开始时间", "Start time")}
-          <input type="time" required value={from} onChange={(event) => setFrom(event.target.value)} />
+          <input
+            type="time"
+            required
+            // biome-ignore lint/a11y/noAutofocus: 点开安排时间段后直接聚焦开始时间。
+            autoFocus
+            value={from}
+            onChange={(event) => {
+              const nextFrom = event.target.value;
+              setFrom(nextFrom);
+              if (nextFrom && !to) {
+                const [hh = "0", mm = "00"] = nextFrom.split(":");
+                const nextHour = Number(hh) + 1;
+                setTo(nextHour >= 24 ? "23:59" : `${String(nextHour).padStart(2, "0")}:${mm}`);
+              }
+            }}
+          />
         </label>
         <label>
           {t("结束时间", "End time")}

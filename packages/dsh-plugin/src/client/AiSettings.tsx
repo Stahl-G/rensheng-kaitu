@@ -70,10 +70,7 @@ export function AiSettings(props: Parameters<typeof useAiConnection>[0]) {
       <p>
         {connected
           ? t(`当前连接：${connected}`, `Current connection: ${connected}`)
-          : t(
-              "还没连接 AI。记录和查看资料照常可用。",
-              "AI is not connected. Notes and your library remain available.",
-            )}
+          : t("未连接 AI", "AI not connected")}
       </p>
       {localOnly && (
         <p>

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { type FileImportServices, OnboardingFileImport } from "./OnboardingSources.js";
 import styles from "./OnboardingSources.module.css";
 import css from "./Prototype.module.css";
-import { jsonImportSource } from "./file-import-source.js";
+import { detectFileImportSource } from "./file-import-source.js";
 import { useT } from "./i18n.js";
 
 /** A dropped File and a picked File take the same preview/confirmation path. */
@@ -64,23 +64,18 @@ export function LibraryFileImport(
           setText(content);
           setKind("text");
         }
-      } else {
-        let source: FileImportSource | "choose";
-        if (extension === "ics") source = "ics";
-        else if (extension === "xml") source = "apple-health";
-        else if (extension === "zip") source = "choose";
-        else if (extension === "json") {
-          source = await jsonImportSource(file).catch(() => {
-            throw readError();
-          });
-        } else
-          throw new Error(
-            t(
-              "支持文本、Markdown、聊天 JSON / ZIP、日历 ICS 和 Nut AI 备份。",
-              "Use text, Markdown, chat JSON / ZIP, calendar ICS or a Nut AI backup.",
-            ),
-          );
+      } else if (["ics", "xml", "zip", "json"].includes(extension ?? "")) {
+        const source = await detectFileImportSource(file).catch(() => {
+          throw readError();
+        });
         if (active) setKind(source);
+      } else {
+        throw new Error(
+          t(
+            "支持文本、Markdown、聊天 JSON / ZIP、Apple 健康、日历 ICS 和 Nut AI 备份。",
+            "Use text, Markdown, chat JSON / ZIP, Apple Health, calendar ICS or a Nut AI backup.",
+          ),
+        );
       }
     })()
       .catch((err) => {

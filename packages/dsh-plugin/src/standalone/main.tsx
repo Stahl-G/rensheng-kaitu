@@ -103,7 +103,9 @@ const props: OverviewPageProps = {
   workspaceBackup: (operation, input = {}) => call("workspaceBackup", operation, input),
   desktopUpdate: (action) => call("desktopUpdate", action),
   privacyNotice: () => call("privacyNotice"),
-  plugins: (action, input) => call("plugins", action, input),
+  plugins: document.documentElement.hasAttribute("data-plugins")
+    ? (action, input) => call("plugins", action, input)
+    : undefined,
   configureAutomation: (tasks, times) => call("configureAutomation", tasks, times),
   exportWorkspace: () => call("exportWorkspace"),
   restoreVersion: (oid) => call("restoreVersion", oid),

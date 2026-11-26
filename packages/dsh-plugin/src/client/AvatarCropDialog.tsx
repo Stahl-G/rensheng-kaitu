@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import Cropper, { type Area } from "react-easy-crop";
 import css from "./AvatarCropDialog.module.css";
 import { avatarBase64 } from "./avatar.js";
+import { useT } from "./i18n.js";
 
 interface AvatarCropDialogProps {
   file: File;
@@ -10,6 +11,7 @@ interface AvatarCropDialogProps {
 }
 
 export function AvatarCropDialog({ file, onSave, onCancel }: AvatarCropDialogProps) {
+  const t = useT();
   const dialog = useRef<HTMLDialogElement>(null);
   const heading = useId();
   const slider = useId();
@@ -26,26 +28,27 @@ export function AvatarCropDialog({ file, onSave, onCancel }: AvatarCropDialogPro
   }, []);
   useEffect(() => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("请选择 JPG、PNG 或 WebP 图片");
+      setError(t("请选择 JPG、PNG 或 WebP 图片", "Choose a JPG, PNG or WebP image"));
       return;
     }
     let active = true;
     const reader = new FileReader();
+    const unreadable = t("无法读取这张图片，请换一张重试", "Could not read this image. Try another file.");
     reader.onload = () => {
       const image = new Image();
       image.src = String(reader.result);
       void image.decode().then(
         () => active && setSource(image.src),
-        () => active && setError("无法读取这张图片，请换一张重试"),
+        () => active && setError(unreadable),
       );
     };
-    reader.onerror = () => active && setError("无法读取这张图片，请换一张重试");
+    reader.onerror = () => active && setError(unreadable);
     reader.readAsDataURL(file);
     return () => {
       active = false;
       reader.abort();
     };
-  }, [file]);
+  }, [file, t]);
   const save = async () => {
     if (!source || !area || saving) return;
     setSaving(true);
@@ -70,8 +73,7 @@ export function AvatarCropDialog({ file, onSave, onCancel }: AvatarCropDialogPro
         if (!saving) onCancel();
       }}
     >
-      <h2 id={heading}>裁剪头像</h2>
-      <p className={css.hint}>拖动图片调整位置，用滑块缩放。</p>
+      <h2 id={heading}>{t("裁剪头像", "Crop avatar")}</h2>
       <div className={css.viewport}>
         {source ? (
           <Cropper
@@ -81,18 +83,23 @@ export function AvatarCropDialog({ file, onSave, onCancel }: AvatarCropDialogPro
             aspect={1}
             cropShape="round"
             classes={{ cropAreaClassName: css.cropArea }}
-            cropperProps={{ role: "group", "aria-label": "头像取景，方向键调整位置" }}
+            cropperProps={{
+              role: "group",
+              "aria-label": t("头像取景，方向键调整位置", "Avatar crop area; use arrow keys to adjust"),
+            }}
             showGrid={false}
             onCropChange={setCrop}
             onZoomChange={setZoom}
             onCropComplete={(_percent, pixels) => setArea(pixels)}
           />
         ) : (
-          <output className={css.loading}>{error ? "图片不可用" : "正在读取图片…"}</output>
+          <output className={css.loading}>
+            {error ? t("图片不可用", "Image unavailable") : t("正在读取图片…", "Loading image…")}
+          </output>
         )}
       </div>
       <label className={css.zoom} htmlFor={slider}>
-        缩放
+        {t("缩放", "Zoom")}
         <input
           id={slider}
           type="range"
@@ -111,10 +118,10 @@ export function AvatarCropDialog({ file, onSave, onCancel }: AvatarCropDialogPro
       )}
       <div className={css.actions}>
         <button type="button" disabled={saving} onClick={onCancel}>
-          取消
+          {t("取消", "Cancel")}
         </button>
         <button type="button" className={css.save} disabled={!area || saving} onClick={() => void save()}>
-          {saving ? "正在保存…" : "保存"}
+          {saving ? t("正在保存…", "Saving…") : t("保存", "Save")}
         </button>
       </div>
     </dialog>
