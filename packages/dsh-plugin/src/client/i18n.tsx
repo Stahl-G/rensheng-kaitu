@@ -13,11 +13,21 @@ export function useT() {
   return useCallback((zh: string, en: string) => (locale === "en" ? en : zh), [locale]);
 }
 
+export function calendarSourceName(source: string, t: ReturnType<typeof useT>) {
+  const names: Record<string, string> = {
+    开图: "Kaitu",
+    导入日历: "Imported calendar",
+    订阅日历: "Subscribed calendar",
+  };
+  return t(source, names[source] ?? source);
+}
+
 /** Translate Kaitu's generated history labels; keep user titles and custom messages verbatim. */
 export function versionText(text: string, locale: Locale): string {
   if (locale !== "en") return text;
   const labels: Record<string, string> = {
     从原文采纳了一个下一步: "Turned a note into a next step",
+    添加了演示用的生活记录: "Added sample life records",
     完成下一步并记下结果: "Completed a next step and logged the result",
     调整了下一步的日期: "Changed the date of a next step",
     保存了一条原文记录: "Saved a quick note",

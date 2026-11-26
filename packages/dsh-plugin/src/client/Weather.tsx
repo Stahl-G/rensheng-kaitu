@@ -214,6 +214,12 @@ export function TodayWeather({
     return (
       <form
         className={css.ask}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && !event.nativeEvent.isComposing && asking) {
+            event.preventDefault();
+            setAsking(false);
+          }
+        }}
         onSubmit={async (event) => {
           event.preventDefault();
           if (!draft.trim()) return;
@@ -229,6 +235,9 @@ export function TodayWeather({
         <label htmlFor="weather-city">{t("选择城市", "Choose city")}</label>
         <input
           id="weather-city"
+          // biome-ignore lint/a11y/noAutofocus: 点开换城市表单后直接聚焦输入。
+          autoFocus
+          onFocus={(event) => event.currentTarget.select()}
           value={draft}
           maxLength={100}
           onChange={(event) => setDraft(event.target.value)}

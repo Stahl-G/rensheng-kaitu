@@ -477,6 +477,7 @@ export function AskPage({
   };
   const [threadMenu, setThreadMenu] = useState<{ id: string; confirm?: boolean } | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
+  const cancelRename = useRef(false);
   const [showArchived, setShowArchived] = useState(false);
   const groups = new Map<string, Thread[]>();
   for (const thread of threads.filter((row) => row.pinned && !row.archived))
@@ -549,7 +550,7 @@ export function AskPage({
       setThreadMenu(null);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setThreadMenu(null);
+      if (event.key === "Escape" && !event.isComposing) setThreadMenu(null);
     };
     window.addEventListener("pointerdown", onPointer);
     window.addEventListener("keydown", onKey);
@@ -558,6 +559,28 @@ export function AskPage({
       window.removeEventListener("keydown", onKey);
     };
   }, [threadMenu]);
+  useEffect(() => {
+    if (!addMenu && !modelMenu) return;
+    const onPointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest(`.${css.addWrap}`) || target.closest(`.${css.modelWrap}`)) return;
+      setAddMenu(false);
+      setModelMenu(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.isComposing) {
+        setAddMenu(false);
+        setModelMenu(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointer);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [addMenu, modelMenu]);
   const threadRow = (thread: Thread) => (
     <div key={thread.id} className={css.threadRow}>
       {renaming?.id === thread.id ? (
@@ -566,11 +589,28 @@ export function AskPage({
           value={renaming.title}
           // biome-ignore lint/a11y/noAutofocus: 点了重命名就是要输入。
           autoFocus
+          onFocus={(event) => {
+            cancelRename.current = false;
+            event.currentTarget.select();
+          }}
           onChange={(event) => setRenaming({ id: thread.id, title: event.target.value })}
-          onBlur={() => organize(thread.id, { title: renaming.title })}
+          onBlur={() => {
+            if (cancelRename.current) {
+              cancelRename.current = false;
+              return;
+            }
+            organize(thread.id, { title: renaming.title });
+          }}
           onKeyDown={(event) => {
-            if (event.key === "Enter") organize(thread.id, { title: renaming.title });
-            if (event.key === "Escape") setRenaming(null);
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              organize(thread.id, { title: renaming.title });
+            }
+            if (event.key === "Escape" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              cancelRename.current = true;
+              setRenaming(null);
+            }
           }}
         />
       ) : (
@@ -588,7 +628,6 @@ export function AskPage({
       <button
         type="button"
         className={css.threadMore}
-        disabled={!settings?.configured}
         aria-label={t("更多", "More")}
         aria-expanded={threadMenu?.id === thread.id}
         onClick={() => setThreadMenu(threadMenu?.id === thread.id ? null : { id: thread.id })}
@@ -1512,7 +1551,12 @@ export function AskPage({
             void addFiles(Array.from(event.dataTransfer.files));
           }}
           onKeyDown={(event) => {
-            if (event.key === "Escape") {
+            if (
+              event.key === "Escape" &&
+              !event.nativeEvent.isComposing &&
+              (addMenu || modelMenu || references || atQuery !== undefined)
+            ) {
+              event.preventDefault();
               setModelMenu(false);
               setAddMenu(false);
               closeReferences();
@@ -1793,7 +1837,7 @@ export function AskPage({
                   className={`${v2["mode-pop"]} ${css.modelPopover}`}
                   aria-label={t("当前 AI", "Current AI")}
                   onKeyDown={(event) => {
-                    if (event.key === "Escape") {
+                    if (event.key === "Escape" && !event.nativeEvent.isComposing) {
                       event.preventDefault();
                       event.stopPropagation();
                       setModelMenu(false);

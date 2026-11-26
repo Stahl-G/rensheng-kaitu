@@ -102,6 +102,7 @@ export function PersonalPages(
   const [busy, setBusy] = useState(false);
   const [history, setHistory] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [confirmCalendarRemoval, setConfirmCalendarRemoval] = useState(false);
   const [restore, setRestore] = useState<string | null>(null);
   const [moving, setMoving] = useState(false);
   const [opening, setOpening] = useState<"activate" | "initialize" | null>(null);
@@ -191,17 +192,26 @@ export function PersonalPages(
           ]),
         });
         const value = await response.json();
-        if (!response.ok) throw new Error(value.error ?? "搜索设置未保存，请重试");
+        if (!response.ok)
+          throw new Error(
+            value.error ?? t("搜索设置未保存，请重试", "Could not save search settings. Try again."),
+          );
         setAi((current) => (current ? { ...current, search: value } : current));
         setSearchKey("");
         window.dispatchEvent(new Event("kaitu-ai-changed"));
       },
-      remove ? "已移除 Key，下一次搜索生效" : "搜索设置已保存，下一次搜索生效",
+      remove
+        ? t("已移除 Key，下一次搜索生效", "Key removed. Applies to the next search.")
+        : t("搜索设置已保存，下一次搜索生效", "Search settings saved. Applies to the next search."),
     );
   const section = props.view === "profile" ? "profile" : props.section;
-  const select = props.selectSection;
+  const select = (id: SettingsSection) => {
+    setConfirmCalendarRemoval(false);
+    props.selectSection(id);
+  };
   const [query, setQuery] = useState("");
-  const item = settingItems.find(([id]) => id === section) ?? settingItems[0];
+  const visibleItems = settingItems.filter(([id]) => id !== "plugins" || props.plugins);
+  const item = visibleItems.find(([id]) => id === section) ?? settingItems[0];
   const [phones, setPhones] = useState<
     { name: string; configured: boolean; paired: boolean; running: boolean; error?: string }[] | null
   >(null);
@@ -263,7 +273,7 @@ export function PersonalPages(
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
-        {settingItems
+        {visibleItems
           .filter((entry) => t(entry[3], entry[4]).toLocaleLowerCase().includes(query.toLocaleLowerCase()))
           .map(([id, zhGroup, enGroup, zh, en], index, list) => (
             <div key={id}>
@@ -310,12 +320,6 @@ export function PersonalPages(
           <>
             {section === "overview" && (
               <>
-                <p>
-                  {t(
-                    "先看要处理的，其余按用途分好。",
-                    "Resolve anything that needs attention, then find settings by purpose.",
-                  )}
-                </p>
                 {!!issues.length && (
                   <section className={settingsCss.attention}>
                     <h2>{t("需要你处理", "Needs attention")}</h2>
@@ -380,7 +384,8 @@ export function PersonalPages(
                       ["about", data.version ?? t("本地工作台", "Local workbench")],
                     ] as const
                   ).map(([id, status]) => {
-                    const item = settingItems.find(([key]) => key === id) ?? settingItems[0];
+                    const item = visibleItems.find(([key]) => key === id);
+                    if (!item) return null;
                     return (
                       <button type="button" key={id} onClick={() => select(id)}>
                         <span>{t(item[3], item[4])}</span>
@@ -413,12 +418,13 @@ export function PersonalPages(
                     <button
                       type="button"
                       className={`${css.btn} ${css["btn-quiet"]}`}
+                      aria-expanded={moving}
                       onClick={() => {
                         setOpening(null);
                         setMoving(!moving);
                       }}
                     >
-                      {t("迁移当前资料…", "Move current notes…")}
+                      {moving ? t("收起", "Close") : t("迁移当前资料…", "Move current notes…")}
                     </button>
                   </div>
                   <div className={css.storageActions}>
@@ -426,6 +432,7 @@ export function PersonalPages(
                       <button
                         type="button"
                         className={`${css.btn} ${css["btn-quiet"]}`}
+                        aria-expanded={opening === "initialize"}
                         disabled={busy}
                         onClick={() => {
                           setMoving(false);
@@ -433,13 +440,16 @@ export function PersonalPages(
                           setOpening(opening === "initialize" ? null : "initialize");
                         }}
                       >
-                        {t("新建空白工作区…", "Create a blank workspace…")}
+                        {opening === "initialize"
+                          ? t("收起", "Close")
+                          : t("新建空白工作区…", "Create a blank workspace…")}
                       </button>
                     )}
                     {props.workspaceBackup && (
                       <button
                         type="button"
                         className={`${css.btn} ${css["btn-quiet"]}`}
+                        aria-expanded={opening === "activate"}
                         disabled={busy}
                         onClick={() => {
                           setMoving(false);
@@ -447,7 +457,9 @@ export function PersonalPages(
                           setOpening(opening === "activate" ? null : "activate");
                         }}
                       >
-                        {t("打开已有工作区…", "Open an existing workspace…")}
+                        {opening === "activate"
+                          ? t("收起", "Close")
+                          : t("打开已有工作区…", "Open an existing workspace…")}
                       </button>
                     )}
                   </div>
@@ -455,6 +467,12 @@ export function PersonalPages(
                 {opening && props.workspaceBackup && (
                   <form
                     className={`${css.card} ${css["sub-form"]}`}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape" && !busy) {
+                        event.preventDefault();
+                        setOpening(null);
+                      }
+                    }}
                     onSubmit={(event) => {
                       event.preventDefault();
                       void run(
@@ -472,20 +490,14 @@ export function PersonalPages(
                       );
                     }}
                   >
-                    {opening === "initialize" && (
-                      <p className={css.small}>
-                        {t(
-                          "选择一个空文件夹，生成独立的空白资料；当前资料会保留在原位置。",
-                          "Choose an empty folder for separate blank notes. Your current notes stay in their original location.",
-                        )}
-                      </p>
-                    )}
                     <label>
                       {opening === "initialize"
                         ? t("空文件夹路径", "Empty folder path")
                         : t("已有工作区路径", "Existing workspace path")}
                       <input
                         required
+                        // biome-ignore lint/a11y/noAutofocus: 展开工作区路径表单后直接聚焦输入。
+                        autoFocus
                         value={workspacePath}
                         disabled={busy}
                         onChange={(event) => setWorkspacePath(event.target.value)}
@@ -554,9 +566,10 @@ export function PersonalPages(
                       <button
                         type="button"
                         className={`${css.btn} ${css["btn-quiet"]}`}
+                        aria-expanded={importing}
                         onClick={() => setImporting(!importing)}
                       >
-                        {t("打开", "Open")}
+                        {importing ? t("收起", "Close") : t("打开", "Open")}
                       </button>
                     </div>
                     <div className={css["switch-row"]}>
@@ -593,9 +606,10 @@ export function PersonalPages(
                       <button
                         type="button"
                         className={`${css.btn} ${css["btn-quiet"]}`}
+                        aria-expanded={history}
                         onClick={() => setHistory(!history)}
                       >
-                        {t("打开", "Open")}
+                        {history ? t("收起", "Close") : t("打开", "Open")}
                       </button>
                     </div>
                   </div>
@@ -689,23 +703,30 @@ export function PersonalPages(
                 )}
                 {search && (
                   <section className={css.sec}>
-                    <h2 className={css.eyebrow}>网络搜索</h2>
+                    <h2 className={css.eyebrow}>{t("网络搜索", "Web search")}</h2>
                     <div className={`${css.card} ${css.sum} ${css["sub-form"]}`}>
                       <b>
                         {search.native?.configured
-                          ? `使用 ${search.native.name} 自带搜索`
+                          ? t(
+                              `使用 ${search.native.name} 自带搜索`,
+                              `Using ${search.native.name} built-in search`,
+                            )
                           : search.configured
-                            ? `当前使用 ${search.name}`
-                            : "先连接 AI，就能使用它自带的搜索"}
+                            ? t(`当前使用 ${search.name}`, `Using ${search.name}`)
+                            : t("先连接 AI，就能使用它自带的搜索", "Connect AI to use its built-in search")}
                       </b>
                       {search.native && !search.native.supported && (
-                        <p className={css.small}>{search.native.reason ?? "当前服务没有自带搜索"}</p>
+                        <p className={css.small}>
+                          {search.native.reason ?? t("当前服务没有自带搜索", "Built-in search unavailable")}
+                        </p>
                       )}
                       <details>
-                        <summary className={css.link}>改用专门的搜索服务</summary>
+                        <summary className={css.link}>
+                          {t("改用专门的搜索服务", "Use a dedicated search provider")}
+                        </summary>
                         <div className={css["sub-form"]}>
                           <label className={css.small} htmlFor="search-provider">
-                            搜索服务
+                            {t("搜索服务", "Search provider")}
                           </label>
                           <select
                             id="search-provider"
@@ -719,12 +740,12 @@ export function PersonalPages(
                             {search.providers.map((item) => (
                               <option value={item.id} key={item.id}>
                                 {item.name}
-                                {item.configured ? " · 已保存 Key" : ""}
+                                {item.configured ? t(" · 已保存 Key", " · Key saved") : ""}
                               </option>
                             ))}
                           </select>
                           <label className={css.small} htmlFor="search-api-key">
-                            搜索 API Key
+                            {t("搜索 API Key", "Search API key")}
                           </label>
                           <input
                             id="search-api-key"
@@ -733,7 +754,9 @@ export function PersonalPages(
                             value={searchKey}
                             disabled={busy}
                             placeholder={
-                              selectedSearch?.configured ? "留空保留已存 Key" : "粘贴这个搜索服务的 Key"
+                              selectedSearch?.configured
+                                ? t("留空保留已存 Key", "Leave blank to keep saved key")
+                                : t("粘贴这个搜索服务的 Key", "Paste the API key")
                             }
                             onChange={(event) => setSearchKey(event.target.value)}
                           />
@@ -744,7 +767,10 @@ export function PersonalPages(
                               target="_blank"
                               rel="noreferrer"
                             >
-                              去 {selectedSearch.name} 官方申请 Key ↗
+                              {t(
+                                `去 ${selectedSearch.name} 官方申请 Key ↗`,
+                                `Get a ${selectedSearch.name} API key ↗`,
+                              )}
                             </a>
                           )}
                           <div className={css["dialog-foot"]}>
@@ -755,7 +781,7 @@ export function PersonalPages(
                                 disabled={busy}
                                 onClick={() => void saveSearch(true)}
                               >
-                                移除 Key
+                                {t("移除 Key", "Remove key")}
                               </button>
                             )}
                             <button
@@ -764,7 +790,7 @@ export function PersonalPages(
                               disabled={busy}
                               onClick={() => void saveSearch()}
                             >
-                              保存搜索设置
+                              {t("保存搜索设置", "Save search settings")}
                             </button>
                           </div>
                         </div>
@@ -787,9 +813,12 @@ export function PersonalPages(
                     <b>{t("接入支持 MCP 的客户端", "Connect an MCP client")}</b>
                     <details>
                       <summary className={css.link}>{t("查看接入说明", "Setup instructions")}</summary>
-                      <pre
-                        className={css.detailBody}
-                      >{`命令：kaitu mcp\n工作目录：${data.storage.root}`}</pre>
+                      <pre className={css.detailBody}>
+                        {t(
+                          `命令：kaitu mcp\n工作目录：${data.storage.root}`,
+                          `Command: kaitu mcp\nWorking directory: ${data.storage.root}`,
+                        )}
+                      </pre>
                       <textarea
                         aria-label={t("AI 接手说明", "AI handover instructions")}
                         rows={5}
@@ -1066,6 +1095,7 @@ export function PersonalPages(
                         disabled={busy || !calendarPush}
                         onChange={(event) =>
                           void run(async () => {
+                            setConfirmCalendarRemoval(false);
                             setCalendarPush(await props.configureCalendarPush(event.target.checked));
                           })
                         }
@@ -1073,21 +1103,49 @@ export function PersonalPages(
                       <i />
                     </span>
                   </div>
-                  {calendarPush && !calendarPush.enabled && (
+                  {calendarPush &&
+                    !calendarPush.enabled &&
+                    Object.values(calendarPush.entries).some(
+                      (entry) => !["deleted", "removed"].includes(entry.status),
+                    ) && (
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={busy}
+                        onClick={() => {
+                          if (!confirmCalendarRemoval) {
+                            setConfirmCalendarRemoval(true);
+                            return;
+                          }
+                          setConfirmCalendarRemoval(false);
+                          void run(
+                            async () => {
+                              const result = await props.removeCalendarPush();
+                              setCalendarPush(result);
+                              if (Object.values(result.entries).some((receipt) => receipt.status === "error"))
+                                throw new Error(
+                                  t(
+                                    "部分事件未移除，请查看下方原因并重试",
+                                    "Some events could not be removed. Check details below and retry.",
+                                  ),
+                                );
+                            },
+                            t("已处理移除请求", "Removal processed"),
+                          );
+                        }}
+                      >
+                        {confirmCalendarRemoval
+                          ? t("确认移除全部事件", "Confirm removal of all events")
+                          : t("移除开图已写入的日历事件", "Remove calendar events written by Kaitu")}
+                      </button>
+                    )}
+                  {confirmCalendarRemoval && !calendarPush?.enabled && (
                     <button
                       type="button"
                       className={css.link}
-                      disabled={busy}
-                      onClick={() =>
-                        void run(async () => {
-                          const result = await props.removeCalendarPush();
-                          setCalendarPush(result);
-                          if (Object.values(result.entries).some((receipt) => receipt.status === "error"))
-                            throw new Error("部分事件未移除，请查看下方原因并重试");
-                        }, "已处理移除请求")
-                      }
+                      onClick={() => setConfirmCalendarRemoval(false)}
                     >
-                      移除开图已写入的日历事件
+                      {t("取消", "Cancel")}
                     </button>
                   )}
                   {calendarPush &&
@@ -1101,19 +1159,17 @@ export function PersonalPages(
                           id={id}
                           state={calendarPush}
                           retry={async () => {
-                            setCalendarPush(await props.removeCalendarPush());
+                            if (calendarPush.enabled) setCalendarPush(await props.retryCalendarPush(id));
+                            else setConfirmCalendarRemoval(true);
                           }}
                         />
                       ))}
                 </div>
               </section>
             )}
-            {section === "plugins" &&
-              (props.plugins ? (
-                <Plugins request={props.plugins} openLabel={props.pluginOpenLabel} />
-              ) : (
-                <p>{t("插件由 DSH 管理。", "Plugins are managed by DSH.")}</p>
-              ))}
+            {section === "plugins" && props.plugins && (
+              <Plugins request={props.plugins} openLabel={props.pluginOpenLabel} />
+            )}
             {section === "about" && (
               <section className={css.sec}>
                 <h2 className={css.eyebrow}>{t("关于", "About")}</h2>

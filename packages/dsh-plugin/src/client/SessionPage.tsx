@@ -20,13 +20,13 @@ export function SessionPage(props: Props) {
     try {
       await (text ? props.onPrompt(text) : props.onAgent());
     } catch (err) {
-      setError(`打开开图会话失败：${err instanceof Error ? err.message : String(err)}`);
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
   return (
     <FileServicesContext.Provider value={props.fileServices}>
-      {error && <p role="alert">{error}</p>}
       <OverviewPage
+        sessionError={error}
         hosted
         {...props}
         onPrompt={(text) => void open(text)}

@@ -138,12 +138,21 @@
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
+  transition: opacity var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.place:hover {
+  opacity: 0.85;
+}
+.place:active {
+  transform: scale(0.96);
 }
 .temp {
   font-size: 76px;
   line-height: 1;
   font-weight: 200;
   letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
 }
 .right {
   display: grid;
@@ -173,6 +182,16 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.wx button:not(.place):hover,
+.bar button:not(.place):hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+.wx button:not(.place):active,
+.bar button:not(.place):active {
+  transform: scale(0.96);
 }
 .hours {
   display: grid;
@@ -181,6 +200,7 @@
   padding: 0;
   list-style: none;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .hours li {
   display: flex;
@@ -217,6 +237,7 @@
   font-size: 30px;
   font-weight: 250;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .bar .credit {
   margin-left: auto;
@@ -232,6 +253,22 @@
   border-radius: 14px;
   background: var(--control);
   color: var(--ink);
+  animation: wxReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes wxReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ask {
+    animation: none !important;
+  }
 }
 .ask input {
   width: 160px;

@@ -1,4 +1,37 @@
 /* 开图总览：克制中性色、板块色圆点，主栏与健康项目侧栏。 */
+.button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--secondary-line, var(--kt-control));
+  background: var(--secondary, var(--kt-card));
+  color: var(--kt-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.button:hover:not(:disabled) {
+  background: var(--kt-subtle);
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.primary {
+  border-color: transparent;
+  background: var(--kt-primary);
+  color: var(--kt-on-primary);
+}
+.primary:hover:not(:disabled) {
+  background: var(--primary-hover, var(--kt-primary));
+}
 .link {
   color: var(--kt-link);
   text-decoration: none;
@@ -29,7 +62,7 @@
   min-height: 40px;
   padding: 4px 10px;
   border-radius: 10px;
-  transition: background-color 120ms ease;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out);
 }
 .row:hover {
   background: var(--kt-subtle);
@@ -57,6 +90,14 @@
   background: transparent;
   color: var(--kt-secondary);
   border-radius: 8px;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.secondaryNav button:hover:not([aria-pressed="true"]) {
+  background: var(--kt-subtle);
+}
+.secondaryNav button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .secondaryNav [aria-pressed="true"] {
   background: var(--kt-control);

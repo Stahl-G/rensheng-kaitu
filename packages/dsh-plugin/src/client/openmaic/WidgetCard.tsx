@@ -22,6 +22,7 @@ export interface TeachingCardProps {
 }
 import { type WidgetMeta, widgetMetaFrom } from "@kaitu/core/teaching-frame";
 import { HEIGHT_MESSAGE_TYPE, buildWidgetDoc } from "@kaitu/core/teaching-frame";
+import { useT } from "../i18n.js";
 
 const MIN_HEIGHT = 480;
 const HEIGHT_CAP = 1600;
@@ -119,6 +120,7 @@ function WidgetFrame({
 }
 
 function Frame({ meta, callId, frameUrl }: { meta: WidgetMeta; callId: string; frameUrl?: string }) {
+  const t = useT();
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [expanded, setExpanded] = useState(false);
 
@@ -135,13 +137,22 @@ function Frame({ meta, callId, frameUrl }: { meta: WidgetMeta; callId: string; f
     return () => removeEventListener("message", onMessage);
   }, [callId]);
 
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpanded(false);
+    };
+    addEventListener("keydown", onKey);
+    return () => removeEventListener("keydown", onKey);
+  }, [expanded]);
+
   return (
     <div>
       <div style={headerStyle}>
         <span style={{ fontWeight: 500 }}>{meta.title}</span>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>OpenMAIC · {meta.widgetType}</span>
         <button type="button" style={expandBtnStyle} onClick={() => setExpanded(true)}>
-          ⛶ 展开
+          ⛶ {t("展开", "Expand")}
         </button>
       </div>
       <WidgetFrame meta={meta} callId={callId} frameUrl={frameUrl} height={height} />
@@ -151,7 +162,7 @@ function Frame({ meta, callId, frameUrl }: { meta: WidgetMeta; callId: string; f
             <span style={{ fontWeight: 500 }}>{meta.title}</span>
             <span style={{ opacity: 0.6 }}>OpenMAIC · {meta.widgetType}</span>
             <button type="button" style={closeBtnStyle} onClick={() => setExpanded(false)}>
-              关闭
+              {t("关闭", "Close")}
             </button>
           </div>
           <WidgetFrame

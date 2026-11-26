@@ -20,7 +20,7 @@ import styles from "./LibraryPage.module.css";
 import { MediaPreview, type MediaServices } from "./MediaPreview.js";
 import css from "./Prototype.module.css";
 import { ReadWarnings } from "./ReadWarnings.js";
-import { useLocale, useT, versionText } from "./i18n.js";
+import { calendarSourceName, useLocale, useT, versionText } from "./i18n.js";
 import { plainStamp } from "./next-presentation.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 
@@ -71,7 +71,6 @@ const icons: Record<string, ReactNode> = {
 };
 
 const SOURCE_EN: Record<string, string> = {
-  开图: "Kaitu",
   你记录的: "Recorded by you",
   "本机 AI": "Local AI",
   "Apple 健康": "Apple Health",
@@ -151,7 +150,13 @@ export function LibraryPage({
       clearTimeout(timer);
     };
   }, [term, searchLibraryNotes, data]);
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [draftOpen, setDraftOpen] = useState(false);
+  const draftButton = useRef<HTMLButtonElement>(null);
+  const closeDraft = () => {
+    setDraftOpen(false);
+    draftButton.current?.focus();
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const away = overview?.sync.cloudOrganizer?.away;
@@ -278,7 +283,10 @@ export function LibraryPage({
             return;
           }
           const text = event.dataTransfer.getData("text/plain");
-          if (capture && text) setDraft(text);
+          if (capture && text) {
+            setDraft(text);
+            setDraftOpen(true);
+          }
         }}
         onPaste={(event) => {
           if (capture && !(event.target instanceof HTMLTextAreaElement)) {
@@ -286,6 +294,7 @@ export function LibraryPage({
             if (text) {
               event.preventDefault();
               setDraft(text);
+              setDraftOpen(true);
             }
           }
         }}
@@ -339,8 +348,14 @@ export function LibraryPage({
             </button>
           )}
           {capture && (
-            <button type="button" onClick={() => setDraft("")}>
-              {t("粘贴一段对话", "Paste a conversation")}
+            <button
+              type="button"
+              ref={draftButton}
+              disabled={busy}
+              aria-expanded={draftOpen}
+              onClick={() => setDraftOpen(!draftOpen)}
+            >
+              {draftOpen ? t("收起", "Close") : t("粘贴一段对话", "Paste a conversation")}
             </button>
           )}
           {onAdd && (
@@ -354,7 +369,7 @@ export function LibraryPage({
             </>
           )}
         </div>
-        {draft !== null && capture && (
+        {draftOpen && capture && (
           <form
             className={styles.capture}
             onSubmit={async (event) => {
@@ -365,7 +380,8 @@ export function LibraryPage({
               try {
                 if (organize) await organize(draft);
                 else await capture(draft);
-                setDraft(null);
+                setDraft("");
+                closeDraft();
               } catch (err) {
                 setError(err instanceof Error ? err.message : String(err));
               } finally {
@@ -376,9 +392,24 @@ export function LibraryPage({
             <label>
               {t("原文", "Original text")}
               <textarea
+                // biome-ignore lint/a11y/noAutofocus: 点击粘贴一段对话后直接聚焦文本框。
+                autoFocus
                 value={draft}
                 maxLength={100000}
                 disabled={busy}
+                onKeyDown={(event) => {
+                  if (
+                    (event.metaKey || event.ctrlKey) &&
+                    event.key === "Enter" &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    event.currentTarget.form?.requestSubmit();
+                  } else if (event.key === "Escape" && !event.nativeEvent.isComposing && !busy) {
+                    event.preventDefault();
+                    closeDraft();
+                  }
+                }}
                 onChange={(event) => setDraft(event.target.value)}
               />
             </label>
@@ -389,8 +420,8 @@ export function LibraryPage({
                   ? t("保存并整理", "Save and organize")
                   : t("保存原文", "Save original")}
             </button>
-            <button type="button" disabled={busy} onClick={() => setDraft(null)}>
-              {t("取消", "Cancel")}
+            <button type="button" disabled={busy} onClick={closeDraft}>
+              {t("收起", "Close")}
             </button>
           </form>
         )}
@@ -418,7 +449,13 @@ export function LibraryPage({
                   </button>
                 ) : section.sources.length > 0 ? (
                   <span className={styles.meta}>
-                    {section.sources.map((source) => t(source, SOURCE_EN[source] ?? source)).join(" · ")}
+                    {section.sources
+                      .map((source) =>
+                        section.id === "calendar"
+                          ? calendarSourceName(source, t)
+                          : t(source, SOURCE_EN[source] ?? source),
+                      )
+                      .join(" · ")}
                   </span>
                 ) : null}
                 {section.latest && (

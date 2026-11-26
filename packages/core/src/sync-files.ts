@@ -6,7 +6,7 @@ import { isICloudPath } from "./sync-location.js";
 
 const isWindows = process.platform === "win32";
 
-/** Disposable shared reading output, including cloud placeholders and conflict copies. */
+/** The organizer's one-page USER.md, including cloud placeholders and conflict copies: never versioned, backed up or validated. */
 export function isUserProfile(file: string): boolean {
   return /^\.?USER(?: \d+| \([^/]*\)| \[[^/]*\])?\.md(?:\.icloud)?$/i.test(file);
 }

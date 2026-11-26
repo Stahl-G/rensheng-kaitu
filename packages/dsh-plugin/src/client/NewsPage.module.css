@@ -166,6 +166,14 @@
   color: var(--kt-text);
   font-size: 14px;
   line-height: 20px;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), filter var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.button:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+.button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .primary {
   background: var(--kt-primary);
@@ -505,5 +513,29 @@
 @container (max-width: 639px) {
   .aside {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+.expanded,
+.editor,
+.diff,
+.notice {
+  animation: newsReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes newsReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .expanded,
+  .editor,
+  .diff,
+  .notice {
+    animation: none !important;
   }
 }

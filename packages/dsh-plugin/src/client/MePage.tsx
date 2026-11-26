@@ -99,57 +99,91 @@ export interface MePageProps {
   onImportMemory: () => void;
   exhibition?: ReactNode;
 }
-const areas: Record<string, string> = {
-  today: "今天",
-  health: "健康",
-  projects: "在做的事",
-  feed: "资讯",
-  me: "个人档案",
+const areas: Record<string, readonly [string, string]> = {
+  today: ["今天", "Today"],
+  health: ["健康", "Health"],
+  projects: ["在做的事", "Projects"],
+  feed: ["资讯", "News"],
+  me: ["个人档案", "Profile"],
 };
-const memoryTypes = { preference: "偏好", fact: "事实", context: "背景", person: "人物", decision: "决定" };
-const patterns: Record<string, string> = {
-  "alternate-days": "隔天一次",
-  daily: "每天",
-  weekdays: "工作日",
-  custom: "自定安排",
+const memoryTypes = {
+  preference: ["偏好", "preference"],
+  fact: ["事实", "fact"],
+  context: ["背景", "context"],
+  person: ["人物", "person"],
+  decision: ["决定", "decision"],
+} as const;
+const patterns: Record<string, readonly [string, string]> = {
+  "alternate-days": ["隔天一次", "Every other day"],
+  daily: ["每天", "Daily"],
+  weekdays: ["工作日", "Weekdays"],
+  custom: ["自定安排", "Custom"],
 };
-const periods: Record<string, string> = { morning: "早上", noon: "中午", afternoon: "下午", evening: "晚上" };
-function ruleRows(r: MeRules): [string, string | undefined][] {
+const periods: Record<string, readonly [string, string]> = {
+  morning: ["早上", "Morning"],
+  noon: ["中午", "Noon"],
+  afternoon: ["下午", "Afternoon"],
+  evening: ["晚上", "Evening"],
+};
+const weekdaysEn = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function ruleRows(r: MeRules, t: Translate): [string, string | undefined][] {
   const days = r.work_hours?.days;
   const workDays =
     days?.join(",") === "1,2,3,4,5"
-      ? "周一到周五"
-      : days?.map((day) => `周${"日一二三四五六"[day]}`).join("、");
+      ? t("周一到周五", "Mon–Fri")
+      : days
+          ?.map((day) => t(`周${"日一二三四五六"[day]}`, weekdaysEn[day] ?? String(day)))
+          .join(t("、", ", "));
   return [
-    ["时区", r.timezone],
-    ["睡觉", r.sleep ? `${r.sleep.start} – ${r.sleep.end}` : undefined],
+    [t("时区", "Time zone"), r.timezone],
+    [t("睡觉", "Sleep"), r.sleep ? `${r.sleep.start} – ${r.sleep.end}` : undefined],
     [
-      "工作",
+      t("工作", "Work"),
       r.work_hours
         ? `${workDays ? `${workDays} ` : ""}${r.work_hours.start} – ${r.work_hours.end}`
         : undefined,
     ],
     [
-      "训练",
+      t("训练", "Training"),
       r.training
         ? [
-            r.training.pattern ? (patterns[r.training.pattern] ?? r.training.pattern) : null,
-            r.training.duration_min ? `${r.training.duration_min} 分钟` : null,
-            r.training.preferred ? (periods[r.training.preferred] ?? r.training.preferred) : null,
+            r.training.pattern
+              ? patterns[r.training.pattern]
+                ? t(patterns[r.training.pattern]?.[0] ?? "", patterns[r.training.pattern]?.[1] ?? "")
+                : r.training.pattern
+              : null,
+            r.training.duration_min
+              ? t(`${r.training.duration_min} 分钟`, `${r.training.duration_min} min`)
+              : null,
+            r.training.preferred
+              ? periods[r.training.preferred]
+                ? t(periods[r.training.preferred]?.[0] ?? "", periods[r.training.preferred]?.[1] ?? "")
+                : r.training.preferred
+              : null,
           ]
             .filter(Boolean)
             .join(" · ")
         : undefined,
     ],
-    ["蛋白质", r.nutrition?.protein_g?.length ? `每天 ${r.nutrition.protein_g.join(" – ")} g` : undefined],
-    [r.no_tasks_after ? `${r.no_tasks_after} 后` : "不安排任务", r.no_tasks_after ? "不安排任务" : undefined],
+    [
+      t("蛋白质", "Protein"),
+      r.nutrition?.protein_g?.length
+        ? t(`每天 ${r.nutrition.protein_g.join(" – ")} g`, `${r.nutrition.protein_g.join(" – ")} g / day`)
+        : undefined,
+    ],
+    [
+      r.no_tasks_after
+        ? t(`${r.no_tasks_after} 后`, `After ${r.no_tasks_after}`)
+        : t("不安排任务", "No tasks"),
+      r.no_tasks_after ? t("不安排任务", "No tasks scheduled") : undefined,
+    ],
   ];
 }
-function sourceLabel(source: string | null) {
+function sourceLabel(source: string | null, t: Translate) {
   if (!source) return "";
-  if (/chatgpt/i.test(source)) return "ChatGPT 导入";
-  if (/^(user|manual|你)$/.test(source)) return "你";
-  if (/^(agent|local-agent|本机 Agent)$/.test(source)) return "本机 Agent";
+  if (/chatgpt/i.test(source)) return t("ChatGPT 导入", "ChatGPT import");
+  if (/^(user|manual|你)$/.test(source)) return t("你", "You");
+  if (/^(agent|local-agent|本机 Agent)$/.test(source)) return t("本机 Agent", "Local Agent");
   return source;
 }
 
@@ -198,6 +232,7 @@ export function MePage({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const [confirmRemoveAvatar, setConfirmRemoveAvatar] = useState(false);
   const [replacement, setReplacement] = useState<MeData["memories"][number] | null>(null);
   const [replacementText, setReplacementText] = useState("");
   const mutateMemory = async (operation: () => Promise<unknown>) => {
@@ -238,12 +273,16 @@ export function MePage({
                   "user-stated": "用户陈述",
                   "ai-estimate": "AI 估算 · 未核实",
                   "ai-suggestion": "AI 建议 · 尚未采纳",
-                }[memory.origin],
-                memory.origin,
+                }[memory.origin] ?? memory.origin,
+                {
+                  "user-stated": "Stated by you",
+                  "ai-estimate": "AI estimate · unverified",
+                  "ai-suggestion": "AI suggestion · not adopted",
+                }[memory.origin] ?? memory.origin,
               )
             : "",
           memory.observed_at ?? "",
-          memory.origin ? memory.source : sourceLabel(memory.source),
+          memory.origin ? memory.source : sourceLabel(memory.source, t),
           memory.sensitive ? t("敏感 · 不进资料包", "Sensitive · left out of packs") : "",
         ]
           .filter(Boolean)
@@ -273,7 +312,10 @@ export function MePage({
             className={`${css.btn} ${css["btn-quiet"]}`}
             onClick={() =>
               onPrompt(
-                `请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type] ?? "记忆"}，保留出处。`,
+                t(
+                  `请读取 memory/${memory.file}，和我修改这条${memoryTypes[memory.type]?.[0] ?? "记忆"}，保留出处。`,
+                  `Read memory/${memory.file} and help me update this ${memoryTypes[memory.type]?.[1] ?? "memory"}, keeping its source.`,
+                ),
               )
             }
           >
@@ -283,12 +325,19 @@ export function MePage({
             type="button"
             className={`${css.btn} ${css["btn-quiet"]}`}
             disabled={busy}
+            aria-expanded={replacement?.file === memory.file}
             onClick={() => {
-              setReplacement(memory);
-              setReplacementText(memory.text);
+              if (replacement?.file === memory.file) {
+                setReplacement(null);
+              } else {
+                setReplacement(memory);
+                setReplacementText(memory.text);
+              }
             }}
           >
-            {t("用新说法替换", "Replace with new wording")}
+            {replacement?.file === memory.file
+              ? t("收起", "Close")
+              : t("用新说法替换", "Replace with new wording")}
           </button>
           <button
             type="button"
@@ -301,6 +350,68 @@ export function MePage({
               : t("这条不再成立", "This no longer applies")}
           </button>
         </span>
+      )}
+      {replacement?.file === memory.file && (
+        <form
+          className={`${css.card} ${css["sub-form"]}`}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && !event.nativeEvent.isComposing && !busy) {
+              event.preventDefault();
+              setReplacement(null);
+            }
+          }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (busy || !replacementText.trim()) return;
+            void mutateMemory(() =>
+              replaceMemory(
+                replacement.file,
+                {
+                  type: replacement.type,
+                  name: replacement.name,
+                  text: replacementText,
+                  ...(replacement.source ? { source: replacement.source } : {}),
+                  sensitive: replacement.sensitive,
+                },
+                expectedMemory(replacement),
+              ),
+            );
+          }}
+        >
+          <label>
+            {t("新的说法", "New wording")}
+            <textarea
+              required
+              // biome-ignore lint/a11y/noAutofocus: 点击用新说法替换后直接聚焦输入框。
+              autoFocus
+              disabled={busy}
+              value={replacementText}
+              onKeyDown={(event) => {
+                if (
+                  (event.metaKey || event.ctrlKey) &&
+                  event.key === "Enter" &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
+              onChange={(event) => setReplacementText(event.target.value)}
+            />
+          </label>
+          <div className={css["dialog-foot"]}>
+            <button type="button" className={css.link} disabled={busy} onClick={() => setReplacement(null)}>
+              {t("取消", "Cancel")}
+            </button>
+            <button
+              type="submit"
+              className={`${css.btn} ${css["btn-primary"]}`}
+              disabled={busy || !replacementText.trim()}
+            >
+              {t("确认替换", "Confirm replacement")}
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );
@@ -336,7 +447,7 @@ export function MePage({
         <p className={css.small}>{t("正在读取档案…", "Loading profile…")}</p>
       ) : (
         <>
-          <section className={`${css.card} ${css["me-avatar"]}`} aria-label="头像">
+          <section className={`${css.card} ${css["me-avatar"]}`} aria-label={t("头像", "Avatar")}>
             <input
               ref={input}
               type="file"
@@ -350,14 +461,18 @@ export function MePage({
             <button
               type="button"
               className={css.avatar}
-              aria-label="更换头像"
+              aria-label={t("更换头像", "Change avatar")}
               disabled={busy}
               onClick={() => input.current?.click()}
             >
-              {data.avatar ? <img src={data.avatar} alt="你的头像" /> : Array.from(data.name ?? "我")[0]}
+              {data.avatar ? (
+                <img src={data.avatar} alt={t("你的头像", "Your avatar")} />
+              ) : (
+                Array.from(data.name ?? t("我", "M"))[0]
+              )}
             </button>
             <span className={css.stack} style={{ flex: "1 1 200px" }}>
-              <b>{data.name ?? "还没有填写名字"}</b>
+              <b>{data.name ?? t("我", "Me")}</b>
               <span className={css.small}>{data.bio}</span>
             </span>
             {exhibition}
@@ -368,30 +483,54 @@ export function MePage({
               type="button"
               className={`${css.btn} ${css["btn-quiet"]}`}
               disabled={busy}
-              onClick={() => input.current?.click()}
+              onClick={() => {
+                setConfirmRemoveAvatar(false);
+                input.current?.click();
+              }}
             >
-              更换头像
+              {t("更换头像", "Change avatar")}
             </button>
-            {data.avatar && (
-              <button
-                type="button"
-                className={`${css.btn} ${css["btn-quiet"]}`}
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await removeAvatar();
-                    setData((value) => (value ? { ...value, avatar: null } : value));
-                  } catch (err) {
-                    setError(err instanceof Error ? err.message : String(err));
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                移除
-              </button>
-            )}
+            {data.avatar &&
+              (confirmRemoveAvatar ? (
+                <>
+                  <button
+                    type="button"
+                    className={`${css.btn} ${css["btn-quiet"]}`}
+                    disabled={busy}
+                    onClick={async () => {
+                      setBusy(true);
+                      try {
+                        await removeAvatar();
+                        setConfirmRemoveAvatar(false);
+                        setData((value) => (value ? { ...value, avatar: null } : value));
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : String(err));
+                      } finally {
+                        setBusy(false);
+                      }
+                    }}
+                  >
+                    {t("确认移除", "Confirm remove")}
+                  </button>
+                  <button
+                    type="button"
+                    className={css.link}
+                    disabled={busy}
+                    onClick={() => setConfirmRemoveAvatar(false)}
+                  >
+                    {t("取消", "Cancel")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={`${css.btn} ${css["btn-quiet"]}`}
+                  disabled={busy}
+                  onClick={() => setConfirmRemoveAvatar(true)}
+                >
+                  {t("移除", "Remove")}
+                </button>
+              ))}
           </section>
           <section className={css.sec}>
             <div className={css["sec-head"]}>
@@ -431,7 +570,9 @@ export function MePage({
                     <div className={css.fact} key={goal.id}>
                       <p>{goal.title}</p>
                       <span className={css.src}>
-                        {goal.area ? `${areas[goal.area] ?? goal.area} · ` : ""}
+                        {goal.area
+                          ? `${areas[goal.area] ? t(areas[goal.area]?.[0] ?? "", areas[goal.area]?.[1] ?? "") : goal.area} · `
+                          : ""}
                         {source
                           ? `${t(source[0], source[1])} · ${origin?.[2]}-${origin?.[3]}-${origin?.[4]}`
                           : t("来自 me/goals.json", "From me/goals.json")}
@@ -457,7 +598,7 @@ export function MePage({
             <h2 className={css.eyebrow}>{t("偏好和规则", "Preferences and rules")}</h2>
             <div className={`${css.card} ${css["list-card"]} ${css.facts}`}>
               {preferences.map(fact)}
-              {ruleRows(data.rules)
+              {ruleRows(data.rules, t)
                 .filter(([, value]) => !!value)
                 .map(([label, value]) => (
                   <div className={css.fact} key={label}>
@@ -472,7 +613,12 @@ export function MePage({
                         type="button"
                         className={`${css.btn} ${css["btn-quiet"]}`}
                         onClick={() =>
-                          onPrompt(`请读取 me/rules.md，和我修改${label}的规则，等我确认再保存。`)
+                          onPrompt(
+                            t(
+                              `请读取 me/rules.md，和我修改${label}的规则，等我确认再保存。`,
+                              `Read me/rules.md and help me update the ${label} rule, confirming with me before saving.`,
+                            ),
+                          )
                         }
                       >
                         {t("修改", "Edit")}
@@ -531,46 +677,17 @@ export function MePage({
               ))}
             </section>
           )}
-          {replacement && (
-            <form
-              className={css.card}
-              onSubmit={(event) => {
-                event.preventDefault();
-                void mutateMemory(() =>
-                  replaceMemory(
-                    replacement.file,
-                    {
-                      type: replacement.type,
-                      name: replacement.name,
-                      text: replacementText,
-                      ...(replacement.source ? { source: replacement.source } : {}),
-                      sensitive: replacement.sensitive,
-                    },
-                    expectedMemory(replacement),
-                  ),
-                );
-              }}
-            >
-              <label>
-                {t("新的说法（旧记忆会保留在已归档中）", "New wording (the old memory stays in the archive)")}
-                <textarea
-                  required
-                  value={replacementText}
-                  onChange={(event) => setReplacementText(event.target.value)}
-                />
-              </label>
-              <button type="submit" className={css.btn} disabled={busy || !replacementText.trim()}>
-                {t("确认替换", "Confirm replacement")}
-              </button>
-              <button type="button" className={css.link} disabled={busy} onClick={() => setReplacement(null)}>
-                {t("取消", "Cancel")}
-              </button>
-            </form>
-          )}
           <button
             type="button"
             className={css.link}
-            onClick={() => onPrompt("请读取 me/profile.md，和我更新名字和简介，确认后保存。")}
+            onClick={() =>
+              onPrompt(
+                t(
+                  "请读取 me/profile.md，和我更新名字和简介，确认后保存。",
+                  "Read me/profile.md and help me update my name and bio, confirming before saving.",
+                ),
+              )
+            }
           >
             {t("编辑名字和简介", "Edit name and bio")}
           </button>

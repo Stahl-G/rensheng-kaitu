@@ -47,7 +47,7 @@ import {
   exploreModules,
   undoLifeMapFirst,
 } from "./explore-modules.js";
-import { type Locale, LocaleContext, browserLocale } from "./i18n.js";
+import { type Locale, LocaleContext, browserLocale, useT } from "./i18n.js";
 import { cityKey } from "./life-map-visuals.js";
 import type { OnboardingServices } from "./onboarding-services.js";
 import { createOverviewRefresh } from "./overview-refresh.js";
@@ -87,6 +87,7 @@ export interface OverviewPageProps
     locale?: string,
   ) => Promise<{ available: boolean; state: string; text: string }>;
   hosted?: boolean;
+  sessionError?: string | null;
   navigation?: PanelNavigation;
   captureOnce?: (text: string, operationId: string) => Promise<import("@kaitu/core").CaptureReceipt>;
   resultDraft?: import("./result-session.js").DraftTransport;
@@ -129,6 +130,11 @@ const modules = [
 /** 先读本机语言偏好（第一次打开时由服务端决定一次），再用它渲染整个应用。 */
 export function OverviewPage(props: OverviewPageProps) {
   const [locale, setLocale] = useState<Locale | null>(null);
+  useEffect(() => {
+    if (props.hosted || !locale) return;
+    document.title = locale === "en" ? "Kaitu" : "人生开图";
+    document.documentElement.lang = locale;
+  }, [props.hosted, locale]);
   const [followSystem, setFollowSystem] = useState(true);
   const [exploreEntries, setExploreEntries] = useState<string[] | null>(null);
   const [pluginModules, setPluginModules] = useState<ExploreModule[]>([]);
@@ -183,7 +189,9 @@ export function OverviewPage(props: OverviewPageProps) {
     };
   }, [props.loadPreferences, props.plugins, preferencesAttempt]);
   return (
-    <LocaleContext.Provider value={locale ?? "zh-CN"}>
+    <LocaleContext.Provider
+      value={locale ?? (browserLocale().toLowerCase().startsWith("zh") ? "zh-CN" : "en")}
+    >
       <Overview
         {...props}
         pluginModules={pluginModules}
@@ -226,7 +234,7 @@ function Overview({
   setExploreEntries: (value: string[]) => void;
   retryPreferences?: () => void;
 }) {
-  const t = (zh: string, en: string) => (locale === "en" ? en : zh);
+  const t = useT();
   const builtinAi = !!props.renderAsk && !props.hosted;
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null);
   const [guide, setGuide] = useState<number | null>();
@@ -634,7 +642,7 @@ function Overview({
   };
   useEffect(() => {
     if (inlineAsk) {
-      const field = askPanel.current?.querySelector<HTMLTextAreaElement>("textarea");
+      const field = askPanel.current?.querySelector<HTMLTextAreaElement>("textarea:not(:disabled)");
       (field ?? askPanel.current)?.focus();
     } else if (restoreAskFocus.current) {
       restoreAskFocus.current = false;
@@ -661,7 +669,11 @@ function Overview({
   }, [workspaceRoot]);
   const [configureRequest, setConfigureRequest] = useState(0);
   const [configureBuiltin, setConfigureBuiltin] = useState(false);
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState(() =>
+    document.body.hasAttribute("data-ds-dark-theme") || matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light",
+  );
   const overviewReads = useRef<ReturnType<typeof createOverviewRefresh> | null>(null);
   const writing = useRef(false);
   const refreshPending = useRef(false);
@@ -952,7 +964,7 @@ function Overview({
     <section
       className={todayCss.capture}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !busy) {
+        if (event.key === "Escape" && !event.nativeEvent.isComposing && !busy) {
           event.preventDefault();
           closeCapture();
         }
@@ -989,14 +1001,7 @@ function Overview({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={100000}
-          placeholder={
-            data?.empty
-              ? t(
-                  "想到什么，先记下。开图会先存原文，不改你的字。",
-                  "Write a thought. Kaitu keeps your original words.",
-                )
-              : t("想到什么，先记下", "Write a thought")
-          }
+          placeholder={t("想到什么，先记下", "Write a thought")}
           disabled={busy}
         />
         <button
@@ -1135,6 +1140,10 @@ function Overview({
             icon: "○",
             shortcut: "⌘J",
             run: () => {
+              if (inlineAsk && view !== "ask" && !askContext) {
+                closeInlineAsk();
+                return;
+              }
               if (askContext) prompt(askContext.prompt);
               else {
                 const title = view === "overview" ? currentCommandStep()?.title : askTitle;
@@ -1211,7 +1220,7 @@ function Overview({
         thread.kind === "project"
           ? t("项目", "Project")
           : thread.kind === "goal"
-            ? t("方向", "Goal")
+            ? t("目标", "Goal")
             : t("笔记", "Note"),
       run: () =>
         thread.kind === "learning"
@@ -1382,7 +1391,7 @@ function Overview({
     <div
       className={`${css.app} ${props.loadHome ? css.referenceApp : ""}`}
       data-theme={theme}
-      lang={locale === "en" ? "en" : "zh-CN"}
+      lang={t("zh-CN", "en")}
     >
       <header className={css.top}>
         <div className={css.brand}>
@@ -1401,24 +1410,6 @@ function Overview({
             <button
               type="button"
               key={id}
-              title={
-                id === "overview"
-                  ? t(
-                      "看看最近的自己，挑一件此刻想做的事",
-                      "See how you have been and pick one thing for now",
-                    )
-                  : id === "explore"
-                    ? t("你的足迹、健康，还有装上的插件", "Your places, health, and installed plugins")
-                    : id === "records"
-                      ? t(
-                          "你留下的每一条原文，以及从中整理出的笔记、日程、健康、财务",
-                          "Your originals, and the notes, schedule, health and finances organized from them",
-                        )
-                      : t(
-                          "和 AI 聊你的资料；每次只发送你允许的那部分",
-                          "Chat with AI about your notes; only the parts you allow are sent",
-                        )
-              }
               aria-current={view === id ? "page" : undefined}
               onClick={() => {
                 setView(id as View);
@@ -1494,9 +1485,14 @@ function Overview({
         {props.desktopUpdate && view !== "settings" && (
           <FeatureUpdates request={props.desktopUpdate} compact />
         )}
-        {error && (
+        {(props.sessionError || error) && (
           <p className={css.error} role="alert">
-            {error}
+            {props.sessionError
+              ? t(
+                  `打开开图会话失败：${props.sessionError}`,
+                  `Could not open Kaitu session: ${props.sessionError}`,
+                )
+              : error}
           </p>
         )}
         {readWarnings.length ? (
@@ -1570,9 +1566,13 @@ function Overview({
           homePresentation && (
             <>
               <LifeHome
-                home={homeState}
+                home={
+                  homeState?.error === "首页读取失败"
+                    ? { ...homeState, error: t("首页读取失败", "Couldn’t load Today") }
+                    : homeState
+                }
                 session={todaySession.current.board}
-                resultAction={resultAction}
+                resultAction={workspaceRoot && props.resultAction ? resultAction : undefined}
                 schedule={
                   data?.blocks.length ? (
                     <section
@@ -1971,7 +1971,7 @@ function Overview({
                   open={setExplore}
                   empty={exploreEmpty}
                   summaries={
-                    // 只数有的；一样都没有时显示模块本身的一句话，不铺一排 0。
+                    // 有资料时才显示数量。
                     exploreContent
                       ? {
                           footprints: [
@@ -1979,7 +1979,7 @@ function Overview({
                             exploreContent.experiences
                               ? t(
                                   `${exploreContent.experiences} 段经历`,
-                                  `${exploreContent.experiences} experiences`,
+                                  `${exploreContent.experiences} experience${exploreContent.experiences === 1 ? "" : "s"}`,
                                 )
                               : "",
                           ]
@@ -1988,23 +1988,26 @@ function Overview({
                           health: exploreContent.healthRecords
                             ? t(
                                 `${exploreContent.healthRecords} 条记录`,
-                                `${exploreContent.healthRecords} records`,
+                                `${exploreContent.healthRecords} record${exploreContent.healthRecords === 1 ? "" : "s"}`,
                               )
                             : "",
                           news: exploreContent.newsTopics
                             ? t(
                                 `${exploreContent.newsTopics} 个关注话题`,
-                                `${exploreContent.newsTopics} interests`,
+                                `${exploreContent.newsTopics} interest${exploreContent.newsTopics === 1 ? "" : "s"}`,
                               )
                             : "",
                           directions: [
                             exploreContent.goals
-                              ? t(`${exploreContent.goals} 个目标`, `${exploreContent.goals} goals`)
+                              ? t(
+                                  `${exploreContent.goals} 个目标`,
+                                  `${exploreContent.goals} goal${exploreContent.goals === 1 ? "" : "s"}`,
+                                )
                               : "",
                             exploreContent.directions
                               ? t(
                                   `${exploreContent.directions} 个方向`,
-                                  `${exploreContent.directions} directions`,
+                                  `${exploreContent.directions} direction${exploreContent.directions === 1 ? "" : "s"}`,
                                 )
                               : "",
                           ]
@@ -2069,7 +2072,7 @@ function Overview({
           <div
             ref={askPanel}
             tabIndex={-1}
-            className={`${css.askPanel} ${inlineAsk && view !== "ask" ? css.inlineAsk : ""}`}
+            className={`${css.askPanel} ${view !== "ask" ? css.inlineAsk : ""}`}
             hidden={view !== "ask" && !inlineAsk}
             role={inlineAsk ? "complementary" : undefined}
             aria-label={inlineAsk ? t("就地问问", "Ask in context") : undefined}
@@ -2077,6 +2080,7 @@ function Overview({
               if (
                 inlineAsk &&
                 event.key === "Escape" &&
+                !event.nativeEvent.isComposing &&
                 !event.defaultPrevented &&
                 !(event.target as HTMLElement).closest("dialog, [role=menu]")
               ) {
@@ -2085,7 +2089,7 @@ function Overview({
               }
             }}
           >
-            {inlineAsk && view !== "ask" && (
+            {view !== "ask" && (
               <div className={css.inlineAskHeader}>
                 <strong>{t("问问", "Ask")}</strong>
                 <button
@@ -2094,7 +2098,7 @@ function Overview({
                   onClick={() => {
                     setInlineAsk(false);
                     setView("ask");
-                    askPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+                    askPanel.current?.querySelector<HTMLTextAreaElement>("textarea:not(:disabled)")?.focus();
                   }}
                 >
                   {t("展开", "Expand")}

@@ -40,6 +40,33 @@
   color: var(--kt-on-primary);
   font-size: 14px;
   font-weight: 500;
+  transition: filter var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+.primary:active:not(:disabled),
+.link:active:not(:disabled),
+.title:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.form {
+  animation: doingReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes doingReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form {
+    animation: none !important;
+  }
 }
 .link {
   padding: 0;
@@ -298,6 +325,11 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+@media (max-width: 560px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .actions {
   display: flex;

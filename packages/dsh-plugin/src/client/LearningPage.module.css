@@ -18,6 +18,22 @@
   display: grid;
   gap: 14px;
   padding: 20px;
+  animation: learnReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes learnReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form {
+    animation: none !important;
+  }
 }
 .form h3,
 .form p {

@@ -272,6 +272,36 @@
 .dialog::backdrop {
   background: var(--scrim);
 }
+.dialog[open] {
+  animation: workDialogIn var(--kt-dur-normal) var(--kt-ease-out);
+}
+.dialog[open]::backdrop {
+  animation: workBackdropIn var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes workDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes workBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open],
+  .dialog[open]::backdrop {
+    animation: none !important;
+  }
+}
 .dialog p {
   line-height: 1.7;
 }

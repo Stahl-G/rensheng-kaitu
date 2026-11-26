@@ -1174,3 +1174,81 @@
 .layout[data-empty] .listPane {
   display: none;
 }
+
+.page button {
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast)
+    var(--kt-ease-out), border-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.page button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.detail {
+  animation: mapDetailIn var(--kt-dur-normal) var(--kt-ease-out);
+}
+.editor,
+.notice {
+  animation: mapReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+.page[data-compact="true"] .detail {
+  animation: mapSheetUp var(--kt-dur-sheet) var(--kt-ease-spring);
+}
+.page[data-compact="true"] .backdrop {
+  animation: mapFadeIn var(--kt-dur-fast) var(--kt-ease-out);
+}
+@container (max-width: 640px) {
+  .detail {
+    animation: mapSheetUp var(--kt-dur-sheet) var(--kt-ease-spring);
+  }
+  .backdrop {
+    animation: mapFadeIn var(--kt-dur-fast) var(--kt-ease-out);
+  }
+}
+@keyframes mapDetailIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mapReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mapSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes mapFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .detail,
+  .editor,
+  .notice,
+  .backdrop,
+  .page[data-compact="true"] .detail,
+  .page[data-compact="true"] .backdrop {
+    animation: none !important;
+  }
+}

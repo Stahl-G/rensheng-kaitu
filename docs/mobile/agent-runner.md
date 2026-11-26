@@ -1,7 +1,7 @@
 # 开图 iPhone v0.7：电脑不在也能用
 
 更新：2026-10-18。产品依据见 [product.md](product.md)，读写格式见[手机契约](../guides/phone-contract.md)。
-给 Agent 照做的规则是 [ORGANIZER.md](ORGANIZER.md)：工作区 `ORGANIZER.md` 的 v0.7 版，新加「白天：更新手机」一节。
+给 Agent 照做的规则是 [ORGANIZER.md](../../templates/kaitu/ORGANIZER.md)：开图把它原样写到工作区根目录，v0.7 版新加「白天：更新手机」一节。
 
 ## 1. 要解决什么
 
@@ -92,7 +92,7 @@
 | R2 | GitHub 同步时，远端 `phone/receipts.json` 里本机没有的回执先并进本机，再上传；today、week、map 仍以电脑为准 | 现在会用本机回执整份覆盖，丢掉整理员写的 |
 | R3 | GitHub 备份双向同步 `inbox/notes/**/*.md`，不受文字开关影响 | 整理员移走的原文要回到电脑；顺带备份还没整理的原文 |
 | R4 | 手机操作去重时，`phone/receipts.json` 里已有的 client_id 也算处理过 | 去重账本在本机 `.kaitu/`，不同步 |
-| R5 | `renderOrganizer` 改成 [ORGANIZER.md](ORGANIZER.md) 的内容；`renderAgentReadme` 的「两个角色与文件」改成「任何 Agent 都能交，用户指定的整理员负责整理和更新手机」；GitHub 方式也维护 `AGENT-README.md`（现在只有 Drive 方式）；AGENTS.md 模板 §11 那行跟着改 | 规则跟着开图版本更新，不靠用户手抄 |
+| R5 | `renderOrganizer` 改成 [ORGANIZER.md](../../templates/kaitu/ORGANIZER.md) 的内容；`renderAgentReadme` 的「两个角色与文件」改成「任何 Agent 都能交，用户指定的整理员负责整理和更新手机」；GitHub 方式也维护 `AGENT-README.md`（现在只有 Drive 方式）；AGENTS.md 模板 §11 那行跟着改 | 规则跟着开图版本更新，不靠用户手抄 |
 | R6 | `kaitu phone run [--as <名字>]`：处理收件箱并生成全部快照，写 generator | 二档；也用来核对一档的结果 |
 
 R1–R4 已在本 PR 实现；同时电脑生成 `phone/library.json`（product §4.4a）。ORGANIZER.md 的白天那一节还假定电脑有 R5；之前测试时在合成仓库里手动换上。
@@ -134,7 +134,7 @@ R1–R4 已在本 PR 实现；同时电脑生成 `phone/library.json`（product 
 只用合成资料，不用真实工作区和真实凭据。
 
 1. 电脑上用合成资料新建工作区，连到一个新的私有测试仓库，等电脑生成一次 `phone/`，然后退出开图。开着的电脑会用旧模板重写 ORGANIZER.md。
-2. 用 [ORGANIZER.md](ORGANIZER.md) 替换仓库根目录的 ORGANIZER.md；给 Agent 一个只授权这个仓库的 token，或用它自带的连接。先核实它能不能写（第 3 节）。
+2. 用 [ORGANIZER.md](../../templates/kaitu/ORGANIZER.md) 替换仓库根目录的 ORGANIZER.md；给 Agent 一个只授权这个仓库的 token，或用它自带的连接。先核实它能不能写（第 3 节）。
 3. 把第 9 节的说明交给 Dot（主）；Grok Bot 错开 30 分钟（备）。
 4. 用例：
 

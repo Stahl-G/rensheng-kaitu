@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import css from "./AskPage.module.css";
+import { useT } from "./i18n.js";
 
 type Entry = { id: string; authKey?: string; authMethods?: { id: string; label: string }[] };
 interface AuthState {
@@ -13,19 +14,23 @@ interface AuthState {
   };
   error?: string;
 }
-async function support<T>(method: string, input: Record<string, unknown>): Promise<T> {
+async function support<T>(method: string, input: Record<string, unknown>, failMessage: string): Promise<T> {
   const response = await fetch("/api/product/askSupport", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Kaitu": "1" },
     body: JSON.stringify([method, input]),
   });
   const value = await response.json();
-  if (!response.ok) throw new Error(value.error ?? "登录未完成");
+  if (!response.ok) throw new Error(value.error ?? failMessage);
   return value;
 }
 
 /** 呈现 DSH authorization 的通知和问题，凭据只交给该流程自身保存。 */
 export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; onAuthorized(): void }) {
+  const t = useT();
+  const failMessage = t("登录未完成", "Sign-in incomplete");
+  const failure = useRef(failMessage);
+  failure.current = failMessage;
   const [state, setState] = useState<AuthState>({ status: "idle" });
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
@@ -38,7 +43,8 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
     setAnswer("");
     setError("");
     return () => {
-      if (key && activeKey.current === key) void support("authCancel", { key }).catch(() => {});
+      if (key && activeKey.current === key)
+        void support("authCancel", { key }, failure.current).catch(() => {});
     };
   }, [key]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: poll restarts only when the login starts or the provider changes.
@@ -48,7 +54,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
       try {
-        const next = await support<AuthState>("authPoll", { key });
+        const next = await support<AuthState>("authPoll", { key }, failMessage);
         if (!active) return;
         setState(next);
         if (next.status === "authorized") {
@@ -70,7 +76,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
   }, [running, key]);
   if (!key || !provider.authMethods?.length) return null;
   return (
-    <section className={css.fields} aria-label="服务商登录">
+    <section className={css.fields} aria-label={t("服务商登录", "Provider sign-in")}>
       {!running &&
         provider.authMethods.map((method) => (
           <button
@@ -81,7 +87,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
               setStarting(true);
               setError("");
               try {
-                await support("authStart", { key, method: method.id });
+                await support("authStart", { key, method: method.id }, failMessage);
                 activeKey.current = key;
                 setState({ status: "running" });
               } catch (err) {
@@ -91,7 +97,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
               }
             }}
           >
-            {method.id === "oauth" ? "用账号登录…" : method.label}
+            {method.id === "oauth" ? t("用账号登录…", "Sign in with account…") : method.label}
           </button>
         ))}
       {state.notices?.map((notice, index) => (
@@ -100,7 +106,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
           {notice.message}{" "}
           {notice.url && /^https?:\/\//.test(notice.url) && (
             <a href={notice.url} target="_blank" rel="noreferrer">
-              打开授权页面 ↗
+              {t("打开授权页面 ↗", "Open authorization page ↗")}
             </a>
           )}
           {notice.code && <code>{notice.code}</code>}
@@ -113,7 +119,7 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
             {state.prompt.message}
             {state.prompt.kind === "select" ? (
               <select value={answer} onChange={(event) => setAnswer(event.target.value)}>
-                <option value="">请选择</option>
+                <option value="">{t("请选择", "Select…")}</option>
                 {state.prompt.options?.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
@@ -135,23 +141,28 @@ export function DshAuthorization({ provider, onAuthorized }: { provider: Entry; 
             disabled={!answer}
             onClick={async () => {
               try {
-                await support("authAnswer", { key, value: answer });
+                await support("authAnswer", { key, value: answer }, failMessage);
                 setAnswer("");
               } catch (err) {
                 setError(err instanceof Error ? err.message : String(err));
               }
             }}
           >
-            继续登录
+            {t("继续登录", "Continue")}
           </button>
         </div>
       )}
       {running && (
-        <button type="button" onClick={() => void support("authCancel", { key })}>
-          取消登录
+        <button
+          type="button"
+          onClick={() =>
+            void support("authCancel", { key }, failMessage).catch((err: Error) => setError(err.message))
+          }
+        >
+          {t("取消登录", "Cancel sign-in")}
         </button>
       )}
-      {state.status === "authorized" && <output>账号已授权</output>}
+      {state.status === "authorized" && <output>{t("账号已授权", "Authorized")}</output>}
       {(error || state.error) && <p role="alert">{error || state.error}</p>}
     </section>
   );

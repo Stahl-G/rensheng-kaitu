@@ -38,6 +38,12 @@
   font-size: 14px;
   line-height: 20px;
   white-space: nowrap;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast)
+    var(--kt-ease-out), box-shadow var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.page button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .primary {
   background: var(--kt-primary);
@@ -214,6 +220,27 @@ summary:hover .link,
   flex-wrap: wrap;
   gap: 12px 24px;
   padding-block: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.preview,
+.notice {
+  animation: finReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes finReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview,
+  .notice {
+    animation: none !important;
+  }
 }
 .counts strong {
   font-size: 20px;

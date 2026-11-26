@@ -155,8 +155,19 @@ function englishError(error: KaituError): string {
     INVALID_RECORD: "Check the record's required fields and values, then try again.",
     INVALID_CONFIG: "Check the settings and try again.",
     INVALID_IMPORT: "The import file could not be read. Check its format and export it again.",
+    INVALID_DOCUMENT: "This document could not be read. Check its format and try again.",
+    INVALID_AVATAR: "Choose a valid JPG, PNG or WebP image and try again.",
     BAD_ARGS: "Check the input and try again.",
     AI_CONNECTION: "The AI connection could not complete. Check AI & connections and try again.",
+    AI_NOT_CONFIGURED: "Connect an AI in AI & connections first.",
+    AI_START: "Could not start the local Agent. Check that it is installed and signed in.",
+    AI_TIMEOUT: "The AI request timed out. Try again.",
+    AI_RESULT: "The AI returned an incomplete response. Try again.",
+    AI_RESPONSE: "The AI response could not be read. Try again.",
+    AI_FAILED: "The AI request failed. Check your connection or quota and try again.",
+    AI_IMAGE: "The current model does not support images. Switch models or remove the image.",
+    AI_ATTACHMENT: "This attachment could not be sent to the current model.",
+    AI_APPROVAL_REQUIRED: "This action needs your approval before continuing.",
     PLUGIN_NETWORK: "The plugin catalog could not connect. Check the network and try again.",
   };
   return messages[error.code] ?? "This action could not be completed. Check the input and try again.";
@@ -822,7 +833,8 @@ export async function startUi(ws: Workspace, input: UiOptions = {}) {
         if (url.pathname.startsWith("/api/")) return json(res, 404, { error: "接口不存在" });
         if (url.pathname === "/") {
           res.writeHead(200, { "Content-Type": MIME[".html"] });
-          return res.end(readFileSync(resolve(WEB_ROOT, "index.html")));
+          const html = readFileSync(resolve(WEB_ROOT, "index.html"), "utf8");
+          return res.end(options.plugins ? html.replace("<html ", "<html data-plugins ") : html);
         }
         const path = resolve(WEB_ROOT, `.${decodeURIComponent(url.pathname)}`);
         if (!path.startsWith(`${resolve(WEB_ROOT)}${sep}`) || !url.pathname.startsWith("/assets/")) {
