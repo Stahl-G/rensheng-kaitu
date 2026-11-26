@@ -11,6 +11,7 @@ import { containsKey } from "./redact.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
+import { deadlinePassed } from "./tasks.js";
 import { localDate, timeZoneNotice } from "./time.js";
 import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
@@ -342,14 +343,18 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
     lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.kind} / ${block.status}）`);
   }
   if (!data.now.blocks.length) lines.push("暂无安排。");
-  if (data.now.date !== data.today) {
+  if (data.now.date && data.now.date !== data.today) {
     // 过期计划仍是接力证据，明确标出日期，避免把它混入今天或在更新时丢掉变化。
     try {
       const plan = normalizeNow(parseFrontmatter(ws.readText("NOW.md")).data) as {
         date: string;
         blocks: { start?: string; end?: string; title: string; status: string }[];
       };
-      lines.push("", `## 最近计划（${plan.date}）`, "");
+      lines.push(
+        "",
+        `## ${plan.date < data.today ? "历史计划 · 已过期" : "后续计划 · 未到日期"}（${plan.date}）`,
+        "",
+      );
       for (const block of plan.blocks)
         if (block && typeof block.title === "string")
           lines.push(`- ${block.start ?? ""}–${block.end ?? ""} ${block.title}（${block.status}）`);
@@ -380,6 +385,11 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
     );
   }
   if (!data.tasks.length) lines.push("今天没有到期或提醒的待办，也没有过期项。");
+  const stepLine = (next: { title: string; status: string; due?: string | null }) => {
+    const overdue =
+      (next.status === "todo" || next.status === "proposed") && deadlinePassed(next.due, data.today, now);
+    return `- ${next.title}（${next.status}${overdue ? " / 已过期" : ""}）${next.due ? ` 截止：${next.due}` : ""}`;
+  };
   lines.push("", "## 模块进度与下一步", "");
   for (const module of data.modules) {
     lines.push(`### ${module.module}（${module.file}）`, "");
@@ -387,7 +397,7 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
       const p = module.progress;
       lines.push(`${p.label}：${p.current} / ${p.target} ${p.unit ?? ""}`, "");
     }
-    for (const next of module.next ?? []) lines.push(`- ${next.title}（${next.status}）`);
+    for (const next of module.next ?? []) lines.push(stepLine(next));
     lines.push("");
   }
   lines.push("## 项目", "");
@@ -398,7 +408,7 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
       `近 7 天：字数变化 ${project.recent7.words ?? "待补"}；${project.recent7.commits} 次提交`,
       `最近进展：${project.lastLogDate ?? "待补"}`,
     );
-    for (const next of project.next) lines.push(`- ${next.title}（${next.status}）`);
+    for (const next of project.next) lines.push(stepLine(next));
     lines.push("");
   }
   const r = data.recent7;
