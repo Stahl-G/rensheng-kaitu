@@ -1,3 +1,5 @@
+import { mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { expect, it } from "vitest";
 import { parseFrontmatter, readUserPage, refreshOverview, renderAgentReadme } from "../src/index.js";
 import { clonedWorkspace } from "./helpers.js";
@@ -86,4 +88,10 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
   expect(overview).toMatch(/引用了不对外的 health\/data[；）]/);
   expect(overview).toMatch(/引用了不对外的 health\/files[；）]/);
   expect(overview).toContain("：改读 `me/goals.json`、`me/profile.md` 与 `memory/MEMORY.md`。");
+
+  rmSync(join(ws.root, "USER.md"));
+  mkdirSync(join(ws.root, "USER.md"));
+  ws.writeText("handoffs/daily/2026-10-16.md", daily("2026-10-16", page(["- 写小说"])));
+  refreshOverview(ws, now);
+  expect(ws.readText("OVERVIEW.md")).toContain("`USER.md` 未通过核对（无法读取）：改读");
 });

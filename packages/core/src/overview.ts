@@ -188,7 +188,13 @@ function judgeUserPage(ws: Workspace, now: Date, organizer: string, date: string
 
 export function readUserPage(ws: Workspace, now = new Date()): UserPage {
   if (!ws.exists("USER.md")) return { state: "missing", problems: [] };
-  const text = ws.scanText("USER.md");
+  let text: string | undefined;
+  try {
+    text = ws.scanText("USER.md");
+  } catch {
+    // 权限不够或同名目录占着：近况是可选的，不能挡住工作区打开。
+    return { state: "missing", problems: ["无法读取"] };
+  }
   if (text === undefined) return { state: "missing", problems: ["还没从云盘下载"] };
   try {
     const { data, body } = parseFrontmatter<{ organizer: string; date: string }>(text);
@@ -204,12 +210,12 @@ export function readUserPage(ws: Workspace, now = new Date()): UserPage {
 function prepareUserPage(ws: Workspace, now: Date, daily: ReturnType<typeof latestDaily>) {
   const current = readUserPage(ws, now);
   const section = daily && userPageSection(daily.body);
-  // 云盘占位的 USER.md 写不进去，照实报告还没下载，不宣称已复制。
-  const placeholder = ws.exists("USER.md") && ws.scanText("USER.md") === undefined;
+  // 在但读不到的 USER.md（云盘占位、读不了）写不进去，照实报告，不宣称已复制。
+  const unreadable = current.state === "missing" && current.problems.length > 0;
   if (
     !daily ||
     section === undefined ||
-    placeholder ||
+    unreadable ||
     (current.date !== undefined && current.date >= daily.date)
   )
     return { page: current };
