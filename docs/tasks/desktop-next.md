@@ -32,14 +32,14 @@ npx vitest run <改到的包>/test      # 最后整体跑一次 npx vitest run
 
 `docs/mobile/agent-runner.md` §8 R5：
 
-- `renderOrganizer` 生成的 `ORGANIZER.md` 改成 `docs/mobile/ORGANIZER.md` 的内容（规则版本 1）。
+- `renderOrganizer` 生成的 `ORGANIZER.md` 就是 `templates/kaitu/ORGANIZER.md` 的内容（规则版本 1）。
 - `renderAgentReadme` 的「两个角色与文件」改成「任何 Agent 都能交，用户指定的整理员负责整理和更新手机」。
 - GitHub 备份方式也维护 `AGENT-README.md`（现在只有 Drive 方式）。
 - AGENTS.md 生成模板 §11 里对应那句跟着改（`packages/core/src/agents-md.ts`）。
 
 不要做：不改 ORGANIZER.md 的规则本身；规则有疑问写进晨报。
 
-验收：新建工作区和已有工作区升级后，根目录的 `ORGANIZER.md` 与 `docs/mobile/ORGANIZER.md` 一致（生成时间这类字段除外）；GitHub 备份同步后远端有 `AGENT-README.md`。
+验收：新建工作区和已有工作区升级后，根目录的 `ORGANIZER.md` 与 `templates/kaitu/ORGANIZER.md` 一致（生成时间这类字段除外）；GitHub 备份同步后远端有 `AGENT-README.md`。
 
 ## K-3 `kaitu phone run`（agent-runner R6）
 
