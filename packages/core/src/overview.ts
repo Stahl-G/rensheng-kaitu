@@ -89,64 +89,59 @@ const dataEnd = String.raw`\.(?:md|jsonl?)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
 const fileEnd = String.raw`\.[A-Za-z0-9]{1,10}(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
 const stops = String.raw`\s\x60'"<>()（）【】「」『』《》、，。；：！？,;!?|`;
 const escapeName = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const dataFile = /\.(?:md|jsonl?)$/i;
 
 /**
- * 近况里引用的路径，统一成工作区相对路径：反引号里的整段、以现有顶层目录开头的文件或目录（含中文、任意扩展名），
- * 以及其余 ASCII 的 Markdown / JSON 路径。
+ * 近况里引用的路径，统一成工作区相对路径：反引号里的整段、以现有顶层目录开头的文件或目录（含中文、任意扩展名）、
+ * 根目录现有的文件名，以及其余 ASCII 的 Markdown / JSON 路径。
  */
-function citedPaths(ws: Workspace, body: string): Set<string> {
+function citedPaths(ws: Workspace, body: string, canRead: (path: string) => boolean): Set<string> {
   const paths = new Set<string>();
   const add = (path: string) => paths.add(posix.normalize(path).replace(/(.)\/$/, "$1"));
-  const roots = readdirSync(ws.root, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => escapeName(entry.name));
-  const top = roots.length ? `(?:\\./)?(?:${roots.join("|")})/` : undefined;
-  let rest = body.replace(/\\/g, "/").replace(/`([^`\n]+)`/g, (_, value: string) => {
-    // #片段、?查询和 :行号指向的还是同一个文件。
-    const path = value.trim().replace(/(?:[#?].*|:\d+(?::\d+)?)$/, "");
-    const cited =
-      path.includes("/") &&
-      !path.includes("://") &&
-      !/[、，。；：！？,;|]/.test(path) &&
-      ((top && new RegExp(`^${top}`, "iu").test(path)) || /\.(?:md|jsonl?)$/i.test(path));
-    if (!cited) return ` ${value} `;
-    add(path);
-    return " ";
-  });
-  if (top) {
-    const rooted = new RegExp(
-      `(?<![A-Za-z0-9_./-])(${top}(?:[^${stops}/]+/)*(?:[^${stops}/]+?${fileEnd}|[^${stops}/]+)?)`,
-      "giu",
-    );
-    rest = rest.replace(rooted, (_, path: string) => {
-      add(existingPrefix(ws, path));
-      return " ";
-    });
-  }
-  for (const match of rest.matchAll(
-    new RegExp(`(?<![\\w./-])((?:\\./)?(?:[\\w.-]+/)+[\\w.-]+${dataEnd})`, "g"),
-  ))
-    add(match[1] as string);
-  return paths;
-}
-
-/** 没有扩展名的末段紧挨着正文时（「见 health/data里」），取末段里最长的现有前缀。 */
-function existingPrefix(ws: Workspace, path: string): string {
-  const cut = path.lastIndexOf("/") + 1;
-  const name = [...path.slice(cut)];
-  const exists = (candidate: string) => {
+  const exists = (path: string) => {
     try {
-      return ws.exists(candidate);
+      return ws.exists(path);
     } catch {
       return false;
     }
   };
-  if (!name.length || /\.[A-Za-z0-9]{1,10}$/.test(path) || exists(path)) return path;
-  for (let end = name.length - 1; end > 0; end--) {
-    const candidate = path.slice(0, cut) + name.slice(0, end).join("");
-    if (exists(candidate)) return candidate;
-  }
-  return path;
+  const entries = readdirSync(ws.root, { withFileTypes: true });
+  const names = (keep: (entry: (typeof entries)[number]) => boolean) =>
+    entries.filter(keep).map((entry) => escapeName(entry.name));
+  const dirs = names((entry) => entry.isDirectory() || entry.isSymbolicLink());
+  const files = names((entry) => !entry.isDirectory());
+  const top = dirs.length ? `(?:\\./)?(?:${dirs.join("|")})/` : undefined;
+  let rest = body.replace(/\\/g, "/").replace(/`([^`\n]+)`/g, (_, value: string) => {
+    // #片段、?查询和 :行号指向的还是同一个文件。
+    const path = value.trim().replace(/(?:[#?].*|:\d+(?::\d+)?)$/, "");
+    const cited =
+      !path.includes("://") &&
+      !/[、，。；：！？,;|]/.test(path) &&
+      (path.includes("/")
+        ? (top && new RegExp(`^${top}`, "iu").test(path)) || dataFile.test(path)
+        : /^[^\s:*?"<>]+$/.test(path) && (dataFile.test(path) || exists(path) || !canRead(path)));
+    if (!cited) return ` ${value} `;
+    add(path);
+    return " ";
+  });
+  // 没有扩展名的末段紧挨着中文正文时（「见 health/data里」），在字母与汉字交界处断开。
+  const proseEnd = (path: string) =>
+    /\.[A-Za-z0-9]{1,10}$/.test(path) || exists(path)
+      ? path
+      : (/^(.*\/[A-Za-z0-9_.-]+)\P{ASCII}[^/]*$/u.exec(path)?.[1] ?? path);
+  const scan = (pattern: string, toPath = (path: string) => path) => {
+    rest = rest.replace(new RegExp(`(?<![A-Za-z0-9_./-])(${pattern})`, "giu"), (_, path: string) => {
+      add(toPath(path));
+      return " ";
+    });
+  };
+  if (top) scan(`${top}(?:[^${stops}/]+/)*(?:[^${stops}/]+?${fileEnd}|[^${stops}/]+)?`, proseEnd);
+  if (files.length) scan(`(?:\\./)?(?:${files.join("|")})(?![A-Za-z0-9_/-]|\\.[A-Za-z0-9])`);
+  for (const match of rest.matchAll(
+    new RegExp(`(?<![\\w./-])((?:\\./)?(?:[\\w.-]+/)*[\\w.-]+${dataEnd})`, "g"),
+  ))
+    add(match[1] as string);
+  return paths;
 }
 
 const rawHealth = (path: string) => /^health\/(?:data|files)(?:\/|$)/i.test(path);
@@ -161,7 +156,7 @@ function checkUserPage(ws: Workspace, body: string): string[] {
     problems.push("写了本机绝对路径");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
   const physical = agentPathResolver(ws.root);
-  for (const path of citedPaths(ws, body)) {
+  for (const path of citedPaths(ws, body, canRead)) {
     let real: string | undefined;
     try {
       real = physical(path);

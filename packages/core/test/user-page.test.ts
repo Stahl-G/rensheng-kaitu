@@ -24,7 +24,7 @@ it("整理员只新建每日整理时，电脑把其中的用户近况复制成 
   const ws = await clonedWorkspace();
   ws.writeText(
     "handoffs/daily/2026-10-15.md",
-    daily("2026-10-15", page(["- 写小说，详见me/profile.md里的档案"])),
+    daily("2026-10-15", page(["- 写小说，详见me/profile.md里的档案", "- 插件在 `0.2.3-alpha.2`"])),
   );
   const now = new Date("2026-10-15T12:00:00+08:00");
   refreshOverview(ws, now);
@@ -52,6 +52,7 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
     "`USER.md` 未通过核对（frontmatter 缺 organizer 或 date）：改读 `me/goals.json`",
   );
 
+  ws.writeText("learning/topic/notes.md", "# 主题\n");
   const leaky = page([
     "- 体重见 health/data/2026-10.jsonl",
     "- 账户见finance/账户.json",
@@ -61,6 +62,9 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
     "- 睡眠见 ./health/data/2026-09.jsonl",
     "- 原始记录在 health/data",
     "- 照片都在health/files里",
+    "- 密钥见 `secrets.json`",
+    "- 另见 missing.md",
+    "- 主题在 learning/topic2",
   ]);
   ws.writeText("handoffs/daily/2026-10-15.md", daily("2026-10-15", leaky.replace("用户近况到此结束", "")));
   refreshOverview(ws, now);
@@ -74,6 +78,9 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
     "引用了不对外的 finance/accounts.json",
     "引用了不对外的 health/files/photos/2026-10-01.jpg",
     "引用了不对外的 health/data/2026-09.jsonl",
+    "引用了不对外的 secrets.json",
+    "引用的 missing.md 不存在",
+    "引用的 learning/topic2 不存在",
   ])
     expect(overview).toContain(problem);
   expect(overview).toMatch(/引用了不对外的 health\/data[；）]/);
