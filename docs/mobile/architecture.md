@@ -29,7 +29,7 @@ v0.6 继续沿用「两个仓库只靠文件格式连接」：手机不引用 `p
 电脑 processInbox ──应用──▶ data/、STATUS.md、NOW.md ──▶ 重新生成快照 + phone/receipts.json
 ```
 
-1. v0.6 只有电脑写资料（`data/`、`STATUS.md`、`NOW.md`、`me/`），与云端接力协议一致；手机只交新文件。v0.7 起电脑不在时，用户指定的整理员（云端 Agent）按 [ORGANIZER.md](ORGANIZER.md) 的白天一节改其中有限的几处（[agent-runner.md](agent-runner.md)）。
+1. v0.6 只有电脑写资料（`data/`、`STATUS.md`、`NOW.md`、`me/`），与云端接力协议一致；手机只交新文件。v0.7 起电脑不在时，用户指定的整理员（云端 Agent）按 [ORGANIZER.md](../../templates/kaitu/ORGANIZER.md) 的白天一节改其中有限的几处（[agent-runner.md](agent-runner.md)）。
 2. 手机界面只依赖两样东西：快照的格式、写入的格式。谁生成快照、谁处理收件箱以后可以换（§8），界面不用改。
 3. 存储层可以换：iCloud 文件夹、GitHub，以后加 WebDAV（坚果云），读写的都是同一组路径。
 
