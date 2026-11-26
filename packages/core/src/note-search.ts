@@ -4,8 +4,8 @@ import { assertAgentPath } from "./agent-file-policy.js";
 import { excerpt, openIndex } from "./chat-search.js";
 import { readTopicStatus } from "./doing-page.js";
 import { KaituError } from "./errors.js";
-import { redact } from "./handover.js";
 import { readLibraryDocument } from "./library.js";
+import { redact } from "./redact.js";
 import type { Workspace } from "./workspace.js";
 
 export interface NoteSearchResult {

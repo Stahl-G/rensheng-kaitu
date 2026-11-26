@@ -6,6 +6,7 @@ import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
 import { agentReadFilter } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { containsKey } from "./redact.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
@@ -157,6 +158,7 @@ function checkUserPage(ws: Workspace, body: string): string[] {
   if (size > userPageLimit) problems.push(`超过 ${userPageLimit} 字（${size} 字）`);
   if (!body.includes(userPageEnd)) problems.push("缺少结尾一行，可能没写完");
   if (absolutePath.test(body)) problems.push("写了本机绝对路径");
+  if (containsKey(body)) problems.push("写了密钥");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
   const physical = agentPathResolver(ws.root);
   for (const path of citedPaths(ws, body, canRead)) {

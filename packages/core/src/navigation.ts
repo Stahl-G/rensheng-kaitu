@@ -2,8 +2,8 @@ import { lstatSync, readdirSync } from "node:fs";
 import { agentReadFilter } from "./exposure.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { deepFreeze } from "./frozen.js";
-import { redact } from "./handover.js";
 import { listModules } from "./modules.js";
+import { redact } from "./redact.js";
 import { placeholderOriginal } from "./sync-files.js";
 import type { Workspace } from "./workspace.js";
 

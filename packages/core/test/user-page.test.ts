@@ -32,6 +32,7 @@ it("整理员只新建每日整理时，电脑把其中的用户近况复制成 
         "- 写小说，详见me/profile.md里的档案",
         "- 插件在 `0.2.3-alpha.2`",
         "- 早/午/晚各记一次，见 https://example.com/docs/a",
+        "- 在算 DeepSeek 的 token 是怎么计费的",
       ]),
     ),
   );
@@ -75,6 +76,7 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
     "- 另见 missing.md",
     "- 主题在 learning/topic2",
     "- 报告在 `/mnt/personal/report.pdf`",
+    "- API key: sk-abcdefghijklmnopqrstuvwxyz123456",
   ]);
   ws.writeText("handoffs/daily/2026-10-15.md", daily("2026-10-15", leaky.replace("用户近况到此结束", "")));
   refreshOverview(ws, now);
@@ -83,6 +85,7 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
   for (const problem of [
     "缺少结尾一行",
     "写了本机绝对路径",
+    "写了密钥",
     "引用了不对外的 health/data/2026-10.jsonl",
     "引用了不对外的 finance/账户.json",
     "引用的 learning/沟通 笔记/notes.md 不存在",
