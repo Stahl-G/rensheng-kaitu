@@ -151,17 +151,17 @@ const absolutePath =
 
 const rawHealth = (path: string) => /^health\/(?:data|files)(?:\/|$)/i.test(path);
 
-/** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。 */
-function checkUserPage(ws: Workspace, body: string): string[] {
+/** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。字数与结尾只看正文，其余连 frontmatter 一起查。 */
+function checkUserPage(ws: Workspace, body: string, text: string): string[] {
   const problems: string[] = [];
   const size = [...body.trim()].length;
   if (size > userPageLimit) problems.push(`超过 ${userPageLimit} 字（${size} 字）`);
   if (!body.includes(userPageEnd)) problems.push("缺少结尾一行，可能没写完");
-  if (absolutePath.test(body)) problems.push("写了本机绝对路径");
-  if (containsKey(body)) problems.push("写了密钥");
+  if (absolutePath.test(text)) problems.push("写了本机绝对路径");
+  if (containsKey(text)) problems.push("写了密钥");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
   const physical = agentPathResolver(ws.root);
-  for (const path of citedPaths(ws, body, canRead)) {
+  for (const path of citedPaths(ws, text, canRead)) {
     let real: string | undefined;
     try {
       real = physical(path);
@@ -184,8 +184,15 @@ function previousDay(date: string): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 }
 
-function judgeUserPage(ws: Workspace, now: Date, organizer: string, date: string, body: string): UserPage {
-  const problems = checkUserPage(ws, body);
+function judgeUserPage(
+  ws: Workspace,
+  now: Date,
+  organizer: string,
+  date: string,
+  body: string,
+  text: string,
+): UserPage {
+  const problems = checkUserPage(ws, body, text);
   if (problems.length) return { state: "invalid", organizer, date, problems };
   const fresh = date >= previousDay(localDate(now, ws.timeZone()));
   return { state: fresh ? "ok" : "stale", organizer, date, problems };
@@ -204,7 +211,7 @@ export function readUserPage(ws: Workspace, now = new Date()): UserPage {
   try {
     const { data, body } = parseFrontmatter<{ organizer: string; date: string }>(text);
     if (schemas().builtin("daily.schema.json")(data))
-      return judgeUserPage(ws, now, data.organizer, data.date, body);
+      return judgeUserPage(ws, now, data.organizer, data.date, body, text);
   } catch {
     // 下面按缺 frontmatter 报告。
   }
@@ -225,10 +232,11 @@ function prepareUserPage(ws: Workspace, now: Date, daily: ReturnType<typeof late
   )
     return { page: current };
   const body = `# 用户近况\n\n${section.replace(/^###(?=[^\S\n])/gm, "##")}\n`;
-  const page = judgeUserPage(ws, now, daily.organizer, daily.date, body);
+  const text = stringifyFrontmatter({ organizer: daily.organizer, date: daily.date }, body);
+  const page = judgeUserPage(ws, now, daily.organizer, daily.date, body, text);
   if (page.state === "invalid")
     return { page: { ...page, problems: page.problems.map((problem) => `${daily.file}：${problem}`) } };
-  return { page, text: stringifyFrontmatter({ organizer: daily.organizer, date: daily.date }, body) };
+  return { page, text };
 }
 
 export function userPageLine(page: UserPage): string {

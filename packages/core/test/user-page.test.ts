@@ -101,6 +101,13 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
   expect(overview).toMatch(/引用了不对外的 health\/files[；）]/);
   expect(overview).toContain("：改读 `me/goals.json`、`me/profile.md` 与 `memory/MEMORY.md`。");
 
+  ws.writeText(
+    "USER.md",
+    `---\norganizer: muse\ndate: 2026-10-16\napi_key: sk-abcdefghijklmnopqrstuvwxyz123456\n---\n${page(["- 写小说"])}`,
+  );
+  refreshOverview(ws, now);
+  expect(ws.readText("OVERVIEW.md")).toContain("`USER.md` 未通过核对（写了密钥）：改读");
+
   rmSync(join(ws.root, "USER.md"));
   mkdirSync(join(ws.root, "USER.md"));
   ws.writeText("handoffs/daily/2026-10-16.md", daily("2026-10-16", page(["- 写小说"])));
