@@ -21,7 +21,7 @@ import { listProjectStatuses } from "./projects.js";
 import { readRecords } from "./records.js";
 import { redact } from "./redact.js";
 import { hasStatusResult } from "./results.js";
-import type { Task } from "./tasks.js";
+import { type Task, deadlinePassed } from "./tasks.js";
 import { localDate } from "./time.js";
 import type { Goal } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -300,6 +300,7 @@ function sections(
 ): HandoverSection[] {
   const plans = readPlans(data);
   const since = now.getTime() - 30 * 86400000;
+  const today = localDate(now, data.ws.timeZone());
   const tasks = (data.records.task ?? []) as Task[];
   const t = (zh: string, en: string) => pick(locale, zh, en);
   const origin = (id: string) => {
@@ -313,11 +314,18 @@ function sections(
           : t(`从 ${AI_NAMES[value.source] ?? "AI"} 搬来`, `from ${AI_NAMES[value.source] ?? "AI"}`);
     return t(`（${from}，${value.date}）`, ` (${from}, ${value.date})`);
   };
+  const goalDue = new Map(data.goals.map((goal) => [goal.id, goal.due]));
   const goals = plans.goals.slice(0, 10).map((goal) => {
-    const next = goal.next
-      ? ` · ${clip(t(`下一步：${goal.next.title}`, `next: ${goal.next.title}`), locale)}`
-      : "";
-    return `- ${clip(goal.title, locale)}${origin(goal.id)}${next}`;
+    const due = goalDue.get(goal.id);
+    const deadline =
+      typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due) && due < today
+        ? t(`（原截止日 ${due} 已过，待重定）`, ` (original deadline ${due} passed; review)`)
+        : "";
+    const next =
+      goal.next && !deadlinePassed(goal.next.due, today, now)
+        ? ` · ${clip(t(`下一步：${goal.next.title}`, `next: ${goal.next.title}`), locale)}`
+        : "";
+    return `- ${clip(goal.title, locale)}${origin(goal.id)}${deadline}${next}`;
   });
   const directions = (data.records.direction ?? []) as unknown as Direction[];
   const experiments = (data.records.exploration_experiment ?? []) as unknown as ExplorationExperiment[];
@@ -351,7 +359,7 @@ function sections(
     .slice(0, 8)
     .map((item) => item.line());
   const open = tasks
-    .filter((task) => task.status === "open")
+    .filter((task) => task.status === "open" && !deadlinePassed(task.due, today, now))
     .slice(-8)
     .map((task) => {
       const goal = taskGoal(task, data.goals);

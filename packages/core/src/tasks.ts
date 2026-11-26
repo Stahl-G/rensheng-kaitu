@@ -53,6 +53,11 @@ export function listTasks(
   });
 }
 
+/** A date-only deadline lasts through the workspace's local day; a timed one expires at its offset-aware instant. */
+export function deadlinePassed(due: string | null | undefined, localToday: string, now: Date): boolean {
+  return !!due && (due.length === 10 ? due < localToday : parseTs(due) < now);
+}
+
 export function tasksForToday(rows: StoredRecord[], timeZone: string, now = new Date()) {
   const today = localDate(now, timeZone);
   return (rows as Task[])
@@ -60,7 +65,7 @@ export function tasksForToday(rows: StoredRecord[], timeZone: string, now = new 
     .map((task) => ({
       ...task,
       dueToday: !!task.due && dueDay(task.due, timeZone) === today,
-      overdue: !!task.due && (task.due.length === 10 ? task.due < today : parseTs(task.due) < now),
+      overdue: deadlinePassed(task.due, today, now),
       remindToday: !!task.remind_at && localDate(parseTs(task.remind_at), timeZone) === today,
     }))
     .filter((task) => task.dueToday || task.overdue || task.remindToday);
