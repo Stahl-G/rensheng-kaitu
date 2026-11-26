@@ -164,7 +164,14 @@ export function readUserPage(ws: Workspace, now = new Date()): UserPage {
 function prepareUserPage(ws: Workspace, now: Date, daily: ReturnType<typeof latestDaily>) {
   const current = readUserPage(ws, now);
   const section = daily && userPageSection(daily.body);
-  if (!daily || section === undefined || (current.date !== undefined && current.date >= daily.date))
+  // 云盘占位的 USER.md 写不进去，照实报告还没下载，不宣称已复制。
+  const placeholder = ws.exists("USER.md") && ws.scanText("USER.md") === undefined;
+  if (
+    !daily ||
+    section === undefined ||
+    placeholder ||
+    (current.date !== undefined && current.date >= daily.date)
+  )
     return { page: current };
   const body = `# 用户近况\n\n${section.replace(/^###(?=[^\S\n])/gm, "##")}\n`;
   const page = judgeUserPage(ws, now, daily.organizer, daily.date, body);
