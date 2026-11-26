@@ -144,6 +144,10 @@ function citedPaths(ws: Workspace, body: string, canRead: (path: string) => bool
   return paths;
 }
 
+/** 以 / 开头的两段以上路径或带扩展名的文件、~/、盘符与 UNC；前面紧挨文字、点或斜杠的（早/午/晚、./、https://）不算。 */
+const absolutePath =
+  /(?<![\p{L}\p{N}_.~:/\\-])(?:~[/\\]|[A-Za-z]:[/\\]|\\\\[^\s/\\]+[/\\]|\/[^\s/`'"<>()（）]+(?:\/|\.[A-Za-z0-9]{1,10}(?![A-Za-z0-9])))/u;
+
 const rawHealth = (path: string) => /^health\/(?:data|files)(?:\/|$)/i.test(path);
 
 /** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。 */
@@ -152,8 +156,7 @@ function checkUserPage(ws: Workspace, body: string): string[] {
   const size = [...body.trim()].length;
   if (size > userPageLimit) problems.push(`超过 ${userPageLimit} 字（${size} 字）`);
   if (!body.includes(userPageEnd)) problems.push("缺少结尾一行，可能没写完");
-  if (/(?:^|[\s(（`"'])(?:~\/|\/(?:Users|home|root|Volumes|private|tmp|var)\/|[A-Za-z]:[\\/])/m.test(body))
-    problems.push("写了本机绝对路径");
+  if (absolutePath.test(body)) problems.push("写了本机绝对路径");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
   const physical = agentPathResolver(ws.root);
   for (const path of citedPaths(ws, body, canRead)) {
