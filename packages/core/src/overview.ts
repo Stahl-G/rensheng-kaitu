@@ -115,11 +115,11 @@ function citedPaths(ws: Workspace, body: string): Set<string> {
   });
   if (top) {
     const rooted = new RegExp(
-      `(?<![A-Za-z0-9_./-])(${top}(?:[^${stops}/]+/)*(?:[^${stops}/]+?${fileEnd})?)`,
+      `(?<![A-Za-z0-9_./-])(${top}(?:[^${stops}/]+/)*(?:[^${stops}/]+?${fileEnd}|[^${stops}/]+)?)`,
       "giu",
     );
     rest = rest.replace(rooted, (_, path: string) => {
-      add(path);
+      add(existingPrefix(ws, path));
       return " ";
     });
   }
@@ -128,6 +128,25 @@ function citedPaths(ws: Workspace, body: string): Set<string> {
   ))
     add(match[1] as string);
   return paths;
+}
+
+/** 没有扩展名的末段紧挨着正文时（「见 health/data里」），取末段里最长的现有前缀。 */
+function existingPrefix(ws: Workspace, path: string): string {
+  const cut = path.lastIndexOf("/") + 1;
+  const name = [...path.slice(cut)];
+  const exists = (candidate: string) => {
+    try {
+      return ws.exists(candidate);
+    } catch {
+      return false;
+    }
+  };
+  if (!name.length || /\.[A-Za-z0-9]{1,10}$/.test(path) || exists(path)) return path;
+  for (let end = name.length - 1; end > 0; end--) {
+    const candidate = path.slice(0, cut) + name.slice(0, end).join("");
+    if (exists(candidate)) return candidate;
+  }
+  return path;
 }
 
 const rawHealth = (path: string) => /^health\/(?:data|files)(?:\/|$)/i.test(path);
