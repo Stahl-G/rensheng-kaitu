@@ -428,6 +428,8 @@ function Empty({ onImport }: { onImport: () => void }) {
   );
 }
 function ImportPanel({
+  busy,
+  setBusy,
   accounts,
   previewFinanceImport,
   commitFinanceImport,
@@ -436,6 +438,8 @@ function ImportPanel({
   onImported,
   stamp,
 }: {
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
   accounts: FinanceAccountsData["accounts"];
   previewFinanceImport: FinancePageProps["previewFinanceImport"];
   commitFinanceImport: FinancePageProps["commitFinanceImport"];
@@ -453,7 +457,6 @@ function ImportPanel({
   const [accountLast4, setAccountLast4] = useState("");
   const [preview, setPreview] = useState<FinanceImportPreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const staged = useRef<string | null>(null);
   const alive = useRef(true);
   const committing = useRef(false);
@@ -789,6 +792,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
   const [period, setPeriod] = useState("month");
   const [currency, setCurrency] = useState("CNY");
   const [importing, setImporting] = useState(props.initialImport ?? false);
+  const [importBusy, setImportBusy] = useState(false);
   const [data, setData] = useState<{
     overview: FinanceOverviewData;
     cashflow: FinanceCashflowData;
@@ -861,6 +865,10 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
     setMessage(null);
     setImporting(true);
   };
+  const closeImport = () => {
+    setImporting(false);
+    setImportBusy(false);
+  };
   const records = data?.overview.records ?? [];
   const currencies = [
     ...new Set([
@@ -881,8 +889,8 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
             type="button"
             className={`${css.button} ${importing ? "" : css.primary}`}
             aria-expanded={importing}
-            onClick={() => (importing ? setImporting(false) : openImport())}
-            disabled={!data}
+            onClick={importing ? closeImport : openImport}
+            disabled={!data || importBusy}
           >
             {importing ? t("收起", "Close") : label("导入账单")}
           </button>
@@ -901,11 +909,13 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
       {importing && data && (
         <ImportPanel
           {...props}
+          busy={importBusy}
+          setBusy={setImportBusy}
           accounts={data.accounts.accounts}
           stamp={stamp}
-          onClose={() => setImporting(false)}
+          onClose={closeImport}
           onImported={(result) => {
-            setImporting(false);
+            closeImport();
             setMessage(
               t(
                 `已导入 ${result.added} 条，已存在 ${result.skipped} 条。`,
