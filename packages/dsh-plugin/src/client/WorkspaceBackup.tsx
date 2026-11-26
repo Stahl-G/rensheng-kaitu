@@ -112,10 +112,7 @@ export function WorkspaceBackup({
         {!c && (
           <output>
             {status
-              ? t(
-                  "尚未连接 GitHub 仓库，本机资料照常保存",
-                  "No GitHub repository connected; local files still save",
-                )
+              ? t("未连接 GitHub 仓库", "Not connected")
               : t("正在读取同步状态…", "Loading sync status…")}
           </output>
         )}

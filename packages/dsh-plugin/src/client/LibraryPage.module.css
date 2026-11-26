@@ -169,9 +169,22 @@ button.row {
   background: var(--secondary);
   font: inherit;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.ways button:hover:not(:disabled),
+.capture button:hover:not(:disabled) {
+  background: var(--link-soft);
+  border-color: var(--link-line);
+}
+.ways button:active:not(:disabled),
+.capture button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .capture {
   margin-top: 16px;
+  animation: libReveal var(--kt-dur-normal) var(--kt-ease-out);
 }
 .capture label {
   display: grid;
@@ -344,6 +357,17 @@ button.row {
   font: inherit;
   font-size: 14px;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.noteFilters button:hover:not(:disabled, [aria-pressed="true"]) {
+  background: var(--sunken);
+  color: var(--ink);
+}
+.noteFilters button:active:not(:disabled),
+.askDocument:active:not(:disabled) {
+  transform: scale(0.96);
 }
 .noteFilters button[aria-pressed="true"],
 .askDocument {
@@ -366,6 +390,16 @@ button.row {
   font: inherit;
   cursor: pointer;
   overflow-wrap: anywhere;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), border-radius var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.noteItem:hover:not([aria-pressed="true"]) {
+  background: var(--sunken);
+  border-radius: 10px;
+}
+.noteItem:active {
+  transform: scale(0.992);
 }
 .noteItem strong {
   font-size: 16px;
@@ -445,5 +479,56 @@ button.row {
   .searchBar input {
     min-width: 0;
     flex-basis: 100%;
+  }
+}
+button.row {
+  border-radius: 8px;
+  padding-inline: 8px;
+  margin-inline: -8px;
+  width: calc(100% + 16px);
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+button.row:hover {
+  background: var(--sunken);
+}
+button.row:active {
+  transform: scale(0.994);
+}
+.category {
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+button.category:active,
+.category:has(.categoryOpen:active) {
+  transform: scale(0.985);
+}
+.document {
+  animation: libDocIn var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes libReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes libDocIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capture,
+  .document {
+    animation: none !important;
   }
 }

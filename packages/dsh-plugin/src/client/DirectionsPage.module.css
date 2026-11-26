@@ -72,6 +72,7 @@
   padding: 20px;
   border-radius: 12px;
   background: var(--kt-subtle);
+  animation: dirReveal var(--kt-dur-normal) var(--kt-ease-out);
 }
 .form > fieldset,
 .referenceFields {
@@ -167,11 +168,32 @@
   flex-direction: column;
   align-items: stretch;
   background: var(--surface);
+  border: 1px solid transparent;
   border-radius: 16px;
   min-width: 0;
+  transition: border-color var(--kt-dur-fast) var(--kt-ease-out), opacity var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.ideaRow:hover {
+  border-color: var(--line);
 }
 .ideaRow[data-paused="true"] {
   opacity: 0.7;
+}
+@keyframes dirReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form {
+    animation: none !important;
+  }
 }
 .ideaBody {
   flex: 1;

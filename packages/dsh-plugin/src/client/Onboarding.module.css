@@ -44,6 +44,9 @@
   color: var(--ink2);
   font-size: 14px;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
 }
 .ais label[data-checked="true"] {
   background: var(--strong);
@@ -191,6 +194,12 @@
   color: var(--ink);
   text-align: left;
   cursor: pointer;
+  transition: border-color var(--kt-dur-fast) var(--kt-ease-out), box-shadow var(--kt-dur-fast)
+    var(--kt-ease-out), background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.option:active {
+  transform: scale(0.985);
 }
 .option b {
   font-weight: 600;
@@ -472,4 +481,36 @@
 /* 换步时把焦点移到标题供读屏，鼠标用户不需要看到焦点框。 */
 h1[tabindex="-1"]:focus {
   outline: none;
+}
+.entryTabs button,
+.draftFields .pathCard {
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.entryTabs button:active:not(:disabled),
+.draftFields .pathCard:active {
+  transform: scale(0.98);
+}
+.original,
+.clipboard,
+.resultForm {
+  animation: onbReveal var(--kt-dur-normal) var(--kt-ease-out);
+}
+@keyframes onbReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .original,
+  .clipboard,
+  .resultForm {
+    animation: none !important;
+  }
 }

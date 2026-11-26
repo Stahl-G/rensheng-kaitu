@@ -160,6 +160,14 @@
   font-weight: 500;
   margin-left: 5px;
 }
+@media (prefers-color-scheme: dark) {
+  :not([data-theme="light"]) .page {
+    --health-chart: #adc7a7;
+    --health-soft: #303e2f;
+    --health-medium: #637f5c;
+    --sleep-chart: #9bb7dc;
+  }
+}
 [data-theme="dark"] .page {
   --health-chart: #adc7a7;
   --health-soft: #303e2f;
@@ -249,8 +257,34 @@
   font-family: inherit;
   cursor: pointer;
 }
-.page button:hover {
-  filter: brightness(0.94);
+.page button {
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast)
+    var(--kt-ease-out), filter var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.page button:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+.page button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.panel {
+  animation: healthPanelIn var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes healthPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none !important;
+  }
 }
 .page button:disabled {
   opacity: 0.5;

@@ -26,6 +26,12 @@ function FormShell({
       className={css.form}
       aria-label={title}
       aria-busy={busy}
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.nativeEvent.isComposing && !busy) {
+          e.preventDefault();
+          e.currentTarget.requestSubmit();
+        }
+      }}
       onSubmit={async (e) => {
         e.preventDefault();
         const form = new FormData(e.currentTarget);

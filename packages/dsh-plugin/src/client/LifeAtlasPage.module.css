@@ -15,6 +15,14 @@
   min-height: 38px;
   padding: 7px 12px;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.page button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+.page button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .page button:disabled {
   opacity: 0.45;
@@ -363,5 +371,29 @@
 @media (prefers-reduced-motion: reduce) {
   .province {
     transition: none;
+  }
+  .detail,
+  .history,
+  .sidebar,
+  .hover {
+    animation: none !important;
+  }
+}
+.detail,
+.history,
+.sidebar {
+  animation: atlasReveal var(--kt-dur-normal) var(--kt-ease-out);
+}
+.hover {
+  animation: atlasReveal var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes atlasReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

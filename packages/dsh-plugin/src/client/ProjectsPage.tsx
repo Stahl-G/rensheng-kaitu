@@ -7,6 +7,7 @@ import { type DoingPageProps, Output, Repository } from "./DoingPage.js";
 import css from "./DoingPage.module.css";
 import { OpenPath } from "./DshFiles.js";
 import { ReadWarnings } from "./ReadWarnings.js";
+import { normalizeGithubRepo } from "./file-import-source.js";
 import { useLocale, useT } from "./i18n.js";
 
 const PROJECT_UNITS_EN: Record<string, string> = {
@@ -146,12 +147,6 @@ function GoalForm({
         <option value="次">{t("次", "times")}</option>
         <option value="版">{t("版", "versions")}</option>
       </datalist>
-      <p className={css.muted}>
-        {t(
-          "「字」随关联手稿同步，「次提交」按关联仓库已统计的提交累计；其他单位可手动更新。",
-          "Words sync from linked manuscripts; commits use totals from linked repositories. Update other units manually.",
-        )}
-      </p>
       <button className={css.primary} disabled={busy || thinking} type="submit">
         {t("确认并保存目标", "Confirm and save goal")}
       </button>
@@ -542,18 +537,32 @@ export function ProjectsPage(
             <section className={css.card}>
               <h3>GitHub</h3>
               {github(project)}
-              <button type="button" className={css.link} disabled={busy} onClick={() => setBinding(!binding)}>
-                {project.github
-                  ? t("更换 GitHub 仓库", "Change GitHub repository")
-                  : t("绑定 GitHub 仓库", "Link GitHub repository")}
+              <button
+                type="button"
+                className={css.link}
+                aria-expanded={binding}
+                disabled={busy}
+                onClick={() => setBinding(!binding)}
+              >
+                {binding
+                  ? t("收起", "Close")
+                  : project.github
+                    ? t("更换 GitHub 仓库", "Change GitHub repository")
+                    : t("绑定 GitHub 仓库", "Link GitHub repository")}
               </button>
               {binding && (
                 <form
                   className={css.form}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && !event.nativeEvent.isComposing && !busy) {
+                      event.preventDefault();
+                      setBinding(false);
+                    }
+                  }}
                   onSubmit={(event) => {
                     event.preventDefault();
                     void run(async () => {
-                      await props.bindProjectGithub(project.slug, repo);
+                      await props.bindProjectGithub(project.slug, normalizeGithubRepo(repo));
                       await refresh();
                     });
                   }}
@@ -561,7 +570,9 @@ export function ProjectsPage(
                   <label>
                     {t("仓库地址", "Repository")}
                     <input
-                      placeholder="owner/repo"
+                      // biome-ignore lint/a11y/noAutofocus: 展开仓库绑定表单后直接聚焦输入。
+                      autoFocus
+                      placeholder={t("owner/repo 或仓库网址", "owner/repo or URL")}
                       required
                       value={repo}
                       onChange={(event) => setRepo(event.target.value)}
@@ -664,19 +675,25 @@ export function ProjectsPage(
       ) : (
         <>
           <header className={css.header}>
-            <p className={css.muted}>
-              {t(
-                "打开一个项目，查看目标、进度和来源。",
-                "Open a project to see its goal, progress and sources.",
-              )}
-            </p>
-            <button type="button" className={css.primary} onClick={() => setCreating(!creating)}>
-              {t("新建项目", "New project")}
+            <span />
+            <button
+              type="button"
+              className={css.primary}
+              aria-expanded={creating}
+              onClick={() => setCreating(!creating)}
+            >
+              {creating ? t("收起", "Close") : t("新建项目", "New project")}
             </button>
           </header>
           {creating && (
             <form
               className={css.form}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && !event.nativeEvent.isComposing && !busy) {
+                  event.preventDefault();
+                  setCreating(false);
+                }
+              }}
               onSubmit={(event) => {
                 event.preventDefault();
                 void run(async () => {
@@ -690,7 +707,13 @@ export function ProjectsPage(
             >
               <label>
                 {t("项目名称", "Project name")}
-                <input required value={title} onChange={(event) => setTitle(event.target.value)} />
+                <input
+                  // biome-ignore lint/a11y/noAutofocus: 点击新建项目后直接聚焦项目名称。
+                  autoFocus
+                  required
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
               </label>
               <button type="submit" disabled={busy} className={css.primary}>
                 {t("创建并设置目标", "Create and set a goal")}

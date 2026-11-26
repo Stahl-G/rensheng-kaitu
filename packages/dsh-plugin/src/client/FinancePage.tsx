@@ -428,6 +428,8 @@ function Empty({ onImport }: { onImport: () => void }) {
   );
 }
 function ImportPanel({
+  busy,
+  setBusy,
   accounts,
   previewFinanceImport,
   commitFinanceImport,
@@ -436,6 +438,8 @@ function ImportPanel({
   onImported,
   stamp,
 }: {
+  busy: boolean;
+  setBusy: (busy: boolean) => void;
   accounts: FinanceAccountsData["accounts"];
   previewFinanceImport: FinancePageProps["previewFinanceImport"];
   commitFinanceImport: FinancePageProps["commitFinanceImport"];
@@ -453,7 +457,6 @@ function ImportPanel({
   const [accountLast4, setAccountLast4] = useState("");
   const [preview, setPreview] = useState<FinanceImportPreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const staged = useRef<string | null>(null);
   const alive = useRef(true);
   const committing = useRef(false);
@@ -546,8 +549,9 @@ function ImportPanel({
     }
   };
   const p = preview?.preview;
+  const needsAccountPreview = !account && (!!p?.account || accountName.trim() !== p?.suggestedAccount.name);
   return (
-    <Section title={label("导入账单")} note={label("先预览，再确认写入")}>
+    <Section title={label("导入账单")}>
       {error && (
         <p role="alert" className={css.notice}>
           {error}
@@ -581,16 +585,6 @@ function ImportPanel({
             <label>
               {label("账户名")}
               <input value={accountName} disabled={busy} onChange={(e) => setAccountName(e.target.value)} />
-              {accountName.trim() && accountName.trim() !== preview.preview.suggestedAccount.name && (
-                <button
-                  type="button"
-                  className={css.button}
-                  disabled={busy}
-                  onClick={() => void upload(selectedFile.current, "", accountName)}
-                >
-                  {label("更新预览")}
-                </button>
-              )}
             </label>
           )}
           {!preview && (
@@ -765,14 +759,14 @@ function ImportPanel({
             className={`${css.button} ${css.primary}`}
             disabled={
               busy ||
-              !!error ||
-              !!p?.errors.length ||
-              p?.account !== (account || null) ||
-              (!account && (!accountName.trim() || accountName.trim() !== p?.suggestedAccount.name))
+              (!account && !accountName.trim()) ||
+              (!needsAccountPreview && (!!error || !!p?.errors.length || p?.account !== (account || null)))
             }
-            onClick={() => void commit()}
+            onClick={() =>
+              void (needsAccountPreview ? upload(selectedFile.current, "", accountName.trim()) : commit())
+            }
           >
-            {label("确认导入")}
+            {label(needsAccountPreview ? "更新预览" : "确认导入")}
           </button>
         )}
         <button type="button" className={css.button} disabled={busy} onClick={() => void discard()}>
@@ -798,6 +792,7 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
   const [period, setPeriod] = useState("month");
   const [currency, setCurrency] = useState("CNY");
   const [importing, setImporting] = useState(props.initialImport ?? false);
+  const [importBusy, setImportBusy] = useState(false);
   const [data, setData] = useState<{
     overview: FinanceOverviewData;
     cashflow: FinanceCashflowData;
@@ -870,6 +865,10 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
     setMessage(null);
     setImporting(true);
   };
+  const closeImport = () => {
+    setImporting(false);
+    setImportBusy(false);
+  };
   const records = data?.overview.records ?? [];
   const currencies = [
     ...new Set([
@@ -881,23 +880,19 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
   return (
     <div className={css.page} aria-busy={loading}>
       <header className={css.header}>
-        <p className={css.muted}>
-          {t(
-            "财务记录与分析 · 明细保存在资料文件夹，随已开启的云盘同步",
-            "Financial records and analysis · Details stay in your workspace and follow its cloud sync settings",
-          )}
-        </p>
+        <span />
         <div className={css.actions}>
           <button type="button" className={css.button} disabled={loading} onClick={() => void refresh()}>
             {loading ? label("刷新中…") : label("刷新")}
           </button>
           <button
             type="button"
-            className={`${css.button} ${css.primary}`}
-            onClick={openImport}
-            disabled={importing || !data}
+            className={`${css.button} ${importing ? "" : css.primary}`}
+            aria-expanded={importing}
+            onClick={importing ? closeImport : openImport}
+            disabled={!data || importBusy}
           >
-            {label("导入账单")}
+            {importing ? t("收起", "Close") : label("导入账单")}
           </button>
         </div>
       </header>
@@ -914,11 +909,13 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
       {importing && data && (
         <ImportPanel
           {...props}
+          busy={importBusy}
+          setBusy={setImportBusy}
           accounts={data.accounts.accounts}
           stamp={stamp}
-          onClose={() => setImporting(false)}
+          onClose={closeImport}
           onImported={(result) => {
-            setImporting(false);
+            closeImport();
             setMessage(
               t(
                 `已导入 ${result.added} 条，已存在 ${result.skipped} 条。`,
@@ -1173,10 +1170,8 @@ export function FinancePage(props: FinancePageProps & { initialImport?: boolean 
                               {money(h.unrealized_gain.amount, h.currency)}
                               {h.snapshot_return.amount !== null && (
                                 <small>
-                                  {t("收益率（小数）：", "Return (decimal): ")}
-                                  {decimal(h.snapshot_return.amount)}
-                                  <br />
-                                  {h.snapshot_return_algorithm}
+                                  {t("收益率：", "Return: ")}
+                                  {`${Number(h.snapshot_return.amount) >= 0 ? "+" : ""}${(Number(h.snapshot_return.amount) * 100).toFixed(2)}%`}
                                 </small>
                               )}
                               {h.converted_valuation && (

@@ -184,6 +184,7 @@
   border-bottom: 1.5px solid var(--kt-muted);
   transform: rotate(-45deg);
   flex: none;
+  transition: transform var(--kt-dur-fast) var(--kt-ease-out);
 }
 .tool[open] summary::after {
   transform: rotate(45deg);
@@ -252,10 +253,16 @@
   background: transparent;
   font-size: 14px;
   color: var(--kt-secondary);
+  transition: box-shadow var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast) var(--kt-ease-out),
+    background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
 }
 .suggestions button:hover {
   box-shadow: 0 0 0 1px var(--kt-muted);
   color: var(--kt-text);
+  background: var(--kt-subtle);
+}
+.suggestions button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .composer {
   position: relative;
@@ -267,6 +274,7 @@
   border-radius: 20px;
   background: var(--kt-card);
   box-shadow: 0 0 0 1px var(--kt-control);
+  transition: box-shadow var(--kt-dur-fast) var(--kt-ease-out);
 }
 .composer:focus-within {
   box-shadow: 0 0 0 1.5px var(--kt-accent);
@@ -314,21 +322,24 @@
   font-size: 12px;
   min-width: 0;
   max-width: 100%;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), color var(--kt-dur-fast)
+    var(--kt-ease-out), border-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
 }
 .add {
   width: 34px;
   padding: 0;
   font-size: 24px;
 }
-.model:hover,
-.add:hover {
+.model:hover:not(:disabled),
+.add:hover:not(:disabled) {
   background: var(--kt-subtle);
   color: var(--kt-text);
 }
-.model:active,
-.add:active,
-.send:active {
-  transform: translateY(1px);
+.model:active:not(:disabled),
+.add:active:not(:disabled),
+.send:active:not(:disabled) {
+  transform: scale(0.94);
 }
 .modelName {
   overflow: hidden;
@@ -416,6 +427,7 @@ output.progress,
 .stepCount {
   color: var(--kt-muted);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 .send {
   width: 36px;
@@ -427,6 +439,11 @@ output.progress,
   background: var(--kt-primary);
   color: var(--kt-on-primary);
   font-size: 24px;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), opacity var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.send:hover:not(:disabled) {
+  background: var(--primary-hover, var(--kt-primary));
 }
 .stopIcon {
   display: block;
@@ -472,8 +489,14 @@ output.progress,
   color: var(--kt-text);
   box-shadow: 0 20px 60px rgb(0 0 0 / 25%);
 }
+.dialog[open] {
+  animation: askDialogIn var(--kt-dur-normal) var(--kt-ease-out);
+}
 .dialog::backdrop {
   background: rgb(31 30 29 / 42%);
+}
+.dialog[open]::backdrop {
+  animation: askBackdropIn var(--kt-dur-fast) var(--kt-ease-out);
 }
 .dialog h2 {
   font-size: 22px;
@@ -643,6 +666,8 @@ output.progress,
   border-radius: 14px;
   background: var(--kt-card);
   box-shadow: 0 8px 28px rgb(0 0 0 / 10%);
+  transform-origin: bottom left;
+  animation: askPopIn var(--kt-dur-fast) var(--kt-ease-out);
 }
 .referenceTabs {
   display: flex;
@@ -888,5 +913,57 @@ output.progress,
     border-left: 0;
     border-top: 1px solid var(--kt-control);
     overflow: visible;
+  }
+}
+.modelPopover {
+  transform-origin: bottom right;
+}
+.evidencePanel {
+  animation: askEvidenceIn var(--kt-dur-normal) var(--kt-ease-out);
+}
+@keyframes askDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes askBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes askPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes askEvidenceIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open],
+  .dialog[open]::backdrop,
+  .referencePanel,
+  .evidencePanel {
+    animation: none !important;
   }
 }

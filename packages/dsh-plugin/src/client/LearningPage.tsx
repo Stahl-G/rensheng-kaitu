@@ -89,6 +89,7 @@ export function LearningPage(
     props.onDraft({ ...props.draft, ...change, operationId: crypto.randomUUID() });
   const [error, setError] = useState("");
   const [receipt, setReceipt] = useState("");
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [working, setBusy] = useState(false);
   const busy = working || !!props.draft.saving;
   const submitting = useRef(false);
@@ -160,7 +161,14 @@ export function LearningPage(
     }
   };
   const save = async () => {
-    if (!detail || busy || submitting.current || !props.draft.operationId) return;
+    if (
+      !detail ||
+      busy ||
+      submitting.current ||
+      !props.draft.operationId ||
+      !(understanding.trim() || questions.trim() || next.trim() || completed)
+    )
+      return;
     submitting.current = true;
     setBusy(true);
     setError("");
@@ -287,15 +295,19 @@ export function LearningPage(
               rows={5}
               maxLength={128 * 1024}
               value={material}
+              onKeyDown={(event) => {
+                if (
+                  (event.metaKey || event.ctrlKey) &&
+                  event.key === "Enter" &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
               onChange={(event) => setMaterial(event.target.value)}
             />
           </label>
-          <p className={css.small}>
-            {t(
-              "保存文字与链接到学习资料。开始对话时，由你当前选择的 AI 阅读材料。",
-              "Save text and links with your learning notes. Your selected AI reads the material when you start a conversation.",
-            )}
-          </p>
           <div className={styles.toolbar}>
             <button className={css.btn} type="submit" disabled={busy}>
               {busy ? t("保存中…", "Saving…") : t("保存主题与资料", "Save topic and source")}
@@ -332,14 +344,6 @@ export function LearningPage(
               </button>
             ))}
           </div>
-          {!props.topic && (
-            <p className={css.small}>
-              {t(
-                "选一个主题继续，或从文章开始。先回答，再用自己的话留下理解。",
-                "Pick a topic to resume, or start from an article. Answer first, then save what you understand in your own words.",
-              )}
-            </p>
-          )}
           {detail && (
             <div className={`${css.card} ${styles.form}`}>
               <h3>{detail.title}</h3>
@@ -361,12 +365,6 @@ export function LearningPage(
               >
                 {t("接着学：让 AI 问我一个问题", "Continue: ask me one question")}
               </button>
-              <p className={css.small}>
-                {t(
-                  "有卡片工具时可用概念卡、小测和模拟；外部 Agent 可用文字练习，PPT 按需。",
-                  "Cards, quizzes and simulations require the matching tools; external agents can use text exercises. Slides are optional.",
-                )}
-              </p>
               <details>
                 <summary>
                   {t(`来源资料（${detail.sources.length}）`, `Sources (${detail.sources.length})`)}
@@ -392,6 +390,16 @@ export function LearningPage(
               </details>
               <form
                 className={styles.form}
+                onKeyDown={(event) => {
+                  if (
+                    (event.metaKey || event.ctrlKey) &&
+                    event.key === "Enter" &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+                    event.currentTarget.requestSubmit();
+                  }
+                }}
                 onSubmit={(event) => {
                   event.preventDefault();
                   void save();
@@ -443,30 +451,49 @@ export function LearningPage(
                     </select>
                   </label>
                 )}
-                <p className={css.small}>
-                  {t(
-                    "本次打开期间，切页或换主题会保留输入；保存后才写入资料。",
-                    "While the app is open, switching pages or topics keeps your draft. Only saving writes it to your files.",
-                  )}
-                </p>
-                <button
-                  type="button"
-                  className={css.link}
-                  disabled={busy || !(understanding || questions || next || completed)}
-                  onClick={() => {
-                    props.onDraft(null);
-                    setReceipt(t("已放弃本次输入。", "Draft discarded."));
-                  }}
-                >
-                  {t("放弃本次输入", "Discard this draft")}
-                </button>
-                <button
-                  type="submit"
-                  className={css.btn}
-                  disabled={busy || !(understanding.trim() || questions.trim() || next.trim() || completed)}
-                >
-                  {busy ? t("保存中…", "Saving…") : t("保存这次学习", "Save this learning note")}
-                </button>
+                <div className={styles.toolbar}>
+                  <button
+                    type="submit"
+                    className={`${css.btn} ${css["btn-primary"]}`}
+                    disabled={busy || !(understanding.trim() || questions.trim() || next.trim() || completed)}
+                  >
+                    {busy ? t("保存中…", "Saving…") : t("保存这次学习", "Save this learning note")}
+                  </button>
+                  {(understanding || questions || next || completed) &&
+                    (confirmDiscard ? (
+                      <>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={busy}
+                          onClick={() => {
+                            props.onDraft(null);
+                            setConfirmDiscard(false);
+                            setReceipt(t("已放弃本次输入。", "Draft discarded."));
+                          }}
+                        >
+                          {t("确认放弃", "Confirm discard")}
+                        </button>
+                        <button
+                          type="button"
+                          className={css.link}
+                          disabled={busy}
+                          onClick={() => setConfirmDiscard(false)}
+                        >
+                          {t("保留草稿", "Keep draft")}
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className={css.link}
+                        disabled={busy}
+                        onClick={() => setConfirmDiscard(true)}
+                      >
+                        {t("放弃本次输入", "Discard this draft")}
+                      </button>
+                    ))}
+                </div>
               </form>
             </div>
           )}

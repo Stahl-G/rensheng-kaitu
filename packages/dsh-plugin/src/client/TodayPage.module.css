@@ -882,6 +882,7 @@
   margin: 0;
 }
 .savepointHome .weatherSlot {
+  min-height: 28px;
   order: 1;
   flex: 0 1 240px;
   width: 240px;
@@ -915,6 +916,17 @@
   margin-bottom: 14px;
   min-height: 28px;
   font: inherit;
+  font-variant-numeric: tabular-nums;
+  border-radius: 999px;
+  padding: 2px 6px;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.resultWeek:hover {
+  background: var(--surface);
+}
+.resultWeek:active {
+  transform: scale(0.97);
 }
 .resultWeek i {
   width: 12px;
@@ -923,10 +935,13 @@
   border-radius: 50%;
   border: 1.5px solid var(--line-strong);
   background: transparent;
+  transition: background-color var(--kt-dur-normal) var(--kt-ease-spring), border-color var(--kt-dur-normal)
+    var(--kt-ease-spring), transform var(--kt-dur-normal) var(--kt-ease-spring);
 }
 .resultWeek i[data-result="true"] {
   background: var(--link);
   border-color: var(--link);
+  animation: todayDotPop var(--kt-dur-normal) var(--kt-ease-spring);
 }
 .resultWeek i[data-today="true"] {
   width: 16px;
@@ -951,6 +966,8 @@
 }
 .actionCard {
   padding: 28px;
+  transition: border-color var(--kt-dur-fast) var(--kt-ease-out), background-color var(--kt-dur-fast)
+    var(--kt-ease-out);
 }
 .actionMeta {
   display: flex;
@@ -975,6 +992,7 @@
   background: linear-gradient(transparent 56%, var(--mark) 56%, var(--mark) 92%, transparent 92%);
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
+  transition: color var(--kt-dur-normal) var(--kt-ease-out), opacity var(--kt-dur-normal) var(--kt-ease-out);
 }
 .actionCard[data-done="true"] mark {
   background: transparent;
@@ -995,6 +1013,8 @@
   color: var(--ink);
   background: var(--surface);
   font: inherit;
+  transition: border-color var(--kt-dur-fast) var(--kt-ease-out), box-shadow var(--kt-dur-fast)
+    var(--kt-ease-out);
 }
 .resultForm input:focus-visible {
   border-color: var(--link);
@@ -1012,9 +1032,14 @@
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
 }
 .askSoft:hover {
   background: var(--link-line);
+}
+.askSoft:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .stepRow > span.stepTitle,
 .stepRow > span[aria-hidden="true"] {
@@ -1028,6 +1053,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  animation: todayReveal var(--kt-dur-normal) var(--kt-ease-out);
 }
 .completionReceipt > span {
   flex: 1;
@@ -1049,6 +1075,7 @@
   border: 0;
 }
 .stepCircle {
+  position: relative;
   width: 20px;
   height: 20px;
   flex: none;
@@ -1056,10 +1083,21 @@
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
+  transition: border-color var(--kt-dur-fast) var(--kt-ease-out), background-color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-spring);
+}
+.stepCircle::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
 }
 .stepCircle:hover {
   border-color: var(--link);
-  background: var(--link-bg);
+  background: var(--link-soft);
+  transform: scale(1.08);
+}
+.stepCircle:active:not(:disabled) {
+  transform: scale(0.9);
 }
 .stepTitle {
   flex: 1;
@@ -1078,6 +1116,9 @@ button.stepTitle {
 .stepRow > span:not(.stepTitle),
 .stepRow small,
 .stepRow time {
+  flex: none;
+  max-width: 40%;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 12px;
 }
@@ -1270,7 +1311,7 @@ button.stepTitle {
     gap: 8px;
   }
   .stepTitle {
-    flex-basis: 65%;
+    flex-basis: min(9rem, 45%);
   }
   .actionCard {
     padding: 20px;
@@ -1329,5 +1370,75 @@ button.stepTitle {
 @media (max-width: 760px) {
   .todaySide {
     order: 2;
+  }
+}
+
+.capture,
+.sourceRecord,
+.weekReview,
+.weatherSlot > section:has(ol) {
+  animation: todayReveal var(--kt-dur-normal) var(--kt-ease-out);
+}
+.threadLinks > button,
+.continueCard,
+.commandTrigger,
+.scheduleCard button,
+.voiceButton {
+  transition:
+    background-color var(--kt-dur-fast) var(--kt-ease-out),
+    border-color var(--kt-dur-fast) var(--kt-ease-out),
+    color var(--kt-dur-fast) var(--kt-ease-out),
+    box-shadow var(--kt-dur-fast) var(--kt-ease-out),
+    transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.threadLinks > button:hover,
+.commandTrigger:hover {
+  border-color: var(--line-strong);
+  background: var(--sunken);
+}
+.scheduleCard button:hover {
+  background: var(--link-soft);
+}
+.threadLinks > button:active:not(:disabled),
+.commandTrigger:active:not(:disabled),
+.scheduleCard button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.voiceButton:hover:not(:disabled) {
+  background: var(--control);
+  color: var(--ink);
+}
+.voiceButton:active:not(:disabled) {
+  transform: scale(0.92);
+}
+@keyframes todayReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes todayDotPop {
+  0% {
+    transform: scale(0.75);
+  }
+  65% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capture,
+  .sourceRecord,
+  .weekReview,
+  .completionReceipt,
+  .weatherSlot > section:has(ol),
+  .resultWeek i[data-result="true"] {
+    animation: none !important;
   }
 }

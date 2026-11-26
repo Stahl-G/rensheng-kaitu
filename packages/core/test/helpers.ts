@@ -103,6 +103,8 @@ export async function clonedWorkspace(
 
 export const workout = { exercise: "深蹲", sets: 3, reps: 12, weight_kg: 60, session_id: "s1" };
 
+export { zipSync };
+
 export function appleHealthZip(): Uint8Array {
   return zipSync({
     "apple_health_export/export.xml": readFileSync(

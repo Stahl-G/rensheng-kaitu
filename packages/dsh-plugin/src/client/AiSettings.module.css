@@ -48,6 +48,15 @@
   margin-bottom: 8px;
   border: 1px solid var(--line);
   border-radius: 12px;
+  cursor: pointer;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), border-color var(--kt-dur-fast)
+    var(--kt-ease-out), transform var(--kt-dur-press) var(--kt-ease-press);
+}
+.choices label:hover:not(:has(input:disabled)) {
+  border-color: var(--line-strong);
+}
+.choices label:active:not(:has(input:disabled)) {
+  transform: scale(0.99);
 }
 .choices label:has(input:checked) {
   background: var(--link-soft);
@@ -93,10 +102,18 @@
   gap: 10px;
   background: #000;
   color: #fff;
-  border: 1px solid #000;
-  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
   padding: 10px 16px;
   font-weight: 600;
+  transition: opacity var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.siwcButton:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.siwcButton:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .planDialog {
@@ -111,6 +128,36 @@
 }
 .planDialog::backdrop {
   background: rgb(31 30 29 / 42%);
+}
+.planDialog[open] {
+  animation: aiDialogIn var(--kt-dur-normal) var(--kt-ease-out);
+}
+.planDialog[open]::backdrop {
+  animation: aiBackdropIn var(--kt-dur-fast) var(--kt-ease-out);
+}
+@keyframes aiDialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes aiBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .planDialog[open],
+  .planDialog[open]::backdrop {
+    animation: none !important;
+  }
 }
 .planDialog p {
   margin: 0 0 20px;

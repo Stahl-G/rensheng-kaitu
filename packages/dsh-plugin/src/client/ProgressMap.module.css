@@ -32,6 +32,11 @@
   color: var(--ink);
   text-align: left;
   font-size: 14px;
+  transition: background-color var(--kt-dur-fast) var(--kt-ease-out), transform var(--kt-dur-press)
+    var(--kt-ease-press);
+}
+.row:active {
+  transform: scale(0.992);
 }
 .row:hover {
   background: var(--sunken);

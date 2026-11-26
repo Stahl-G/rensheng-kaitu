@@ -90,19 +90,15 @@ export function JobsPage(props: JobsPageProps) {
     <section className={css.page} aria-label={t("岗位箱", "Job inbox")}>
       <header>
         {props.embedded ? <h2>{t("求职", "Job search")}</h2> : <h1>{t("岗位箱", "Job inbox")}</h1>}
-        <p>
-          {t(
-            "读取已有岗位来源，展开查看详情。",
-            "Read existing job sources and expand a position for details.",
-          )}
-        </p>
         <button type="button" onClick={() => void refresh()}>
           {t("重新读取", "Reload")}
         </button>
       </header>
       {error && <p role="alert">{error}</p>}
       {!data && !error && <output>{t("正在读取岗位…", "Loading positions…")}</output>}
-      {data && <p>{t(`共 ${data.items.length} 个岗位`, `${data.items.length} positions`)}</p>}
+      {data && data.items.length > 0 && (
+        <p>{t(`共 ${data.items.length} 个岗位`, `${data.items.length} positions`)}</p>
+      )}
       {data && !data.available && (
         <p>
           {t(

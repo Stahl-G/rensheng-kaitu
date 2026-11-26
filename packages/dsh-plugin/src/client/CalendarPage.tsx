@@ -8,15 +8,13 @@ import { useEffect, useState } from "react";
 import type { CalendarData, CalendarEntry } from "../types.js";
 import { CalendarPushResult, type CalendarPushServices, CalendarSlotForm } from "./CalendarPush.js";
 import css from "./Prototype.module.css";
-import { type Locale, useLocale, useT } from "./i18n.js";
+import { type Locale, calendarSourceName, useLocale, useT } from "./i18n.js";
 
 export interface CalendarPageProps extends CalendarPushServices {
   loadCalendar: () => Promise<CalendarData>;
   addCalendar: (url: string, name: string) => Promise<CalendarData>;
   decideProposal: (id: string, decision: "confirmed" | "rejected") => Promise<unknown>;
 }
-const sourceName = (source: string, t: ReturnType<typeof useT>) =>
-  source === "开图" ? t("开图", "Kaitu") : source;
 
 export function calendarDay(value: string, zone: string) {
   return value.length === 10 || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)
@@ -114,7 +112,7 @@ export function Agenda({
                     </button>
                   </div>
                 ) : (
-                  <span className={css.small}>{sourceName(event.source, t)}</span>
+                  <span className={css.small}>{calendarSourceName(event.source, t)}</span>
                 )}
               </div>
             ))
@@ -174,11 +172,15 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
   return (
     <div className={css.sec}>
       <div className={css["sec-head"]}>
-        <p className={css.small}>
-          {t("日历订阅每 15 分钟刷新", "Calendar subscriptions refresh every 15 minutes")}
-        </p>
-        <button type="button" className={`${css.btn} ${css["btn-quiet"]}`} onClick={() => setAdding(!adding)}>
-          {t("＋ 添加日历", "+ Add calendar")}
+        <span />
+        <button
+          type="button"
+          className={`${css.btn} ${css["btn-quiet"]}`}
+          disabled={busy}
+          aria-expanded={adding}
+          onClick={() => setAdding(!adding)}
+        >
+          {adding ? t("收起", "Close") : t("＋ 添加日历", "+ Add calendar")}
         </button>
       </div>
       {error && (
@@ -189,6 +191,12 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
       {adding && (
         <form
           className={`${css.card} ${css["sub-form"]}`}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !e.nativeEvent.isComposing && !busy) {
+              e.preventDefault();
+              setAdding(false);
+            }
+          }}
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -211,6 +219,8 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
               {t("ICS 订阅地址", "ICS subscription URL")}
               <input
                 required
+                // biome-ignore lint/a11y/noAutofocus: 点开添加日历后直接聚焦输入地址。
+                autoFocus
                 value={url}
                 placeholder={t("https://…/basic.ics 或 webcal://…", "https://…/basic.ics or webcal://…")}
                 onChange={(e) => setUrl(e.target.value)}
@@ -225,9 +235,14 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
               />
             </label>
           </div>
-          <button type="submit" className={`${css.btn} ${css["btn-primary"]}`} disabled={busy}>
-            {t("添加订阅", "Add subscription")}
-          </button>
+          <div className={css["dialog-foot"]}>
+            <button type="button" className={css.link} disabled={busy} onClick={() => setAdding(false)}>
+              {t("取消", "Cancel")}
+            </button>
+            <button type="submit" className={`${css.btn} ${css["btn-primary"]}`} disabled={busy}>
+              {busy ? t("正在同步日历…", "Syncing calendar…") : t("添加订阅", "Add subscription")}
+            </button>
+          </div>
         </form>
       )}
       <div className={`${css.card} ${css.cal} ${css.calendarShell}`}>
@@ -289,7 +304,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
         {sources.map((source) => (
           <span key={source}>
             <i className={css.dot} style={{ background: `var(--${colorFor(source)})` }} />
-            {sourceName(source, t)}
+            {calendarSourceName(source, t)}
           </span>
         ))}
         <span>{t("┄ 开图建议", "┄ Kaitu suggestion")}</span>
@@ -299,7 +314,7 @@ export function CalendarPage(props: CalendarPageProps & { initialAdding?: boolea
           <span className={css.stack}>
             <b>{selected.title}</b>
             <span className={css.small}>
-              {selected.start} · {sourceName(selected.source, t)}
+              {selected.start} · {calendarSourceName(selected.source, t)}
             </span>
           </span>
           <CalendarPushResult
