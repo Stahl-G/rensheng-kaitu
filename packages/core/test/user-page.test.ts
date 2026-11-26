@@ -22,12 +22,15 @@ const daily = (date: string, body: string) => `---\norganizer: muse\ndate: ${dat
 
 it("整理员只新建每日整理时，电脑把其中的用户近况复制成 USER.md，并在入口写明能否直接读", async () => {
   const ws = await clonedWorkspace();
-  ws.writeText("handoffs/daily/2026-10-15.md", daily("2026-10-15", page(["- 写小说，详见 me/profile.md"])));
+  ws.writeText(
+    "handoffs/daily/2026-10-15.md",
+    daily("2026-10-15", page(["- 写小说，详见me/profile.md里的档案"])),
+  );
   const now = new Date("2026-10-15T12:00:00+08:00");
   refreshOverview(ws, now);
   const user = parseFrontmatter(ws.readText("USER.md"));
   expect(user.data).toEqual({ organizer: "muse", date: "2026-10-15" });
-  expect(user.body).toMatch(/^# 用户近况\n\n## 我是谁\n\n- 写小说，详见 me\/profile\.md\n/);
+  expect(user.body).toMatch(/^# 用户近况\n\n## 我是谁\n\n- 写小说，详见me\/profile\.md里的档案\n/);
   expect(user.body).not.toContain("昨天做了什么");
   const line = "先读 `USER.md`：muse 在 2026-10-15 写的用户近况，电脑已核对。";
   expect(ws.readText("OVERVIEW.md")).toContain(line);
@@ -51,8 +54,8 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
 
   const leaky = page([
     "- 体重见 health/data/2026-10.jsonl",
-    "- 账户见 finance/accounts.json",
-    "- 草稿 me/none.md",
+    "- 账户见finance/账户.json",
+    "- 笔记见 `learning/沟通 笔记/notes.md`",
   ]);
   ws.writeText("handoffs/daily/2026-10-15.md", daily("2026-10-15", leaky.replace("用户近况到此结束", "")));
   refreshOverview(ws, now);
@@ -61,8 +64,8 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
   for (const problem of [
     "缺少结尾一行",
     "引用了不对外的 health/data/2026-10.jsonl",
-    "引用了不对外的 finance/accounts.json",
-    "引用的 me/none.md 不存在",
+    "引用了不对外的 finance/账户.json",
+    "引用的 learning/沟通 笔记/notes.md 不存在",
   ])
     expect(overview).toContain(problem);
   expect(overview).toContain("：改读 `me/goals.json`、`me/profile.md` 与 `memory/MEMORY.md`。");

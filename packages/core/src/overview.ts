@@ -84,6 +84,35 @@ export type UserPage = {
   problems: string[];
 };
 
+const pathEnd = String.raw`\.(?:md|jsonl?)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
+const escapeName = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** 近况里引用的相对路径：反引号里的整段、以现有目录开头的中文路径，以及其余 ASCII 路径。 */
+function citedPaths(ws: Workspace, body: string): Set<string> {
+  const paths = new Set<string>();
+  let rest = body.replace(/`([^`\n]+)`/g, (_, value: string) => {
+    const path = value.trim();
+    if (path.includes("/") && !path.includes("://") && /\.(?:md|jsonl?)$/.test(path)) paths.add(path);
+    return " ";
+  });
+  const roots = readdirSync(ws.root, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => escapeName(entry.name));
+  if (roots.length) {
+    const rooted = new RegExp(
+      `(?<![A-Za-z0-9_./-])((?:${roots.join("|")})/[^\\s\`'"<>()（）【】「」『』《》、，。；：！？,;!?|]+?${pathEnd})`,
+      "gu",
+    );
+    rest = rest.replace(rooted, (_, path: string) => {
+      paths.add(path);
+      return " ";
+    });
+  }
+  for (const match of rest.matchAll(new RegExp(`(?<![\\w./-])((?:[\\w.-]+/)+[\\w.-]+${pathEnd})`, "g")))
+    paths.add(match[1] as string);
+  return paths;
+}
+
 /** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。 */
 function checkUserPage(ws: Workspace, body: string): string[] {
   const problems: string[] = [];
@@ -93,12 +122,7 @@ function checkUserPage(ws: Workspace, body: string): string[] {
   if (/(?:^|[\s(（`"'])(?:~\/|\/(?:Users|home|root|Volumes|private|tmp|var)\/|[A-Za-z]:[\\/])/m.test(body))
     problems.push("写了本机绝对路径");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
-  const cited = new Set(
-    [...body.matchAll(/(?<![\w./-])((?:[\w.-]+\/)+[\w.-]+\.(?:md|json|jsonl))(?![\w/-])/g)].map(
-      (m) => m[1] as string,
-    ),
-  );
-  for (const path of cited) {
+  for (const path of citedPaths(ws, body)) {
     if (path.split("/").includes("..") || !canRead(path) || /^health\/(?:data|files)\//.test(path))
       problems.push(`引用了不对外的 ${path}`);
     else if (!ws.exists(path) && !ws.isUnavailable(path)) problems.push(`引用的 ${path} 不存在`);
