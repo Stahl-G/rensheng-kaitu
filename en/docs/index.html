@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Docs · Kaitu</title>
-<meta name="description" content="Install Kaitu 0.1.0-rc.4, the four tabs, your notes folder, connecting an AI, storage and sync, and FAQ.">
+<meta name="description" content="Install Kaitu, the four tabs, your notes folder, connecting an AI, storage and sync, and FAQ.">
 <link rel="canonical" href="https://kaitu.si/en/docs/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/docs/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/docs/">
@@ -12,19 +12,19 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Kaitu">
 <meta property="og:title" content="Docs · Kaitu">
-<meta property="og:description" content="Install Kaitu 0.1.0-rc.4, the four tabs, your notes folder, connecting an AI, storage and sync, and FAQ.">
+<meta property="og:description" content="Install Kaitu, the four tabs, your notes folder, connecting an AI, storage and sync, and FAQ.">
 <meta property="og:url" content="https://kaitu.si/en/docs/">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#171716" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f2f1ed" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1916" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="stylesheet" href="/tokens.css?v=d42dd90b">
-<link rel="stylesheet" href="/style.css?v=61a374f1">
+<link rel="stylesheet" href="/tokens.css?v=95e81d85">
+<link rel="stylesheet" href="/style.css?v=d873fa52">
 <script>document.documentElement.classList.add("js")</script>
-<script src="/app.js?v=205c3cab" defer></script>
+<script src="/app.js?v=f6718613" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -32,14 +32,14 @@
   <div class="wrap">
     <a class="brand" href="/en/"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="hd-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="hd-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#hd-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#hd-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><span>Kaitu</span></a>
     <a class="lang" href="/docs/" hreflang="zh-CN" lang="zh-CN" data-lang-switch="zh">中文</a>
-    <nav class="site-nav" aria-label="Site"><a href="/en/#tour">Product</a><a href="/en/docs/" aria-current="page">Docs</a><a href="/en/download/">Download</a><a href="/en/#inspiration">Inspiration</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
+    <nav class="site-nav" aria-label="Site"><a href="/en/download/">Download</a><a href="/en/docs/" aria-current="page">Docs</a><a href="/en/developers/">Developers</a><a href="/en/vision/">Vision</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a></nav>
   </div>
 </header>
 <main id="main" tabindex="-1">
 <div class="wrap">
   <header class="page-head">
     <h1>Docs</h1>
-    <p class="lead">For Kaitu <span data-rel="version">0.1.0-rc.4</span>. Not installed yet? Start at <a href="/en/download/">Download</a>. For what is stored where and sent to whom, see <a href="/en/privacy/">Where your data goes</a>.</p>
+    <p class="lead">For Kaitu <span data-rel="version">0.1.4-rc.2</span>. Not installed yet? Start at <a href="/en/download/">Download</a>. For what is stored where and sent to whom, see <a href="/en/privacy/">Where your data goes</a>.</p>
   </header>
   <div class="docs-layout">
     <details class="toc" data-toc open>
@@ -77,7 +77,7 @@
 </ol>
 <h3 id="first-run">The first time you open it<a class="anchor" href="#first-run" aria-label="#">#</a></h3>
 <ul>
-  <li><strong>Choose where your notes live</strong>: this computer (no sync), iCloud Drive, Google Drive, Nutstore (坚果云), or a folder another sync app syncs. Each option shows whether its sync folder was found on this computer. On this computer the default is <code>~/kaitu</code>, created automatically. You can change it later; see <a href="#storage">Storage and sync</a>.</li>
+  <li><strong>Choose where your notes live</strong>: this computer (no sync), iCloud Drive, Google Drive, Nutstore (坚果云), or a folder another sync app syncs. Each option shows whether its sync folder was found on this computer. On this computer the default is <code>~/kaitu-ai-memory</code> (an existing <code>~/kaitu</code> is kept), created automatically. You can change it later; see <a href="#storage">Storage and sync</a>.</li>
   <li><strong>Bring one thing</strong>: write what you want to change, or paste a conversation you had with an AI. When you click Save and organize, Kaitu saves your text as written, then drafts a Current goal, What's known now and One next step, all editable. Only the step you adopt with Adopt this next step becomes a task, and its goal is added to your goals; other suggestions stay in the original text. If you don't want any of them, click Just save the text.</li>
   <li>When the AI offers several Possible paths, pick one first; then you can turn its small experiment into your next step.</li>
   <li>You can organize without connecting Kaitu's AI: under Organize with your own AI, click 1 · Copy the prompt, send it to any AI (Doubao, Kimi, DeepSeek, ChatGPT…), paste the answer back as is, and click 3 · Read the answer. Or fill in the three fields yourself.</li>
@@ -303,7 +303,7 @@
 <h2 id="updates">Updates<a class="anchor" href="#updates" aria-label="#">#</a></h2>
 <ul>
   <li><strong>Feature package</strong>: interface, notes service, tools and skills. Settings → About → Kaitu feature updates: Check for updates → Download update → Restart app. Packages must pass signature and engine-version checks, or Kaitu keeps the current version. Restore previous features if something goes wrong; this doesn't restore your notes (use version history for that).</li>
-  <li><strong>The app itself</strong>: when the DSH engine (pinned at 0.2.1-rc.2), Electron or the launcher changes, download a new Kaitu.app.</li>
+  <li><strong>The app itself</strong>: when the DSH engine (pinned at 0.2.2-rc.4), Electron or the launcher changes, download a new Kaitu.app.</li>
 </ul>
 <p>If Settings shows No update source configured, in-app updates aren't available; get the new version from <a href="/en/download/">Download</a>. A new app version upgrades the built-in templates and skills in your notes folder on launch and keeps your settings. Command-line only? Run <code>kaitu upgrade</code> on older folders first (<code>--dry-run</code> to preview).</p>
 
@@ -366,7 +366,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <h3 id="faq-export">How do I take all my notes with me?<a class="anchor" href="#faq-export" aria-label="#">#</a></h3>
 <p>Settings → Export everything gives you a zip, or just copy your notes folder.</p>
 <h3 id="faq-dsh">How does it relate to DeepSeek Harness?<a class="anchor" href="#faq-dsh" aria-label="#">#</a></h3>
-<p>Kaitu.app is built on DeepSeek Harness (DSH) 0.2.1-rc.2, and Ask runs on its engine. If you already use DSH, you can install Kaitu as a plugin instead (see <a href="#dsh">Add Kaitu to DeepSeek Harness</a>).</p>
+<p>Kaitu.app is built on DeepSeek Harness (DSH) 0.2.2-rc.4, and Ask runs on its engine. If you already use DSH, you can install Kaitu as a plugin instead (see <a href="#dsh">Add Kaitu to DeepSeek Harness</a>).</p>
 <h3 id="faq-engine">Ask says its engine didn't load?<a class="anchor" href="#faq-engine" aria-label="#">#</a></h3>
 <p>Reinstall the full CLI and web package and restart the workbench. Until then, you can still copy a context pack from AI &amp; connections to the AI you use.</p>
 <h3 id="faq-update-source">Settings says No update source configured?<a class="anchor" href="#faq-update-source" aria-label="#">#</a></h3>
@@ -384,7 +384,7 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
   <div class="wrap">
     <p class="foot-brand"><svg viewBox="0 0 48 48" aria-hidden="true"><defs><clipPath id="ft-a"><path d="M4 10L17.33 6L17.33 38L4 42Z"/><path d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/></clipPath><clipPath id="ft-b"><path d="M30.67 10L44 6L44 38L30.67 42Z"/></clipPath></defs><path class="mk-face mk-f0" d="M4 10L17.33 6L17.33 38L4 42Z"/><path class="mk-face mk-f1" d="M17.33 6L30.67 10L30.67 42L17.33 38Z"/><path class="mk-face mk-f2" d="M30.67 10L44 6L44 38L30.67 42Z"/><g clip-path="url(#ft-a)"><path class="mk-route mk-rf" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g><g clip-path="url(#ft-b)"><path class="mk-route mk-ro" d="M8.5 34C11 31 14 28 17.33 26.5C21 25 26 31 30.67 29.5C34 28 36.5 22 39.5 16"/></g></svg><b>Kaitu</b><span>Life, coming into focus.</span></p>
     <nav class="foot-links" aria-label="Footer"><a href="/en/docs/">Docs</a><a href="/en/developers/">For developers</a><a href="/en/download/">Download</a><a href="/en/privacy/">Where your data goes</a><a href="/en/privacy/iphone/">iPhone privacy</a><a href="/en/support/">Support</a><a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/open-source.md" rel="noopener">Open-source credits</a><a href="https://github.com/Stahl-G/rensheng-kaitu" rel="noopener">GitHub ↗</a><a href="https://github.com/Stahl-G/rensheng-kaitu/issues" rel="noopener">Feedback ↗</a></nav>
-    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.0-rc.4"><span data-rel="version">0.1.0-rc.4</span></a></p>
+    <p class="foot-note">MIT License · <a data-rel="page" href="https://github.com/Stahl-G/rensheng-kaitu/releases/tag/v0.1.4-rc.2"><span data-rel="version">0.1.4-rc.2</span></a></p>
     <p class="foot-note">Inspired by an interview between Allen Shao and Justin Sun. This is an independent open-source project, not affiliated with either of them or their companies.</p>
   </div>
 </footer>
