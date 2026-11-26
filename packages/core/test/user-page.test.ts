@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, renameSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 import { parseFrontmatter, readUserPage, refreshOverview, renderAgentReadme } from "../src/index.js";
@@ -107,6 +107,17 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
   );
   refreshOverview(ws, now);
   expect(ws.readText("OVERVIEW.md")).toContain("`USER.md` 未通过核对（写了密钥）：改读");
+
+  renameSync(join(ws.root, "health"), join(ws.root, "wellness"));
+  ws.writeText("wellness/data/moods/2026-10.jsonl", "");
+  ws.writeText(
+    "USER.md",
+    `---\norganizer: muse\ndate: 2026-10-16\n---\n${page(["- 心情见 wellness/data/moods/2026-10.jsonl"])}`,
+  );
+  refreshOverview(ws, now);
+  expect(ws.readText("OVERVIEW.md")).toContain(
+    "`USER.md` 未通过核对（引用了不对外的 wellness/data/moods/2026-10.jsonl）：改读",
+  );
 
   rmSync(join(ws.root, "USER.md"));
   mkdirSync(join(ws.root, "USER.md"));

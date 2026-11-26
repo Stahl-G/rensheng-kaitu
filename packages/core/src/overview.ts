@@ -6,6 +6,7 @@ import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
 import { agentReadFilter } from "./exposure.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import { listRecordTypes, recordFilePattern } from "./modules.js";
 import { containsKey } from "./redact.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
@@ -149,7 +150,26 @@ function citedPaths(ws: Workspace, body: string, canRead: (path: string) => bool
 const absolutePath =
   /(?<![\p{L}\p{N}_.~:/\\-])(?:~[/\\]|[A-Za-z]:[/\\]|\\\\[^\s/\\]+[/\\]|\/[^\s/`'"<>()（）]+(?:\/|\.[A-Za-z0-9]{1,10}(?![A-Za-z0-9])))/u;
 
-const rawHealth = (path: string) => /^health\/(?:data|files)(?:\/|$)/i.test(path);
+/** 健康模块的原始记录与附件：按 module.json 找到模块的实际目录，挡住 files、记录所在的子目录和直接放在模块目录下的记录文件。 */
+function rawHealthCheck(ws: Workspace) {
+  const roots = new Set(["health/data", "health/files"]);
+  const files: { dir: string; match: RegExp }[] = [];
+  for (const ref of listRecordTypes(ws)) {
+    if (ref.module.def.id !== "health") continue;
+    const { dir } = ref.module;
+    roots.add(`${dir}/files`.toLowerCase());
+    const [first, rest] = ref.def.path.split(/\/(.*)/s);
+    if (rest !== undefined) roots.add(`${dir}/${first}`.toLowerCase());
+    else files.push({ dir: dir.toLowerCase(), match: recordFilePattern(ref).match });
+  }
+  return (path: string) => {
+    const lower = path.toLowerCase();
+    return (
+      [...roots].some((root) => lower === root || lower.startsWith(`${root}/`)) ||
+      files.some(({ dir, match }) => posix.dirname(lower) === dir && match.test(posix.basename(path)))
+    );
+  };
+}
 
 /** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。字数与结尾只看正文，其余连 frontmatter 一起查。 */
 function checkUserPage(ws: Workspace, body: string, text: string): string[] {
@@ -161,6 +181,7 @@ function checkUserPage(ws: Workspace, body: string, text: string): string[] {
   if (containsKey(text)) problems.push("写了密钥");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
   const physical = agentPathResolver(ws.root);
+  const rawHealth = rawHealthCheck(ws);
   for (const path of citedPaths(ws, text, canRead)) {
     let real: string | undefined;
     try {
