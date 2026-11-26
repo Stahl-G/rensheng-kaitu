@@ -56,6 +56,7 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
     "- 体重见 health/data/2026-10.jsonl",
     "- 账户见finance/账户.json",
     "- 笔记见 `learning/沟通 笔记/notes.md`",
+    "- 明细见 `finance/accounts.json#account-1`",
   ]);
   ws.writeText("handoffs/daily/2026-10-15.md", daily("2026-10-15", leaky.replace("用户近况到此结束", "")));
   refreshOverview(ws, now);
@@ -66,6 +67,7 @@ it("近况引用不对外的资料或没写完时不复制，旧的程序画像�
     "引用了不对外的 health/data/2026-10.jsonl",
     "引用了不对外的 finance/账户.json",
     "引用的 learning/沟通 笔记/notes.md 不存在",
+    "引用了不对外的 finance/accounts.json",
   ])
     expect(overview).toContain(problem);
   expect(overview).toContain("：改读 `me/goals.json`、`me/profile.md` 与 `memory/MEMORY.md`。");

@@ -91,8 +91,10 @@ const escapeName = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 function citedPaths(ws: Workspace, body: string): Set<string> {
   const paths = new Set<string>();
   let rest = body.replace(/`([^`\n]+)`/g, (_, value: string) => {
-    const path = value.trim();
-    if (path.includes("/") && !path.includes("://") && /\.(?:md|jsonl?)$/.test(path)) paths.add(path);
+    // #片段、?查询和 :行号指向的还是同一个文件。
+    const path = value.trim().replace(/(?:[#?].*|:\d+(?::\d+)?)$/, "");
+    if (!path.includes("/") || path.includes("://") || !/\.(?:md|jsonl?)$/.test(path)) return ` ${value} `;
+    paths.add(path);
     return " ";
   });
   const roots = readdirSync(ws.root, { withFileTypes: true })
