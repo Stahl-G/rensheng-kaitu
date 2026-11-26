@@ -8,7 +8,6 @@ import { financeOverview } from "./finance/views.js";
 import { batchSnapshot } from "./history.js";
 import { type Locale, normalizeLocale, pick } from "./locale.js";
 import { listMemories } from "./memory.js";
-import { findRecordType, recordFileFor } from "./modules.js";
 import {
   type OnboardingMatter,
   type OnboardingMatterSuggestion,
@@ -22,7 +21,7 @@ import { listProjectStatuses } from "./projects.js";
 import { readRecords } from "./records.js";
 import { hasStatusResult } from "./results.js";
 import type { Task } from "./tasks.js";
-import { localDate, localMonth, parseTs } from "./time.js";
+import { localDate } from "./time.js";
 import type { Goal } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
 
@@ -331,19 +330,11 @@ function sections(
   now: Date,
   data: ReturnType<typeof handoverData>,
   connection: AgentConnection = "local-ask",
-  sources = false,
 ): HandoverSection[] {
   const plans = readPlans(data);
   const since = now.getTime() - 30 * 86400000;
   const tasks = (data.records.task ?? []) as Task[];
   const t = (zh: string, en: string) => pick(locale, zh, en);
-  const source = (file: string) => (sources ? ` (${singleLine(redact(file, locale))})` : "");
-  const recordSource = (type: string, item: { id: string; ts: string }) =>
-    sources
-      ? source(
-          `${recordFileFor(findRecordType(data.ws, type), localMonth(parseTs(item.ts), data.ws.timeZone()))}#${item.id}`,
-        )
-      : "";
   const origin = (id: string) => {
     const value = goalOrigin(id);
     if (!value) return "";
@@ -359,8 +350,7 @@ function sections(
     const next = goal.next
       ? ` · ${clip(t(`下一步：${goal.next.title}`, `next: ${goal.next.title}`), locale)}`
       : "";
-    const task = tasks.find((task) => task.id === goal.next?.id);
-    return `- ${clip(goal.title, locale)}${origin(goal.id)}${next}${source(`me/goals.json#${goal.id}`)}${task ? recordSource("task", task) : ""}`;
+    return `- ${clip(goal.title, locale)}${origin(goal.id)}${next}`;
   });
   const directions = (data.records.direction ?? []) as unknown as Direction[];
   const experiments = (data.records.exploration_experiment ?? []) as unknown as ExplorationExperiment[];
@@ -371,14 +361,14 @@ function sections(
       .map((task) => ({
         at: completedAt(task),
         line: () =>
-          `- ${clip(`${task.title}${t("：", ": ")}${noteLine(task.notes ?? "", "完成结果")}`, locale)}${recordSource("task", task)}`,
+          `- ${clip(`${task.title}${t("：", ": ")}${noteLine(task.notes ?? "", "完成结果")}`, locale)}`,
       })),
     ...data.projects.flatMap((project) =>
       project.next.filter(hasStatusResult).map((step) => ({
         at: Date.parse(step.completed),
         line: () => {
           const label = `${clip(project.title, locale, 40)} · ${clip(step.title, locale, 40)}${t("：", ": ")}`;
-          return `- ${label}${clip(step.result, locale, lineLimit - label.length)}${source(`${project.file}#${step.id}`)}`;
+          return `- ${label}${clip(step.result, locale, lineLimit - label.length)}`;
         },
       })),
     ),
@@ -386,8 +376,7 @@ function sections(
       .filter((item) => item.status === "completed" && item.result)
       .map((item) => ({
         at: Date.parse(item.updated_at ?? item.ts),
-        line: () =>
-          `- ${clip(`${item.action}${t("：", ": ")}${item.result}`, locale)}${recordSource("exploration_experiment", item)}`,
+        line: () => `- ${clip(`${item.action}${t("：", ": ")}${item.result}`, locale)}`,
       })),
   ]
     .filter((item) => item.at >= since && item.at <= now.getTime())
@@ -401,18 +390,18 @@ function sections(
       const goal = taskGoal(task, data.goals);
       const due = task.due ? t(`（${task.due} 前）`, ` (by ${task.due})`) : "";
       const why = goal ? t(` · 为了：${goal.title}`, ` · for: ${goal.title}`) : "";
-      return `- ${clip(`${task.title}${due}${why}`, locale)}${recordSource("task", task)}`;
+      return `- ${clip(`${task.title}${due}${why}`, locale)}`;
     });
   const projects = data.projects
     .filter((project) => project.stage === "active")
     .slice(0, 8)
-    .map((project) => `- ${clip(project.title, locale)}${source(project.file)}`);
+    .map((project) => `- ${clip(project.title, locale)}`);
   const active = directions
     .filter((item) => item.status === "active")
     .slice(0, 6)
     .map(
       (item) =>
-        `- ${clip(item.hypothesis ? `${item.title}${t("：", ": ")}${item.hypothesis}` : item.title, locale)}${recordSource("direction", item)}`,
+        `- ${clip(item.hypothesis ? `${item.title}${t("：", ": ")}${item.hypothesis}` : item.title, locale)}`,
     );
   const memories = data.memories.filter((memory) =>
     agentCanRead(data.ws, `memory/${memory.file}`, connection),
@@ -420,7 +409,7 @@ function sections(
   const about = memories
     .filter((memory) => ["preference", "fact", "context"].includes(memory.type))
     .slice(0, 12)
-    .map((memory) => `- ${clip(memory.text, locale)}${source(`memory/${memory.file} · ${memory.updated}`)}`);
+    .map((memory) => `- ${clip(memory.text, locale)}`);
   const people = memories
     .filter((memory) => memory.type === "person")
     .slice(0, 6)
@@ -443,44 +432,6 @@ function sections(
     },
     { id: "about", title: t("关于我", "About me"), lines: about, defaultOn: true },
     { id: "people", title: t("重要的人", "People in my life"), lines: people, defaultOn: false },
-  ];
-}
-
-/** Shared file projection: reuse handover filtering/redaction, never request finance. */
-export function userProfileSections(ws: Workspace, locale: Locale, now: Date) {
-  const data = handoverData(ws);
-  const list = sections(locale, now, data, { id: "handover", finance: false }, true);
-  // Keep a current correction discoverable even when many older facts fill the section.
-  const about = list.find((section) => section.id === "about");
-  if (about) {
-    const corrections = data.memories
-      .filter((memory) => memory.replaces && ["preference", "fact", "context"].includes(memory.type))
-      .filter((memory) => agentCanRead(ws, `memory/${memory.file}`, { id: "handover", finance: false }))
-      .map((memory) => `- ${clip(memory.text, locale)} (memory/${memory.file} · ${memory.updated})`);
-    about.lines = [...new Set([...about.lines.slice(0, 1), ...corrections, ...about.lines.slice(1)])];
-  }
-  const today = localDate(now, ws.timeZone());
-  const phases = records(ws, "phase")
-    .filter(
-      (item) =>
-        item.status === "confirmed" &&
-        String(item.start) <= today &&
-        (!item.end || String(item.end) >= today.slice(0, String(item.end).length)),
-    )
-    .sort((a, b) => String(b.start).localeCompare(String(a.start)))
-    .slice(0, 2)
-    .map(
-      (item) =>
-        `- ${clip(String(item.title), locale)} (${recordFileFor(findRecordType(ws, "phase"), localMonth(parseTs(item.ts), ws.timeZone()))}#${item.id} · ${item.start})`,
-    );
-  return [
-    {
-      id: "phase",
-      title: pick(locale, "这阵子（用户确认）", "Current phase (confirmed)"),
-      lines: phases,
-      defaultOn: true,
-    },
-    ...list,
   ];
 }
 

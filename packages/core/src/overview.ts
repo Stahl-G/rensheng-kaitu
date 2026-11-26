@@ -3,19 +3,21 @@ import { join } from "node:path";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { agentReadFilter } from "./exposure.js";
+import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { schemas } from "./schema.js";
 import { readStatus } from "./status.js";
 import { syncMode } from "./sync-location.js";
-import { timeZoneNotice } from "./time.js";
-import { prepareUserProfile, publishUserProfile } from "./user-profile.js";
+import { localDate, timeZoneNotice } from "./time.js";
 import { workspaceBackupEnabled } from "./workspace-backup.js";
 import type { Workspace } from "./workspace.js";
 
-export function renderAgentReadme(ws: Workspace, now = new Date()): string {
+export function renderAgentReadme(ws: Workspace, now: Date, page: UserPage): string {
   return `# 开图云端 Agent：任务入口
 
 ${timeZoneNotice(ws.timeZone(), now)}
+
+${userPageLine(page)}
 
 按根目录 \`AGENTS.md\` 的路由选择当前任务，只读相关摘要、技能和必要格式；外部 Agent 从文件读取入口。接续任务才读相关交接，整理员按 \`ORGANIZER.md\` 执行。
 
@@ -30,7 +32,7 @@ ${timeZoneNotice(ws.timeZone(), now)}
 - 交新文件，不建收件箱子目录、不覆盖已有文件。只更新自己做过的项目 STATUS.md 与 log.md；项目链接目录只读。
 - 档案、偏好、目标、规则保留原内容，建议交到收件箱；用户明确授权的修改按确认范围执行。收件箱不接受删除、恢复、规则或目标修改。
 - 日程建议等待用户确认；敏感记忆须用户明确要求。记忆替换只交 replaces 候选，用户确认前保留旧条。
-- \`.kaitu/\`、版本库、密钥由程序管理。RECORDS.md、ORGANIZER.md、AGENT-README.md、AGENTS.md、OVERVIEW.md 与 RECORDS.md由本机维护；手机文件只按 ORGANIZER.md 的授权范围更新。
+- \`.kaitu/\`、版本库、密钥由程序管理。RECORDS.md、ORGANIZER.md、AGENT-README.md、AGENTS.md 与 OVERVIEW.md 由本机维护；USER.md 与手机文件只由整理员按 ORGANIZER.md 更新。
 - 密钥保留在本机，不写入投递文件或日志。健康只做记录、趋势与提醒。
 
 ${AI_NETWORK_RULES}
@@ -70,6 +72,93 @@ function recentHandoffs(ws: Workspace) {
   return entries
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || b.file.localeCompare(a.file))
     .slice(0, 3);
+}
+
+const userPageEnd = "用户近况到此结束";
+const userPageLimit = 1500;
+
+export type UserPage = {
+  state: "ok" | "stale" | "invalid" | "missing";
+  organizer?: string;
+  date?: string;
+  problems: string[];
+};
+
+/** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。 */
+function checkUserPage(ws: Workspace, body: string): string[] {
+  const problems: string[] = [];
+  const size = [...body.trim()].length;
+  if (size > userPageLimit) problems.push(`超过 ${userPageLimit} 字（${size} 字）`);
+  if (!body.includes(userPageEnd)) problems.push("缺少结尾一行，可能没写完");
+  if (/(?:^|[\s(（`"'])(?:~\/|\/(?:Users|home|root|Volumes|private|tmp|var)\/|[A-Za-z]:[\\/])/m.test(body))
+    problems.push("写了本机绝对路径");
+  const canRead = agentReadFilter(ws, { id: "handover", finance: false });
+  const cited = new Set(
+    [...body.matchAll(/(?<![\w./-])((?:[\w.-]+\/)+[\w.-]+\.(?:md|json|jsonl))(?![\w/-])/g)].map(
+      (m) => m[1] as string,
+    ),
+  );
+  for (const path of cited) {
+    if (path.split("/").includes("..") || !canRead(path) || /^health\/(?:data|files)\//.test(path))
+      problems.push(`引用了不对外的 ${path}`);
+    else if (!ws.exists(path) && !ws.isUnavailable(path)) problems.push(`引用的 ${path} 不存在`);
+  }
+  return problems;
+}
+
+function userPageSection(body: string): string | undefined {
+  const section = body.split(/^## 用户近况[^\S\n]*\r?\n/m)[1];
+  return section?.split(/^## /m)[0]?.trim();
+}
+
+function previousDay(date: string): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
+function judgeUserPage(ws: Workspace, now: Date, organizer: string, date: string, body: string): UserPage {
+  const problems = checkUserPage(ws, body);
+  if (problems.length) return { state: "invalid", organizer, date, problems };
+  const fresh = date >= previousDay(localDate(now, ws.timeZone()));
+  return { state: fresh ? "ok" : "stale", organizer, date, problems };
+}
+
+export function readUserPage(ws: Workspace, now = new Date()): UserPage {
+  if (!ws.exists("USER.md")) return { state: "missing", problems: [] };
+  const text = ws.scanText("USER.md");
+  if (text === undefined) return { state: "missing", problems: ["还没从云盘下载"] };
+  try {
+    const { data, body } = parseFrontmatter<{ organizer: string; date: string }>(text);
+    if (schemas().builtin("daily.schema.json")(data))
+      return judgeUserPage(ws, now, data.organizer, data.date, body);
+  } catch {
+    // 下面按缺 frontmatter 报告。
+  }
+  return { state: "invalid", problems: ["frontmatter 缺 organizer 或 date"] };
+}
+
+/** 电脑开着时，把比 USER.md 新的每日整理里的「用户近况」复制过去；只能新建文件的整理员靠它更新。 */
+function prepareUserPage(ws: Workspace, now: Date, daily: ReturnType<typeof latestDaily>) {
+  const current = readUserPage(ws, now);
+  const section = daily && userPageSection(daily.body);
+  if (!daily || section === undefined || (current.date !== undefined && current.date >= daily.date))
+    return { page: current };
+  const body = `# 用户近况\n\n${section.replace(/^###(?=[^\S\n])/gm, "##")}\n`;
+  const page = judgeUserPage(ws, now, daily.organizer, daily.date, body);
+  if (page.state === "invalid")
+    return { page: { ...page, problems: page.problems.map((problem) => `${daily.file}：${problem}`) } };
+  return { page, text: stringifyFrontmatter({ organizer: daily.organizer, date: daily.date }, body) };
+}
+
+export function userPageLine(page: UserPage): string {
+  if (page.state === "ok")
+    return `先读 \`USER.md\`：${page.organizer} 在 ${page.date} 写的用户近况，电脑已核对。`;
+  if (page.state === "stale")
+    return `先读 \`USER.md\`：${page.organizer} 在 ${page.date} 写的，已超过一天，读后用最新每日整理和 \`NOW.md\` 核对。`;
+  const reason =
+    page.state === "missing" && !page.problems.length
+      ? "还没有整理员写的 `USER.md`"
+      : `\`USER.md\` 未通过核对（${page.problems.join("；")}）`;
+  return `${reason}：改读 \`me/goals.json\`、\`me/profile.md\` 与 \`memory/MEMORY.md\`。`;
 }
 
 export function latestDaily(ws: Workspace) {
@@ -114,13 +203,7 @@ export async function batchOverview<T>(ws: Workspace, operation: () => Promise<T
 
 export function prepareOverview(ws: Workspace, now = new Date()) {
   const documents: { file: string; text: string; previous: string | undefined }[] = [];
-  let profile: ReturnType<typeof prepareUserProfile> | undefined;
-  try {
-    profile = prepareUserProfile(ws, now);
-  } catch {
-    /* Derived output cannot block original writes. */
-  }
-  const result = { root: ws.root, documents, profile };
+  const result = { root: ws.root, documents };
   function put(file: string, text: string) {
     const exists = ws.exists(file);
     const previous = exists ? ws.scanText(file) : undefined;
@@ -166,6 +249,8 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
   lines.push("", "## 最新每日整理", "");
   const daily = latestDaily(ws);
   lines.push(daily ? `- ${daily.date}（${daily.file}）` : "暂无每日整理。");
+  const user = prepareUserPage(ws, now, daily);
+  lines.push(`- ${userPageLine(user.page)}`);
   lines.push("", "## 最近交接", "");
   const handoffs = recentHandoffs(ws);
   for (const handoff of handoffs) {
@@ -219,8 +304,9 @@ export function prepareOverview(ws: Workspace, now = new Date()) {
     "",
   );
   // 接力说明与整理规则随版本维护，GitHub 与同步盘使用同一份入口。
+  if (user.text) put("USER.md", user.text);
   if (syncMode(ws.root) === "drive" || workspaceBackupEnabled(ws))
-    put("AGENT-README.md", renderAgentReadme(ws, now));
+    put("AGENT-README.md", renderAgentReadme(ws, now, user.page));
   put("ORGANIZER.md", renderOrganizer());
   const text = lines.join("\n");
   // 内容不变时保留原生成时间，避免派生文件持续改动。
@@ -235,13 +321,6 @@ export function publishOverview(ws: Workspace, prepared: ReturnType<typeof prepa
   if (prepared.root !== ws.root) return false;
   for (const { file, previous } of prepared.documents) {
     if ((ws.exists(file) ? ws.scanText(file) : undefined) !== previous) return false;
-  }
-  if (prepared.profile?.change) {
-    try {
-      publishUserProfile(ws, prepared.profile.change);
-    } catch {
-      /* Preserve original-write availability. */
-    }
   }
   for (const { file, text } of prepared.documents) ws.writeText(file, text);
   return true;

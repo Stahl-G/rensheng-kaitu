@@ -5,6 +5,7 @@ import { inboxNotes } from "./inbox-notes.js";
 import { journeyRoutes } from "./journey-routes.js";
 import { listMemories } from "./memory.js";
 import { listRecordTypes } from "./modules.js";
+import { userNavigation } from "./navigation.js";
 import type { readOverviewPage } from "./overview-page.js";
 import { phoneInboxName } from "./phone-actions.js";
 import type { Experience, LifeMapData } from "./places.js";
@@ -12,7 +13,6 @@ import { progressRows } from "./progress-map.js";
 import { readRecords } from "./records.js";
 import { listTasks } from "./tasks.js";
 import { localDate, parseTs } from "./time.js";
-import { userNavigation } from "./user-profile.js";
 import type { Workspace } from "./workspace.js";
 
 type Overview = Awaited<ReturnType<typeof readOverviewPage>>;

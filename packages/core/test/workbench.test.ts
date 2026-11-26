@@ -20,7 +20,7 @@ import {
   validateWorkspace,
   workspaceFileStampsAsync,
 } from "../src/index.js";
-import { userNavigation } from "../src/user-profile.js";
+import { userNavigation } from "../src/navigation.js";
 import { freshWorkspace, tmp } from "./helpers.js";
 
 it("每轮工作台读取更新类型定义，重复类型不读入，坏行仍区分只读与严格读取", async () => {
