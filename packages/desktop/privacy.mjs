@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readPreferences, savePreferences } from "../core/dist/index.js";
 
 // Bump when the notice or outgoing-data scope changes, including for existing installations.
-export const PRIVACY_NOTICE_VERSION = "2026-11-04.1";
+export const PRIVACY_NOTICE_VERSION = "2026-11-26.1";
 const ACTION = "https://kaitu.invalid/privacy";
 const summary = [
   [
@@ -15,8 +15,8 @@ const summary = [
   [
     ["AI 用到哪些资料", "What AI receives"],
     [
-      "对话内容和为任务读取的相关资料，会发送给你选择的 AI 服务或 Agent。",
-      "Conversation content and relevant data read for a task go to the AI service or agent you choose.",
+      "对话和为任务读取的资料会发送给你选择的 AI。首次用 AI 整理时，也会发送你提交整理的文字。",
+      "Conversations and data read for a task go to the AI you choose. First-time AI organization also sends the text you submit for that task.",
     ],
   ],
   [
@@ -37,6 +37,13 @@ const items = [
     [
       "问问的消息及为回答读取的资料，会交给你配置的模型或 Agent 及其服务商。已开启的自动任务会在开始使用后恢复，按原设置读取和发送资料；完整 Agent 可读取工作区之外的文件。第三方如何留存和使用资料，依其政策。不开启 AI 也能使用开图。",
       "Ask messages and data read to answer them go to your configured model or agent and its provider. Previously enabled automatic tasks resume after you get started and read and send data under their existing settings. Full agents can read files outside the workspace. Third-party retention and use follow their policies. You can use Kaitu without AI.",
+    ],
+  ],
+  [
+    ["首次整理与资料包", "First-time organization and context packs"],
+    [
+      "只保存原文或手工填写，不会调用模型。用内置模型整理时，只把这一次提交的文字发送给已连接的模型，开图会去掉认得出的密钥和本机路径，原文不变。选择本机完整 Agent 时，它仍可按所选权限读取文件。资料包可以先预览和删减；开图只在你点击复制时写入剪贴板，不替你发送。",
+      "Saving the original or filling in a plan by hand does not call a model. When organizing with the built-in model, Kaitu sends only the text submitted for that task to the connected model, with recognized credentials and local paths removed. The saved original is unchanged. A connected full local agent can still read files under its selected permissions. Preview and edit the context pack first; Kaitu copies it to your clipboard only when you click Copy, and does not send it for you.",
     ],
   ],
   [

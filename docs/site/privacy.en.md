@@ -16,13 +16,14 @@ Kaitu describes three places your notes can go: kept on this computer, synced to
 ## Sent to an AI this time
 
 - Ask: your messages, and the Kaitu notes it reads to answer, go to the AI service you chose in AI & connections. By default it can only read and write your notes folder, not keys, credentials or version history.
+- First-time organization: saving the original or editing the plan by hand does not call an AI model. If you use Kaitu’s built-in model to organize it, Kaitu sends this submission with recognized credentials and local paths removed, without workspace instructions or file tools. Your saved original is unchanged. With a full local agent, its own file permissions apply.
 - Full agent: only for a conversation where you turn it on. It can run commands and read or write any file on this computer, and what it reads may go to the AI service.
 - Morning plan, daily organizer and news search: when on, they run on schedule with Ask's AI, read the notes they need and send them to the same AI service.
 - Web search: queries go to Ask's current AI service by default, or to Perplexity or Exa if you switch.
 - Other AIs over MCP (Claude, Codex, ChatGPT, Grok and others) can read and write your notes; none can read memories marked sensitive, keys, credentials or version history. Finance access follows each connection's switch in AI & connections: local MCP, local Ask and phone Ask can read finance by default, remote MCP cannot. These switches cover Kaitu tools only; a full agent can read the disk directly, and the GitHub backup organizer can read everything in the backup repository. What they read goes to the AI service behind them.
 - Cloud relay: a cloud AI that works through your drive (such as Grok over Google Drive) can read every note file on the drive, finance details included.
 - Phone channels: messages you send on WeChat, Telegram, Feishu or QQ, and the replies, pass through those platforms; Ask's AI answers them.
-- Context pack and clipboard: only the text you copy and paste leaves Kaitu. Packs leave out raw health records and memories marked sensitive; you choose each time whether to include a finance summary; recognizable keys and local paths are removed.
+- Context pack and clipboard: preview and edit the pack first. Kaitu writes it to the system clipboard only when you choose Copy, and does not send it for you. Packs leave out raw health records and memories marked sensitive; you choose each time whether to include a finance summary; recognizable keys and local paths are removed.
 
 ## Other connections
 
