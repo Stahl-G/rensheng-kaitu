@@ -126,7 +126,7 @@ test("首次已确认的目标经过存放选择后带入手动采纳，并可�
   }
 });
 
-test("空首页可主动开始，已有目标直达其ID，老用户不出现新手开始操作", async () => {
+test("空首页可主动开始，有目标后可直达目标或把近况带去别的 AI", async () => {
   const ws = await freshWorkspace();
   let app!: ReturnType<typeof create>;
   try {
@@ -134,12 +134,14 @@ test("空首页可主动开始，已有目标直达其ID，老用户不出现新
     const home = { data: readHome(await readHomeSources(ws)), loading: false, error: null };
     const begin = vi.fn();
     const openGoal = vi.fn();
+    const handover = vi.fn();
     const props = {
       data,
       home,
       firstVisit: true,
       begin,
       openGoal,
+      handover,
       askText: "",
       setAskText: vi.fn(),
       loadProjects: async () => [],
@@ -152,6 +154,7 @@ test("空首页可主动开始，已有目标直达其ID，老用户不出现新
     });
     const start = app.root.findAllByType("button").find((button) => button.children.includes("开始"));
     expect(start).toBeDefined();
+    expect(app.root.findAllByProps({ id: "life-handover-start" })).toHaveLength(0);
     await act(async () => start?.props.onClick());
     expect(begin).toHaveBeenCalledOnce();
     await act(async () => app.update(createElement(LifeHome, { ...props, firstVisit: false })));
@@ -166,6 +169,8 @@ test("空首页可主动开始，已有目标直达其ID，老用户不出现新
     );
     await act(async () => app.root.findByProps({ "aria-label": "打开合成目标" }).props.onClick());
     expect(openGoal).toHaveBeenCalledWith(target?.id);
+    await act(async () => app.root.findByProps({ id: "life-handover-start" }).props.onClick());
+    expect(handover).toHaveBeenCalledOnce();
     expect(props.library).not.toHaveBeenCalled();
   } finally {
     if (app) await act(async () => app.unmount());
