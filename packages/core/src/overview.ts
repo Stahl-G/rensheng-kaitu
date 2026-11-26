@@ -1,5 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, posix } from "node:path";
+import { agentPathResolver } from "./agent-file-policy.js";
 import { AI_NETWORK_RULES } from "./ai-instructions.js";
 import { templateDir } from "./assets.js";
 import { normalizeHandoff, normalizeNow } from "./doc-input.js";
@@ -84,36 +85,52 @@ export type UserPage = {
   problems: string[];
 };
 
-const pathEnd = String.raw`\.(?:md|jsonl?)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
+const dataEnd = String.raw`\.(?:md|jsonl?)(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
+const fileEnd = String.raw`\.[A-Za-z0-9]{1,10}(?![A-Za-z0-9_/-]|\.[A-Za-z0-9])`;
+const stops = String.raw`\s\x60'"<>()（）【】「」『』《》、，。；：！？,;!?|`;
 const escapeName = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** 近况里引用的相对路径：反引号里的整段、以现有目录开头的中文路径，以及其余 ASCII 路径。 */
+/**
+ * 近况里引用的路径，统一成工作区相对路径：反引号里的整段、以现有顶层目录开头的文件或目录（含中文、任意扩展名），
+ * 以及其余 ASCII 的 Markdown / JSON 路径。
+ */
 function citedPaths(ws: Workspace, body: string): Set<string> {
   const paths = new Set<string>();
-  let rest = body.replace(/`([^`\n]+)`/g, (_, value: string) => {
-    // #片段、?查询和 :行号指向的还是同一个文件。
-    const path = value.trim().replace(/(?:[#?].*|:\d+(?::\d+)?)$/, "");
-    if (!path.includes("/") || path.includes("://") || !/\.(?:md|jsonl?)$/.test(path)) return ` ${value} `;
-    paths.add(path);
-    return " ";
-  });
+  const add = (path: string) => paths.add(posix.normalize(path).replace(/(.)\/$/, "$1"));
   const roots = readdirSync(ws.root, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => escapeName(entry.name));
-  if (roots.length) {
+  const top = roots.length ? `(?:\\./)?(?:${roots.join("|")})/` : undefined;
+  let rest = body.replace(/\\/g, "/").replace(/`([^`\n]+)`/g, (_, value: string) => {
+    // #片段、?查询和 :行号指向的还是同一个文件。
+    const path = value.trim().replace(/(?:[#?].*|:\d+(?::\d+)?)$/, "");
+    const cited =
+      path.includes("/") &&
+      !path.includes("://") &&
+      !/[、，。；：！？,;|]/.test(path) &&
+      ((top && new RegExp(`^${top}`, "iu").test(path)) || /\.(?:md|jsonl?)$/i.test(path));
+    if (!cited) return ` ${value} `;
+    add(path);
+    return " ";
+  });
+  if (top) {
     const rooted = new RegExp(
-      `(?<![A-Za-z0-9_./-])((?:${roots.join("|")})/[^\\s\`'"<>()（）【】「」『』《》、，。；：！？,;!?|]+?${pathEnd})`,
-      "gu",
+      `(?<![A-Za-z0-9_./-])(${top}(?:[^${stops}/]+/)*(?:[^${stops}/]+?${fileEnd})?)`,
+      "giu",
     );
     rest = rest.replace(rooted, (_, path: string) => {
-      paths.add(path);
+      add(path);
       return " ";
     });
   }
-  for (const match of rest.matchAll(new RegExp(`(?<![\\w./-])((?:[\\w.-]+/)+[\\w.-]+${pathEnd})`, "g")))
-    paths.add(match[1] as string);
+  for (const match of rest.matchAll(
+    new RegExp(`(?<![\\w./-])((?:\\./)?(?:[\\w.-]+/)+[\\w.-]+${dataEnd})`, "g"),
+  ))
+    add(match[1] as string);
   return paths;
 }
+
+const rawHealth = (path: string) => /^health\/(?:data|files)(?:\/|$)/i.test(path);
 
 /** 整理员写的一页近况：只在这里核对一次，读者按 AGENT-README 的结论决定读它还是读正本。 */
 function checkUserPage(ws: Workspace, body: string): string[] {
@@ -124,10 +141,17 @@ function checkUserPage(ws: Workspace, body: string): string[] {
   if (/(?:^|[\s(（`"'])(?:~\/|\/(?:Users|home|root|Volumes|private|tmp|var)\/|[A-Za-z]:[\\/])/m.test(body))
     problems.push("写了本机绝对路径");
   const canRead = agentReadFilter(ws, { id: "handover", finance: false });
+  const physical = agentPathResolver(ws.root);
   for (const path of citedPaths(ws, body)) {
-    if (path.split("/").includes("..") || !canRead(path) || /^health\/(?:data|files)\//.test(path))
+    let real: string | undefined;
+    try {
+      real = physical(path);
+    } catch {
+      // 越出工作区或指向程序目录。
+    }
+    if (real === undefined || rawHealth(path) || rawHealth(real) || !canRead(path))
       problems.push(`引用了不对外的 ${path}`);
-    else if (!ws.exists(path) && !ws.isUnavailable(path)) problems.push(`引用的 ${path} 不存在`);
+    else if (!ws.exists(real) && !ws.isUnavailable(path)) problems.push(`引用的 ${path} 不存在`);
   }
   return problems;
 }
