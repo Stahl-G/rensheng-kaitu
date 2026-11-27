@@ -113,7 +113,7 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
       },
     ]);
     mark("send.accepted");
-    // Observe the actual stream event; the whole test still has its unchanged 15s deadline.
+    // Observe the actual stream event rather than sleeping.
     await streamed.promise;
     await expect(ask.send(row.id, "Another question")).rejects.toMatchObject({ code: "AI_CONNECTION" });
     await expect(ask.configure({ choice: "external" })).rejects.toMatchObject({ code: "AI_CONNECTION" });
@@ -161,4 +161,5 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
     await new Promise<void>((done) => server.close(() => done()));
     rmSync(root, { recursive: true, force: true });
   }
-});
+  // Starts real DSH three times: about 12 s on a normal Windows runner, past 15 s on a slow one.
+}, 30_000);
