@@ -12,7 +12,7 @@ Kaitu has no server. With sync on, your notes are stored in the drive or reposit
 
 - Only after you pick iCloud, Google Drive, Nutstore or a synced folder in Settings → Change where notes live.
 - Every note file in the folder syncs, including health records, finance details and memories marked sensitive. Your cloud service stores and syncs them; Kaitu is not in between.
-- GitHub backup: when on, the text and structured files you selected are pushed to your linked repository, health, finance and sensitive memories included. Program state, hidden folders, the inbox, credential files and media are not uploaded. Public repositories are not uploaded to by default.
+- GitHub backup: when on, the text and structured files you selected are pushed to your linked repository, health, finance and sensitive memories included, along with agent drop-offs, not-yet-imported health samples and unsorted notes in the inbox. Program state, hidden folders, credential files and media are not uploaded. Public repositories are not uploaded to by default.
 - Version history, keys, credentials and the index still stay on this computer.
 
 ## Sent to an AI this time
