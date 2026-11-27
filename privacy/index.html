@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>资料去向 · 人生开图</title>
-<meta name="description" content="哪些资料存在这台电脑，哪些同步到你的云盘，哪些会发给 AI。">
+<meta name="description" content="哪些资料存在这台电脑，哪些同步到你的云盘或仓库，哪些会发给 AI。">
 <link rel="canonical" href="https://kaitu.si/privacy/">
 <link rel="alternate" hreflang="zh-CN" href="https://kaitu.si/privacy/">
 <link rel="alternate" hreflang="en" href="https://kaitu.si/en/privacy/">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="人生开图">
 <meta property="og:title" content="资料去向 · 人生开图">
-<meta property="og:description" content="哪些资料存在这台电脑，哪些同步到你的云盘，哪些会发给 AI。">
+<meta property="og:description" content="哪些资料存在这台电脑，哪些同步到你的云盘或仓库，哪些会发给 AI。">
 <meta property="og:url" content="https://kaitu.si/privacy/">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:locale:alternate" content="en_US">
@@ -38,17 +38,17 @@
 </header>
 <main id="main" tabindex="-1">
 <div class="wrap narrow">
-  <header class="page-head"><h1>资料去向</h1><p class="lead">本页内容来自开图仓库的 <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/site/privacy.zh-CN.md">docs/site/privacy.zh-CN.md</a>，对应 0.1.0-rc.4。</p></header>
+  <header class="page-head"><h1>资料去向</h1><p class="lead">本页内容来自开图仓库的 <a href="https://github.com/Stahl-G/rensheng-kaitu/blob/main/docs/site/privacy.zh-CN.md">docs/site/privacy.zh-CN.md</a>。</p></header>
   <div class="doc">
-<p>开图把资料分三种去向说清楚：存在这台电脑、同步到你的云盘、这次发给 AI。下面逐项写明什么时候、发到哪里、发什么。</p>
+<p>开图不设服务器。开了同步，资料存到你选的云盘或仓库；用 AI 时，消息和它读到的资料发给模型服务商。下面逐项写明什么时候、发到哪里、发什么。</p>
 <h2>存在这台电脑</h2>
-<ul><li>资料文件放在你选的资料文件夹里：目标、记录、笔记、记忆、项目和原文，都是 Markdown、JSON 和 JSONL，用任何编辑器都能打开。</li><li>程序状态只在这台电脑：版本历史、AI 服务的 Key 和各种凭据、搜索索引、头像、界面设置。开了云盘同步，它们也不进云盘。</li></ul>
-<h2>同步到你的云盘</h2>
-<ul><li>只有在「设置 → 换一个存放位置」选了 iCloud、Google Drive、坚果云或同步文件夹，资料才会同步。</li><li>同步的是资料文件夹里的全部资料文件，包括财务明细，由你选的云盘服务存放和同步，开图不经手。</li><li>版本历史、Key、凭据和索引仍留在这台电脑。</li></ul>
+<ul><li>资料文件放在你选的资料文件夹里：目标、记录、笔记、记忆、项目和原文，都是 Markdown、JSON 和 JSONL，用任何编辑器都能打开。</li><li>程序状态只在这台电脑：版本历史、AI 服务的 Key 和各种凭据、搜索索引、头像、界面设置。开了同步，它们也不进云盘或仓库。</li><li>开图没有接收资料的服务器。独立 App 关闭内置遥测和会话日志上报；装进 DeepSeek Harness 当插件时，按 DeepSeek Harness 自己的设置。</li></ul>
+<h2>同步到你的云盘或仓库</h2>
+<ul><li>只有在「设置 → 换一个存放位置」选了 iCloud、Google Drive、坚果云或同步文件夹，资料才会同步。</li><li>同步的是资料文件夹里的全部资料文件，包括健康记录、财务明细和标为敏感的记忆，由你选的云盘服务存放和同步，开图不经手。</li><li>GitHub 备份：开启后，把所选的文字和结构化资料推送到你绑定的仓库，同样包括健康、财务和敏感记忆；收件箱里 Agent 投递的文件、还没导入的健康样本和待整理笔记也会上传。程序状态、隐藏目录、凭据文件和媒体不上传。公开仓库默认不上传。</li><li>版本历史、Key、凭据和索引仍留在这台电脑。</li></ul>
 <h2>这次发给 AI</h2>
-<ul><li>问问：你发的消息，和它为回答读到的开图资料，会发给你在「AI 与连接」里选的 AI 服务。默认只能读写资料文件夹，读不到 Key、凭据和版本历史。</li><li>完整 Agent：只在你为某个对话开启后生效，能运行命令、读写这台电脑上的任何文件，读到的内容都可能发给 AI 服务。</li><li>早间计划、每日整理、资讯搜索：开启后按时用问问的 AI 运行，会读取相关资料，发给同一个 AI 服务。</li><li>网络搜索：搜索词默认发给问问当前的 AI 服务；改用 Perplexity、Exa 或 Tavily 时发给所选服务。</li><li>外部 AI：通过 MCP 连接的 Claude、Codex、ChatGPT、Grok 等能读写开图资料；经公网连接的读不到财务明细；所有外部 AI 都读不到 Key、凭据和版本历史。读到的内容会发给它们背后的 AI 服务。</li><li>云盘接力：在云盘里读写开图资料的云端 AI（如通过 Google Drive 接手的 Grok）能读到云盘里的全部资料文件，包括财务明细。</li><li>手机通道：你在微信、Telegram、飞书或 QQ 发的消息和收到的回答都会经过这些平台，由问问的 AI 回答。</li><li>资料包和剪贴板：只有你复制、粘贴的那段文字会离开开图。资料包不带健康记录、财务明细和标为敏感的记忆，认得出的 Key 和本机路径会去掉。</li></ul>
+<ul><li>问问：你发的消息，和它为回答读到的开图资料，会发给你在「AI 与连接」里选的 AI 服务。默认只能读写资料文件夹，包括健康记录，读不到 Key、凭据和版本历史。</li><li>首次整理：只保存原文不会调用模型。使用已连接的 AI 整理时，提交的文字会发给所选的 AI；整理任务可按该连接的权限读取更多资料。</li><li>完整 Agent：只在你为某个对话开启后生效，能运行命令、读写这台电脑上的任何文件，读到的内容都可能发给 AI 服务。</li><li>早间计划、每日整理、资讯搜索：开启后按时用问问的 AI 运行，会读取相关资料，发给同一个 AI 服务。</li><li>网络搜索：搜索词默认发给问问当前的 AI 服务；改用 Perplexity 或 Exa 时发给所选服务。</li><li>外部 AI：通过 MCP 连接的 Claude、Codex、ChatGPT、Grok 等能读写开图资料，经开图工具读不到标为敏感的记忆、Key、凭据和版本历史。能否读财务明细按「AI 与连接」里各连接的开关：本机 MCP、本机问问、手机问问默认可读，远程 MCP 默认不可读。健康记录没有开关，所有连接都能读。读到的内容会发给它们背后的 AI 服务。</li><li>这些限制只管开图工具。完整 Agent、在资料文件夹里直接打开的 Claude Code 或 Codex 能直接读文件，包括标为敏感的记忆；GitHub 备份的整理员能读备份仓库里的全部内容。</li><li>云盘接力：在云盘里读写开图资料的云端 AI（如通过 Google Drive 接手的 Grok）能读到云盘里的全部资料文件，包括健康记录、财务明细和标为敏感的记忆。</li><li>手机通道：你在微信、Telegram、飞书或 QQ 发的消息和收到的回答都会经过这些平台，由问问的 AI 回答。</li><li>资料包和剪贴板：只有你复制、粘贴的那段文字会离开开图。资料包不带健康原始记录和标为敏感的记忆；每次生成时由你选择是否带上财务近况；认得出的 Key 和本机路径会去掉。</li></ul>
 <h2>其他联网</h2>
-<ul><li>地图图块来自 OpenFreeMap。</li><li>行情参考价来自 Yahoo，发出的是代码，不含持仓数量。</li><li>GitHub 进度用你填的 token 读取所绑定的仓库。</li><li>日历订阅从你填的地址读取；确认的日程可以写进这台电脑的系统日历。</li><li>邮箱、Slack、飞书采集只读你授权的账号，摘录进入资料文件夹。</li></ul>
+<ul><li>天气把所选城市的坐标发给 Open-Meteo，城市也可能来自足迹里的现居城市。</li><li>足迹的全球底图（Natural Earth）随应用保存在本机；缩放级别低于5时不向地图服务发送请求。拉近区域细节时，按当前视野向 OpenFreeMap 下载水面与主要河流瓦片（zoom 5起），并向 AWS Terrain Tiles 下载地形瓦片（zoom 6起）；服务器会收到请求的地图区域、IP 地址与常规网络信息。这些请求不包含你的经历文字、档案或账号，城市级经历位置也不是实时定位。断网时保留本地全球底图，并提示城市细节需要联网。</li><li>行情参考价来自 Yahoo，发出的是代码，不含持仓数量。</li><li>GitHub 进度用你填的 token 读取所绑定的仓库。</li><li>日历订阅从你填的地址读取；确认的日程可以写进这台电脑的系统日历。</li><li>邮箱、Slack、飞书采集只读你授权的账号，摘录进入资料文件夹。</li><li>iPhone 健康收件箱：快捷指令把健康样本发到你自己部署的 Google Apps Script，再写进你的 Google Drive。</li><li>更新检查访问 GitHub；浏览插件目录访问开图官网。</li><li>学习页可从公共 CDN（cdnjs、jsDelivr、esm.sh、unpkg）和公共字体服务加载脚本与字体。</li></ul>
 <h2>你随时可以</h2>
 <ul><li>在「设置 → 导出全部资料」拿走全部资料文件。</li><li>在「设置 → 换一个存放位置」搬回这台电脑，停止云盘同步。</li><li>在「AI 与连接」更换或断开 AI 服务。</li></ul>
   </div>

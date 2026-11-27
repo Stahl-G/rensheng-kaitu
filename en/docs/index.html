@@ -171,7 +171,7 @@
   <li><strong>Every service you add is kept.</strong> The model button under the message box lists your saved services and models; click one to switch, or choose Add a provider. A new service or model applies from your next message.</li>
   <li>Keys are stored only in this computer's credential store.</li>
   <li>You can quote files, folders and other conversations; up to 10 attachments at a time, 25 MB each. Whether images work depends on the model; if it says the current model doesn't support images, go to AI &amp; connections → Manage model and pick another.</li>
-  <li>Web search uses the current AI service's built-in search by default, no extra key. If the service has none (for example when signed in with an account), add a Perplexity, Exa or Tavily key under AI &amp; connections → Web search.</li>
+  <li>Web search uses the current AI service's built-in search by default, no extra key. If the service has none (for example when signed in with an account), add a Perplexity or Exa key under AI &amp; connections → Web search.</li>
 </ul>
 <div class="tablewrap"><table>
   <thead><tr><th>Mode</th><th>What it can do</th></tr></thead>
@@ -344,9 +344,9 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <h2 id="privacy">Where your data goes<a class="anchor" href="#privacy" aria-label="#">#</a></h2>
 <ul>
   <li><strong>Kept on this computer</strong>: your notes folder, plus version history, keys, credentials and the index.</li>
-  <li><strong>Synced to your cloud drive</strong>: only after you pick one, and only note files.</li>
-  <li><strong>Sent to an AI this time</strong>: Ask sends your messages and the notes it reads to the AI service you chose; a full agent may send anything it reads; scheduled tasks use the same AI; external AIs over MCP or cloud relay send what they read to the services behind them; context packs and the clipboard send only what you copy.</li>
-  <li><strong>Other connections</strong>: map tiles (OpenFreeMap), reference prices (Yahoo, ticker symbols only), GitHub, calendar subscriptions, and mail and chat collection.</li>
+  <li><strong>Synced to your cloud drive or repository</strong>: only after you pick a cloud drive or connect GitHub sync; note files sync, including health records, finance details and memories marked sensitive.</li>
+  <li><strong>Sent to an AI this time</strong>: Ask sends your messages and the notes it reads, health records included, to the AI service you chose; a full agent may send anything it reads; scheduled tasks use the same AI; external AIs over MCP or cloud relay send what they read to the services behind them; context packs and the clipboard send only what you copy.</li>
+  <li><strong>Other connections</strong>: weather (Open-Meteo), map tiles (OpenFreeMap, AWS Terrain Tiles), reference prices (Yahoo, ticker symbols only), GitHub, calendar subscriptions, mail and chat collection, and public CDNs and fonts on learning pages.</li>
 </ul>
 <p>Details are on <a href="/en/privacy/">Where your data goes</a>.</p>
 
