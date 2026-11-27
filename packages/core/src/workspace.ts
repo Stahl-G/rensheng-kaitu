@@ -5,6 +5,7 @@ import {
   mkdirSync,
   readFileSync,
   renameSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -64,6 +65,32 @@ export function migrateHistory(root: string, icloud?: boolean): void {
       `无法把版本历史从 ${old} 迁移到 ${target}：${(error as Error).message}`,
       "HISTORY_MIGRATION",
     );
+  }
+}
+
+const pause = new Int32Array(new SharedArrayBuffer(4));
+const heldByAnotherProgram = new Set(["EPERM", "EACCES", "EBUSY"]);
+
+/** Windows 上杀毒、索引或同步程序会短暂占住刚写好的文件，改名被拒：退避重试。
+ * 写入是同步的，重试会挡住同一线程，所以最多只等 150 毫秒，守住日常操作 0.3 秒的上限；
+ * 其他系统或其他错误立即抛出；放弃时删掉临时文件，不留 `.tmp`。 */
+function replaceFile(tmp: string, target: string) {
+  for (let waited = 0, delay = 10; ; waited += delay, delay *= 2) {
+    try {
+      renameSync(tmp, target);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? "";
+      if (process.platform !== "win32" || !heldByAnotherProgram.has(code) || waited >= 150) {
+        try {
+          rmSync(tmp, { force: true });
+        } catch {
+          /* 临时文件同样被占住时保留，原错误更有用。 */
+        }
+        throw error;
+      }
+      Atomics.wait(pause, 0, 0, delay);
+    }
   }
 }
 
@@ -298,7 +325,7 @@ export class Workspace {
     mkdirSync(dirname(abs), { recursive: true });
     const tmp = `${abs}.${randomBytes(4).toString("hex")}.tmp`;
     writeFileSync(tmp, content, { mode: opts.mode ?? 0o644 });
-    renameSync(tmp, abs);
+    replaceFile(tmp, abs);
     invalidateNoteIndex(this, rel);
     invalidateHistoryFile(this, relative(this.root, abs).split(sep).join("/"));
   }
