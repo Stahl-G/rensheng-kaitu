@@ -10,6 +10,7 @@ import {
   pick,
   readOnboardingMatter,
   recordOnboardingAiConnection,
+  redact,
 } from "@kaitu/core";
 import type { AskService } from "./ask.js";
 
@@ -21,12 +22,29 @@ export async function organizeOnboardingMatter(
   write: WorkspaceWrite = (operation) => operation(),
 ): Promise<OnboardingMatter> {
   const matter = await write(async () => readOnboardingMatter(ws, source));
-  if (!ask || !(await ask.settings()).configured) return matter;
-  await write(async () => recordOnboardingAiConnection(ws, "问问"));
-  const service = ask.background();
+  if (!ask) return matter;
+  const settings = await ask.settings();
+  if (!settings.configured) return matter;
+  // The managed model only needs this submission. Do not inject workspace instructions or grant tools.
+  // A local Agent is explicitly connected as a full Agent and keeps its existing permission flow.
+  const textOnly = !settings.fullOnly;
+  const service = ask.background(undefined, { textOnly });
   let stop = () => {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    // The background lease blocks changes while preparing/sending the first turn.
+    const selected = await service.settings();
+    if (!selected.configured || Boolean(selected.fullOnly) !== Boolean(settings.fullOnly)) {
+      throw new KaituError(
+        pick(
+          locale,
+          "AI 连接已变化，原文已保存，请重试",
+          "The AI connection changed. Your text is saved; try again",
+        ),
+        "AI_CONNECTION",
+      );
+    }
+    await write(async () => recordOnboardingAiConnection(ws, "问问"));
     const thread = await service.create();
     const response = new Promise<string>((resolve, reject) => {
       timer = setTimeout(
@@ -59,7 +77,8 @@ export async function organizeOnboardingMatter(
         else reject(new Error("AI 未返回整理草稿，原文已保存，可以手工填写"));
       });
     });
-    const sending = service.send(thread.id, matterPrompt(matter.text, locale, "json"));
+    const original = textOnly ? redact(matter.text, locale) : matter.text;
+    const sending = service.send(thread.id, matterPrompt(original, locale, "json"));
     void sending.catch(() => {});
     const text = await Promise.race([response, sending.then(() => response)]);
     let input: ReturnType<typeof parseMatterAnswer>;

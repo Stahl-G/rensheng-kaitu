@@ -179,3 +179,40 @@ it("所选连接统一决定问问、整理和恢复的能力，切换普通模�
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+it("连接在整理开始前切换时保留原文，不沿用旧连接的数据范围", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-onboarding-connection-change-"));
+  const ws = await initWorkspace(join(root, "workspace"));
+  let reads = 0;
+  let launches = 0;
+  const ask = createAskService({
+    state: join(root, "state"),
+    workspace: ws.root,
+    settings: async () => ({
+      configured: true,
+      provider: "synthetic",
+      model: "synthetic",
+      fullOnly: ++reads === 1,
+    }),
+    configure: async () => ({}),
+    models: async () => [],
+    runtime: async () => {
+      launches++;
+      throw new Error("The changed runtime must not start");
+    },
+  });
+  try {
+    const original = "合成原文：本周写一篇短文";
+    const row = (await productRequest(ws, "onboardingMatterSave", [original], ask)) as OnboardingMatter;
+    await expect(productRequest(ws, "onboardingMatterOrganize", [row.source], ask)).rejects.toMatchObject({
+      code: "AI_CONNECTION",
+      message: "AI 连接已变化，原文已保存，请重试",
+    });
+    expect(readOnboardingMatter(ws, row.source).text.trim()).toBe(original);
+    expect(launches).toBe(0);
+    expect(ask.list()).toEqual([]);
+  } finally {
+    await ask.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+});

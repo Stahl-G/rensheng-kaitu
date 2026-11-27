@@ -16,6 +16,20 @@ const connection = process.env.KAITU_AGENT_CONNECTION === "phone-ask" ? "phone-a
 export const name = "kaitu-sdk-host";
 export const inject = ["loader", "tools"];
 export async function apply(ctx) {
+  if (process.env.KAITU_AGENT_TOOLS === "none") {
+    // Restrict each background agent before its first step so tools are not sent to the provider.
+    ctx.on("agent/created", ({ agent }) => {
+      agent.ctx.tools.restrict({ allow: [] });
+      const { systemPrompt } = agent.ctx;
+      systemPrompt.suppressRuntimeContext();
+      // The host marks cwd as required; override it for text-only agents without changing filesystem policy.
+      systemPrompt.context({
+        name: "working-directory:current",
+        order: systemPrompt.getContextOrder("WORKING_DIRECTORY"),
+        text: "",
+      });
+    });
+  }
   const attachments = new Set();
   ctx.provide("kaituAttachmentPaths", attachments);
   await ctx.plugin(
