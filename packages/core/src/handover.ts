@@ -433,8 +433,8 @@ export function handoverPack(
   );
   const excluded = pick(
     locale,
-    "资料包带上勾选的内容，发送前会去掉密钥与本机路径。健康原始记录与敏感记忆保留在工作区。",
-    "The pack includes your selected sections. Keys and local paths are removed before sharing; raw health records and sensitive memories stay in your workspace.",
+    "资料包带上勾选的内容，去掉认得出的密钥与本机路径。健康原始记录与敏感记忆保留在工作区。",
+    "The pack includes your selected sections, with recognizable keys and local paths removed. Raw health records and sensitive memories stay in your workspace.",
   );
   const connection = { id: "handover", finance: includeFinance } as const;
   const list = sections(locale, now, handoverData(ws), connection);

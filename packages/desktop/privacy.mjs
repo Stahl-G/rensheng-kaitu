@@ -2,26 +2,29 @@ import { createHash } from "node:crypto";
 import { readPreferences, savePreferences } from "../core/dist/index.js";
 
 // Bump when the notice or outgoing-data scope changes, including for existing installations.
-export const PRIVACY_NOTICE_VERSION = "2026-11-04.1";
+export const PRIVACY_NOTICE_VERSION = "2026-11-27.1";
 const ACTION = "https://kaitu.invalid/privacy";
 const summary = [
   [
-    ["资料在你自己手里", "Your data stays in your hands"],
+    ["资料在哪", "Where your data is"],
     [
-      "资料存在本机或你选择的存储中，开图不把个人档案上传到自营服务器。",
-      "Your data is stored on this computer or in storage you choose. Kaitu does not upload personal profiles to its own servers.",
+      "资料在你选的文件夹，版本历史和 Key 在这台电脑。开图没有接收资料的服务器。",
+      "Your data is in the folder you choose; version history and keys stay on this computer. Kaitu has no server that receives your data.",
     ],
   ],
   [
-    ["AI 用到哪些资料", "What AI receives"],
+    ["发给 AI 的", "What goes to AI"],
     [
-      "对话内容和为任务读取的相关资料，会发送给你选择的 AI 服务或 Agent。",
-      "Conversation content and relevant data read for a task go to the AI service or agent you choose.",
+      "消息和 AI 读到的资料会发给你选的 AI，包括健康记录；财务按连接开关。开启的自动任务按时同样发送。",
+      "Your messages and the data the AI reads go to the AI you choose, health records included; finance follows each connection's switch. Automatic tasks you turned on send data the same way on schedule.",
     ],
   ],
   [
-    ["敏感资料由你决定", "You decide about sensitive data"],
-    ["云同步和完整 Agent 由你开启。", "You choose whether to turn on cloud sync or use a full agent."],
+    ["同步出去的", "What sync sends"],
+    [
+      "开了同步，资料文件夹里的全部资料交给你选的服务。",
+      "With sync on, every file in your data folder goes to the service you chose.",
+    ],
   ],
 ];
 const items = [
@@ -35,15 +38,15 @@ const items = [
   [
     ["模型与 Agent", "Models and agents"],
     [
-      "问问的消息及为回答读取的资料，会交给你配置的模型或 Agent 及其服务商。已开启的自动任务会在开始使用后恢复，按原设置读取和发送资料；完整 Agent 可读取工作区之外的文件。第三方如何留存和使用资料，依其政策。不开启 AI 也能使用开图。",
-      "Ask messages and data read to answer them go to your configured model or agent and its provider. Previously enabled automatic tasks resume after you get started and read and send data under their existing settings. Full agents can read files outside the workspace. Third-party retention and use follow their policies. You can use Kaitu without AI.",
+      "问问的消息及为回答读取的资料（包括健康记录），会交给你配置的模型或 Agent 及其服务商。已开启的自动任务会在开始使用后恢复，按原设置读取和发送资料；完整 Agent 可读取工作区之外的文件。第三方如何留存和使用资料，依其政策。不开启 AI 也能使用开图。",
+      "Ask messages and data read to answer them, health records included, go to your configured model or agent and its provider. Previously enabled automatic tasks resume after you get started and read and send data under their existing settings. Full agents can read files outside the workspace. Third-party retention and use follow their policies. You can use Kaitu without AI.",
     ],
   ],
   [
     ["你选择的同步服务", "Your chosen sync services"],
     [
-      "选择 iCloud、Google Drive、坚果云等同步文件夹后，其中的资料由该服务同步；开启 GitHub 同步后，所选范围会发送到绑定仓库。能访问云盘或仓库的人员和云端 Agent 也可能读到这些资料。",
-      "Files in an iCloud, Google Drive, Nutstore or other synced folder are synced by that service. GitHub sync sends the selected data to your connected repository. People and cloud agents with access to that folder or repository may also read it.",
+      "选择 iCloud、Google Drive、坚果云等同步文件夹后，其中的全部资料由该服务同步，包括健康、财务和标为敏感的记忆；开启 GitHub 同步后，所选范围会发送到绑定仓库。能访问云盘或仓库的人员和云端 Agent 也可能读到这些资料。",
+      "Every file in an iCloud, Google Drive, Nutstore or other synced folder is synced by that service, including health, finance and memories marked sensitive. GitHub sync sends the selected data to your connected repository. People and cloud agents with access to that folder or repository may also read it.",
     ],
   ],
   [
@@ -56,15 +59,15 @@ const items = [
   [
     ["更新与其他连接", "Updates and other connections"],
     [
-      "更新检查访问 GitHub，浏览插件目录访问开图站点；网络搜索、网页、Yahoo 行情、日历、邮件和聊天按所用功能访问对应服务，传输查询、代码、账号授权或消息等必要内容。第三方插件还可能连接自己的服务。",
-      "Update checks contact GitHub; browsing the plugin catalog contacts the Kaitu site. Search, web pages, Yahoo quotes, calendars, email and chat contact their respective services with the queries, symbols, account authorization or messages needed for that feature. Third-party plugins may connect to their own services.",
+      "更新检查访问 GitHub，浏览插件目录访问开图站点；网络搜索、网页、Yahoo 行情、日历、邮件和聊天按所用功能访问对应服务，传输查询、代码、账号授权或消息等必要内容。学习页可从公共 CDN 和字体服务加载脚本与字体。第三方插件还可能连接自己的服务。",
+      "Update checks contact GitHub; browsing the plugin catalog contacts the Kaitu site. Search, web pages, Yahoo quotes, calendars, email and chat contact their respective services with the queries, symbols, account authorization or messages needed for that feature. Learning pages can load scripts and fonts from public CDNs and font services. Third-party plugins may connect to their own services.",
     ],
   ],
   [
     ["权限与访问范围", "Permissions and access"],
     [
-      "各项功能按各自的权限和确认流程操作。财务资料的工具访问可按连接设置；完整 Agent 直接读取文件时不受这些工具开关限制。设置中可随时查看完整政策。",
-      "Each feature follows its own permission and confirmation process. Financial-data tool access can be set per connection; these tool switches do not restrict a full agent's direct file access. You can review the full policy in Settings at any time.",
+      "各项功能按各自的权限和确认流程操作。财务资料的工具访问可按连接设置，健康记录没有单独开关；标为敏感的记忆、Key 和凭据不经开图工具给出。完整 Agent 或直接打开资料文件夹的 Agent 读取文件时不受这些限制。设置中可随时查看完整政策。",
+      "Each feature follows its own permission and confirmation process. Financial-data tool access can be set per connection; health records have no separate switch; sensitive memories, keys and credentials are not served by Kaitu tools. These limits do not apply to a full agent, or any agent that opens the data folder directly. You can review the full policy in Settings at any time.",
     ],
   ],
 ];
