@@ -170,7 +170,7 @@
   <li><strong>添加过的服务都会保留。</strong>输入框下方的模型按钮会列出已保存的服务和模型，点一下就切换；要再加一个，点「添加服务商」。换服务或模型后，从下一条消息开始生效。</li>
   <li>Key 只存在这台电脑的凭据存储里。</li>
   <li>可以引用文件、文件夹和其他对话；一次最多 10 个附件，每个不超过 25MB。能不能发图片取决于所选模型；提示「当前模型不支持图片」时，到「AI 与连接」点「管理模型」换一个。</li>
-  <li>网络搜索默认用当前 AI 服务自带的搜索，不用另申请 Key。当前服务没有自带搜索时（例如用账号登录连接），在「AI 与连接 → 网络搜索」添加 Perplexity、Exa 或 Tavily 的 Key。</li>
+  <li>网络搜索默认用当前 AI 服务自带的搜索，不用另申请 Key。当前服务没有自带搜索时（例如用账号登录连接），在「AI 与连接 → 网络搜索」添加 Perplexity 或 Exa 的 Key。</li>
 </ul>
 <div class="tablewrap"><table>
   <thead><tr><th>模式</th><th>能做什么</th></tr></thead>
@@ -343,9 +343,9 @@ node packages/cli/dist/main.js --dir ~/kaitu-demo ui</code></pre><button type="b
 <h2 id="privacy">资料去向<a class="anchor" href="#privacy" aria-label="#">#</a></h2>
 <ul>
   <li><strong>存在这台电脑</strong>：资料文件夹，以及版本历史、Key、凭据和索引。</li>
-  <li><strong>同步到你的云盘</strong>：只在你选了云盘之后，只同步资料文件。</li>
-  <li><strong>这次发给 AI</strong>：问问把你的消息和它读到的资料发给你选的 AI 服务；完整 Agent 读到的内容都可能发出；自动任务用同一个 AI；通过 MCP 或云盘接力的外部 AI，读到的内容会发给它们背后的服务；资料包和剪贴板只发你复制的那一段。</li>
-  <li><strong>其他联网</strong>：地图图块（OpenFreeMap）、行情参考价（Yahoo，只发代码）、GitHub、日历订阅、邮箱和聊天采集。</li>
+  <li><strong>同步到你的云盘或仓库</strong>：只在你选了云盘或连了 GitHub 同步之后，同步资料文件，包括健康记录、财务明细和标为敏感的记忆。</li>
+  <li><strong>这次发给 AI</strong>：问问把你的消息和它读到的资料（包括健康记录）发给你选的 AI 服务；完整 Agent 读到的内容都可能发出；自动任务用同一个 AI；通过 MCP 或云盘接力的外部 AI，读到的内容会发给它们背后的服务；资料包和剪贴板只发你复制的那一段。</li>
+  <li><strong>其他联网</strong>：天气（Open-Meteo）、地图图块（OpenFreeMap、AWS Terrain Tiles）、行情参考价（Yahoo，只发代码）、GitHub、日历订阅、邮箱和聊天采集、学习页的公共 CDN 与字体。</li>
 </ul>
 <p>逐项说明见<a href="/privacy/">资料去向</a>。</p>
 
