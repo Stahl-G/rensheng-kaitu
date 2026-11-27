@@ -71,7 +71,8 @@ export function migrateHistory(root: string, icloud?: boolean): void {
 const pause = new Int32Array(new SharedArrayBuffer(4));
 const heldByAnotherProgram = new Set(["EPERM", "EACCES", "EBUSY"]);
 
-/** Windows 上杀毒、索引或同步程序会短暂占住刚写好的文件，改名被拒：退避重试，最多约 1.3 秒。
+/** Windows 上杀毒、索引或同步程序会短暂占住刚写好的文件，改名被拒：退避重试。
+ * 写入是同步的，重试会挡住同一线程，所以最多只等 150 毫秒，守住日常操作 0.3 秒的上限；
  * 其他系统或其他错误立即抛出；放弃时删掉临时文件，不留 `.tmp`。 */
 function replaceFile(tmp: string, target: string) {
   for (let waited = 0, delay = 10; ; waited += delay, delay *= 2) {
@@ -80,7 +81,7 @@ function replaceFile(tmp: string, target: string) {
       return;
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code ?? "";
-      if (process.platform !== "win32" || !heldByAnotherProgram.has(code) || waited >= 1000) {
+      if (process.platform !== "win32" || !heldByAnotherProgram.has(code) || waited >= 150) {
         try {
           rmSync(tmp, { force: true });
         } catch {
