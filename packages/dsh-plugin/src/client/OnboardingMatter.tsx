@@ -211,6 +211,10 @@ export function OnboardingMatter(
         : `请用 kaitu_onboarding 的 matter-read 读取原文 ${saved.source}，整理当前目标和已知现状；已有明确的事时给一个下一步，不知道做什么时给 2–3 条可能路径（为什么适合、还有哪些不清楚、一个低成本小实验），不要预选路径或下一步。调用 matter-draft 保存供我核对的草稿。不要创建待办或采纳其他建议。我会回到开图核对并采纳。`,
     );
   };
+  const enterManually = async () => {
+    await save();
+    if (alive.current) setManual(true);
+  };
   const organize = async () => {
     const saved = await save();
     if (!props.builtin) {
@@ -326,12 +330,26 @@ export function OnboardingMatter(
             </button>
             <button
               type="button"
-              className={primary}
+              className={props.initialGoal ? quiet : primary}
               disabled={busy || !text.trim()}
               onClick={() => void run(organize)}
             >
-              {busy ? t("正在保存…", "Saving…") : t("保存并整理", "Save and organize")}
+              {busy
+                ? t("正在保存…", "Saving…")
+                : props.builtin
+                  ? t("发给 AI 整理", "Send to AI to organize")
+                  : t("在问问继续", "Continue in Ask")}
             </button>
+            {props.initialGoal && (
+              <button
+                type="button"
+                className={primary}
+                disabled={busy || !text.trim()}
+                onClick={() => void run(enterManually)}
+              >
+                {t("自己定下一步", "Set my own next step")}
+              </button>
+            )}
           </div>
         </>
       ) : (

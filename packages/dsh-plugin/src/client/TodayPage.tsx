@@ -277,11 +277,11 @@ export function LifeHome({
           {home && <h1>{t("今天", "Today")}</h1>}
           {weather && <div className={todayCss.weatherSlot}>{weather}</div>}
         </div>
-        {!home && !firstVisit && (
+        {!firstVisit && (
           <button
             id="life-handover-start"
             type="button"
-            className={`${css.btn} ${data.proposedTasks.length ? "" : css["btn-strong"]}`}
+            className={`${css.btn} ${home || data.proposedTasks.length ? "" : css["btn-strong"]}`}
             onClick={handover}
           >
             {t("带去别的 AI 聊", "Take this to another AI")}

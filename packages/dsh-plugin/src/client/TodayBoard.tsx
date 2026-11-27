@@ -321,7 +321,7 @@ export function TodayBoard({
               : t("今天想推进什么？", "What would you like to move forward?")}
           </h2>
           <button type="button" className={css.btn} onClick={begin ?? library}>
-            {begin ? t("开始", "Get started") : t("打开资料", "Open Library")}
+            {begin ? t("写下一件事", "Write down one thing") : t("打开资料", "Open Library")}
           </button>
         </section>
       )}

@@ -80,14 +80,16 @@ test("首次已确认的目标经过存放选择后带入手动采纳，并可�
           ?.props.onClick(),
       );
     };
-    await click("保存并整理");
-    await vi.waitFor(() => expect(organize).toHaveBeenCalledOnce());
-    await vi.waitFor(() =>
-      expect(app.root.findAllByType("textarea").some((area) => area.props.value === goal)).toBe(true),
-    );
-    const fields = app.root.findByType(OnboardingMatter).findAllByType("textarea");
-    expect(fields[0]?.props.value).toBe(goal);
-    await act(async () => fields[2]?.props.onChange({ target: { value: next } }));
+    await click("自己定下一步");
+    expect(organize).not.toHaveBeenCalled();
+    const field = (label: string) =>
+      app.root
+        .findByType(OnboardingMatter)
+        .findAllByType("label")
+        .find((element) => element.findAllByType("b").some((title) => title.children.includes(label)))
+        ?.findByType("textarea");
+    await vi.waitFor(() => expect(field("当前目标")?.props.value).toBe(goal));
+    await act(async () => field("一个下一步")?.props.onChange({ target: { value: next } }));
     await click("采纳这个下一步");
     await vi.waitFor(() => expect(done).toHaveBeenCalled());
     const overview = await readOverviewPage(ws);
@@ -126,7 +128,7 @@ test("首次已确认的目标经过存放选择后带入手动采纳，并可�
   }
 });
 
-test("空首页可主动开始，已有目标直达其ID，老用户不出现新手开始操作", async () => {
+test("空首页可主动开始，有目标后可直达目标或把近况带去别的 AI", async () => {
   const ws = await freshWorkspace();
   let app!: ReturnType<typeof create>;
   try {
@@ -134,12 +136,14 @@ test("空首页可主动开始，已有目标直达其ID，老用户不出现新
     const home = { data: readHome(await readHomeSources(ws)), loading: false, error: null };
     const begin = vi.fn();
     const openGoal = vi.fn();
+    const handover = vi.fn();
     const props = {
       data,
       home,
       firstVisit: true,
       begin,
       openGoal,
+      handover,
       askText: "",
       setAskText: vi.fn(),
       loadProjects: async () => [],
@@ -150,12 +154,15 @@ test("空首页可主动开始，已有目标直达其ID，老用户不出现新
     await act(async () => {
       app = create(createElement(LifeHome, props));
     });
-    const start = app.root.findAllByType("button").find((button) => button.children.includes("开始"));
+    const start = app.root.findAllByType("button").find((button) => button.children.includes("写下一件事"));
     expect(start).toBeDefined();
+    expect(app.root.findAllByProps({ id: "life-handover-start" })).toHaveLength(0);
     await act(async () => start?.props.onClick());
     expect(begin).toHaveBeenCalledOnce();
     await act(async () => app.update(createElement(LifeHome, { ...props, firstVisit: false })));
-    expect(app.root.findAllByType("button").some((button) => button.children.includes("开始"))).toBe(false);
+    expect(app.root.findAllByType("button").some((button) => button.children.includes("写下一件事"))).toBe(
+      false,
+    );
     const saved = await saveOnboardingMatter(ws, "合成目标");
     await adoptOnboardingMatter(ws, saved.source, { goal: "合成目标", current: "", next: "合成下一步" });
     const updated = { ...home, data: readHome(await readHomeSources(ws)) };
@@ -166,6 +173,8 @@ test("空首页可主动开始，已有目标直达其ID，老用户不出现新
     );
     await act(async () => app.root.findByProps({ "aria-label": "打开合成目标" }).props.onClick());
     expect(openGoal).toHaveBeenCalledWith(target?.id);
+    await act(async () => app.root.findByProps({ id: "life-handover-start" }).props.onClick());
+    expect(handover).toHaveBeenCalledOnce();
     expect(props.library).not.toHaveBeenCalled();
   } finally {
     if (app) await act(async () => app.unmount());
