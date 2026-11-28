@@ -77,6 +77,8 @@
 - 云盘只放资料；版本历史、密钥和索引留在这台电脑。每次写入都存一个版本，可以查看和恢复。
 - 可以导入 Apple 健康、日历（ICS）、ChatGPT 记忆、Nut AI、飞书云文档、支付宝账单和券商持仓 CSV。
 
+已有 Linger 的用户可以用[可选的 Linger 收件桥](integrations/linger/README.md)，把审阅过的 Room Markdown 附件放进开图收件箱；开图默认不依赖 Linger。
+
 ## 现在的状态
 
 开图还在首批试用前的打磨期，版本号是 `0.1.0-rc`。
