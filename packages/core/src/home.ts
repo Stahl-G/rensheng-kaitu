@@ -1,8 +1,10 @@
 import { latestPortrait } from "./life-portrait.js";
 import { readOverviewPage } from "./overview-page.js";
+import { type PlanContext, planContext } from "./plans.js";
 import { readProjectsPage } from "./project-page.js";
 
 import type { ResultRow } from "./results.js";
+import type { Task } from "./tasks.js";
 import { localDate } from "./time.js";
 import { type NextItem, type WorkbenchData, readWorkbench } from "./workbench.js";
 import type { Workspace } from "./workspace.js";
@@ -86,7 +88,7 @@ export interface HomeData {
   traces: HomeTrace[];
   results?: (ResultRow & { at: string; date: string })[];
   resultActivityDays?: number;
-  steps?: (NonNullable<HomeThread["next"]> & { key: string; parent: string })[];
+  steps?: (NonNullable<HomeThread["next"]> & { key: string; parent: string; context?: PlanContext })[];
   pending: { id: string; title: string; rev: number }[];
   /** No inferred mappings: a later atlas projection must prove matching source and permissions. */
   atlas: null;
@@ -309,6 +311,7 @@ export function readHome(input: HomeSources): HomeData {
           due: typeof item.due === "string" ? item.due : null,
           priority: "normal",
           parent: threads.find((thread) => thread.next?.id === item.id)?.title ?? "",
+          context: planContext(item as Task),
           precondition: { kind: "task" as const, expectedRev: item.rev ?? 1 },
         })),
     ]

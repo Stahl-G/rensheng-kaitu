@@ -977,6 +977,10 @@
   color: var(--muted);
 }
 .actionMeta > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--link);
   font-weight: 600;
 }

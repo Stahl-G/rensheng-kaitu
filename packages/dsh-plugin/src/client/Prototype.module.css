@@ -1576,7 +1576,7 @@ button.avatar:active:not(:disabled) {
 
 /* 今天页「你带来的规划」与「在原来的 AI 里继续」的资料包 */
 .plans > div + div,
-.plans details {
+.plans > details {
   border-top: 1px solid var(--line);
 }
 .plans .row {
@@ -1585,6 +1585,30 @@ button.avatar:active:not(:disabled) {
 }
 .plans summary {
   padding: 12px 0;
+}
+.planRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 16px;
+  padding-top: 12px;
+}
+.planRow + details {
+  margin-bottom: 8px;
+}
+.planRow .planNext {
+  justify-content: flex-start;
+}
+.planTitle,
+.planStep {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .planRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .planNext {
   display: inline-flex;

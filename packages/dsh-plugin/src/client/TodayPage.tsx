@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   DoingProject,
   InboxEntry,
@@ -8,6 +8,7 @@ import type {
   OverviewMetric,
   OverviewNext,
 } from "../types.js";
+import { PlanDetails, type ReadPlanOriginal } from "./PlanReading.js";
 import css from "./Prototype.module.css";
 import { TodayBoard, type TodayBoardSession } from "./TodayBoard.js";
 import todayCss from "./TodayPage.module.css";
@@ -20,6 +21,7 @@ import {
   todayProjectFacts,
   todaySourceGroups,
 } from "./next-presentation.js";
+import { planHeadline } from "./plan-reading.js";
 
 export function LifeHome({
   home,
@@ -50,6 +52,7 @@ export function LifeHome({
   loadProjects,
   openProject,
   openGoal,
+  readOriginal,
   begin,
   resultAction,
   schedule,
@@ -65,6 +68,7 @@ export function LifeHome({
   loadProjects: () => Promise<DoingProject[]>;
   openProject: (slug: string) => void;
   openGoal?: (id: string) => void;
+  readOriginal?: ReadPlanOriginal;
   begin?: () => void;
   data: Pick<OverviewData, "today" | "timeZone" | "cutoff" | "metrics" | "proposedTasks">;
   firstVisit: boolean;
@@ -327,6 +331,7 @@ export function LifeHome({
           resultAction={resultAction}
           openProject={openProject}
           openGoal={openGoal}
+          readOriginal={readOriginal}
           begin={firstVisit ? begin : undefined}
           library={library}
           ask={ask}
@@ -756,37 +761,17 @@ export function TodayStart({
   );
 }
 
-/** Only clipped goals become interactive; the full text remains unchanged. */
 export function TodayGoal({ text, title = false }: { text: string; title?: boolean }) {
   const t = useT();
-  const line = useRef<HTMLSpanElement>(null);
-  const [clipped, setClipped] = useState(false);
-  const [open, setOpen] = useState(false);
-  useLayoutEffect(() => {
-    setOpen(false);
-    const measure = () => {
-      const node = line.current;
-      if (node)
-        setClipped(!!text && (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (line.current) observer.observe(line.current);
-    return () => observer.disconnect();
-  }, [text]);
-  const Text = title ? "b" : "span";
   return (
     <div className={`${todayCss.goal} ${title ? todayCss.goalTitle : ""}`}>
       {!title && <span>{t("为了", "For")}</span>}
-      <Text ref={line} className={todayCss.goalLine}>
-        {text}
-      </Text>
-      {clipped && (
-        <button type="button" className={css.link} aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? t("收起", "Show less") : t("展开", "Show more")}
-        </button>
+      {title ? (
+        <b>{planHeadline(text)}</b>
+      ) : (
+        <span className={todayCss.goalLine}>{planHeadline(text, 48)}</span>
       )}
-      {open && clipped && <p>{text.replace(/(?<=.)(?=[[【][^\]】]{1,16}[\]】])/g, "\n")}</p>}
+      <PlanDetails goal={text} />
     </div>
   );
 }
