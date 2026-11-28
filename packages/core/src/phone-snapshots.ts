@@ -338,7 +338,12 @@ export function startPhoneSnapshots(
       running = false;
       if (again) {
         again = false;
-        schedule();
+        // A new workspace is not an edit burst in the old one. Retire its pending
+        // debounce and compute against the new root, still through the owner queue.
+        if (!closed && ws.root !== root && watchedRoot !== ws.root) {
+          clearTimeout(timer);
+          void run();
+        } else schedule();
       }
     }
   };
