@@ -11,8 +11,8 @@ description: 新建个人或工作项目、记录进展、更新下一步，或�
 
 先用 `kaitu project list --json-out` 检查已有项目。补齐标题、工作还是个人、链接哪个文件夹；
 写作项目还需明确正文子目录，避免把大纲、备份当作正文。已知的信息不重复询问。
-用 `kaitu project new --title "标题" --kind work|personal` 建档。
-用 `kaitu project link <slug> <绝对路径> --role manuscript|repo|folder [--include "正文/**/*.md"]` 添加链接。
+工作项目用 `kaitu project new --title "标题" --kind work` 建档；个人项目把 work 换成 personal。
+用 `kaitu project link <slug> <绝对路径> --role folder` 添加链接；代码库用 repo，手稿用 manuscript。需要限制文件时再加 `--include "正文/**/*.md"`。
 阅读链接文件夹里的 README、AGENTS.md 了解背景，遵守其读取约定，不修改其中的任何文件。
 
 ## 记录与下一步
@@ -23,11 +23,11 @@ description: 新建个人或工作项目、记录进展、更新下一步，或�
 直接更新 Markdown 后只校验该项目，再保存一个版本；专用命令回执已含版本时直接采用该结果，不重复校验和存版本。
 下一步用
 `kaitu project set <slug> --next-json '[{"id":"p1","title":"具体动作","status":"todo"}]'` 更新。
-阶段变更用 `kaitu project set <slug> --stage idea|active|paused|done`。
+阶段变更用 `kaitu project set <slug> --stage active`；按实际阶段把 active 换成 idea、paused 或 done。
 
 ## 查询与回顾
 
-用户问「XX 推进到哪了」时，先 `kaitu project sync <slug>`，再 `project show` 与 `project list`。
+用户问「XX 推进到哪了」时，先 `kaitu project sync <slug>`，再用 `kaitu project show <slug> --json-out` 与 `kaitu project list --json-out`。
 结合 STATUS、日志与近 7 天字数变化 / 提交数，说明进展、障碍、下一步及链接读取问题。
 字数和提交数只代表对应活动量，完成判断以 STATUS、日志和用户说明为准。
 每周项目回顾先 `kaitu project sync`，逐项核对工作与个人项目，保留未解决的障碍与未完成的下一步。

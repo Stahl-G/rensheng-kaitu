@@ -72,6 +72,9 @@ it("background phone computation publishes through the owner queue and discards 
     release = resolve;
   });
   let queued = false;
+  // Observe real writes: final file contents alone cannot rule out an old
+  // snapshot briefly appearing in the new folder before it is overwritten.
+  const writes = vi.spyOn(ws, "writeJson");
   const stop = startPhoneSnapshots(
     ws,
     (error) => errors.push(error),
@@ -102,6 +105,14 @@ it("background phone computation publishes through the owner queue and discards 
     expect(errors).toEqual([]);
     phase = "closing";
     await stop();
+    expect(writes.mock.calls.filter(([file]) => file === "phone/today.json")).toEqual([
+      [
+        "phone/today.json",
+        expect.objectContaining({
+          mobile: expect.objectContaining({ tasks: [expect.objectContaining({ title: "New root" })] }),
+        }),
+      ],
+    ]);
     ws.root = root;
     expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
     phase = "finished";
@@ -109,8 +120,45 @@ it("background phone computation publishes through the owner queue and discards 
     release();
     await stop();
     status.mockRestore();
+    writes.mockRestore();
     rmSync(root, { recursive: true, force: true });
     rmSync(other.root, { recursive: true, force: true });
+  }
+});
+
+it("stopping a phone snapshot leaves an already queued owner write inert", async () => {
+  const ws = await clonedWorkspace();
+  addRecord(ws, "task", { title: "Must not publish after stop" });
+  const before = ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined;
+  const entered = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<void>();
+  const finished = Promise.withResolvers<void>();
+  const errors: unknown[] = [];
+  const status = vi.spyOn(backup, "workspaceBackupEnabled").mockReturnValue(true);
+  const stop = startPhoneSnapshots(
+    ws,
+    (error) => errors.push(error),
+    async (operation) => {
+      entered.resolve();
+      await resume.promise;
+      try {
+        return await operation();
+      } finally {
+        finished.resolve();
+      }
+    },
+  );
+  try {
+    await entered.promise;
+    await stop();
+    resume.resolve();
+    await finished.promise;
+    expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(before);
+    expect(errors).toEqual([]);
+  } finally {
+    resume.resolve();
+    await stop();
+    status.mockRestore();
   }
 });
 

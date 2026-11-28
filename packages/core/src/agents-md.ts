@@ -43,9 +43,9 @@ const routes = [
   },
   {
     request: "加个待办",
-    use: "kaitu task add --title 事项 --by agent",
+    use: "kaitu task add --title 事项 --by agent --json-out",
     read: "无需先读资料",
-    done: "回执有 id",
+    done: "回执有 record.id，状态为 proposed，尚待用户采纳",
     skill: undefined,
     match: /待办|todo|to-do|task add/i,
   },
@@ -67,7 +67,7 @@ const routes = [
   },
   {
     request: "存一篇文章去学 / 接着学",
-    use: "learn-topic；有命令行时 kaitu learning start / save",
+    use: "learn-topic；命令行用 kaitu learning start --json 或 kaitu learning save --json，参数见技能",
     read: "该主题 STATUS 与 notes；新主题只读用户给的材料",
     done: "回执有 topic；记下的理解只来自用户原话",
     skill: "learn-topic",
@@ -150,7 +150,7 @@ ${routes.map((route) => `| ${route.request} | ${route.use} | ${route.read} | ${r
 6. 摘要可能不完整。CLOUD_UNAVAILABLE 表示未下载或暂不可读，不是文件不存在；说明缺口后停止读取。其他错误只用原工具重试一次，第二次失败就报告缺口，不换工具/别名/整目录扫描循环读取。写入结果未知时核对原回执或复用原幂等标识，不另建记录重试。
 7. ${AI_NETWORK_RULES}
 
-工作区不在默认位置时加 --dir <绝对路径> 或设置 KAITU_DIR。工具与文件的实际权限继续生效；凭据留在本机，不写进资料或日志。
+工作区不在默认位置时加 --dir <绝对路径> 或设置 KAITU_DIR；已经在目标工作区根目录时也可加 --dir .，仅切换当前目录不会切换工作区。工具与文件的实际权限继续生效；凭据留在本机，不写进资料或日志。
 `;
 }
 

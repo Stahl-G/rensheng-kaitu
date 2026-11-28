@@ -3,7 +3,8 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, it, vi } from "vitest";
 import { openIndex } from "../src/chat-search.js";
 import { disposeNoteIndex, pauseNoteIndex, resumeNoteIndex, searchLibraryNotes } from "../src/note-search.js";
-import { freshWorkspace } from "./helpers.js";
+import { Workspace } from "../src/workspace.js";
+import { tmp } from "./helpers.js";
 
 const control = vi.hoisted(() => ({
   remaining: 0,
@@ -40,7 +41,7 @@ vi.mock("node:fs", async (original) => {
 it("pause and dispose drain real index builds before directory moves, and dispose prevents reopening", async () => {
   for (const operation of ["pause", "dispose"] as const) {
     for (const yieldNumber of [1, 2]) {
-      const ws = await freshWorkspace();
+      const ws = new Workspace(tmp());
       const label = `${operation}, yield ${yieldNumber}`;
       const databases = new Set<DatabaseSync>();
       const exec = DatabaseSync.prototype.exec;
@@ -68,8 +69,15 @@ it("pause and dispose drain real index builds before directory moves, and dispos
       const failures: { phase: string; error: unknown }[] = [];
       try {
         ws.writeText("decisions/synthetic/STATUS.md", "---\ntitle: 合成决定\n---\n合成生命周期正文");
-        queries.push(outcome(searchLibraryNotes(ws, "生命周期")));
-        await entered;
+        const first = outcome(searchLibraryNotes(ws, "生命周期"));
+        queries.push(first);
+        // If setup or search fails before the barrier, report it instead of waiting for the test timeout.
+        await Promise.race([
+          entered,
+          first.then(({ error }) => {
+            throw error ?? new Error(`Search finished before the index barrier (${label})`);
+          }),
+        ]);
         expect(
           [...databases].some((db) => db.isOpen),
           label,
@@ -146,7 +154,7 @@ it("pause and dispose drain real index builds before directory moves, and dispos
 });
 
 it("failed SQLite initialization closes the real database and preserves the initialization error", async () => {
-  const ws = await freshWorkspace();
+  const ws = new Workspace(tmp());
   const failure = new Error("synthetic schema failure");
   const failures: { phase: string; error: unknown }[] = [];
   let database: DatabaseSync | undefined;
