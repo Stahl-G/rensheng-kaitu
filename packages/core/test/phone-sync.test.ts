@@ -48,9 +48,23 @@ const phoneFile = (suffix: string) => `inbox/agents/ios-3fa9c1d2-${ulid()}.${suf
 
 it("background phone computation publishes through the owner queue and discards a moved root", async () => {
   const started = performance.now();
+  const times: Record<string, number> = {};
+  const mark = (name: string) => {
+    times[name] = Math.round((performance.now() - started) * 10) / 10;
+  };
+  const log = (outcome: string) =>
+    process.stderr.write(
+      `${JSON.stringify({
+        phoneTrace: outcome,
+        node: process.version,
+        ...times,
+        elapsed: Math.round(performance.now() - started),
+      })}\n`,
+    );
   let phase = "initialize";
   const errors: unknown[] = [];
   onTestFailed(() => {
+    log("failed");
     console.error("phone-background-stage", {
       phase,
       elapsedMs: performance.now() - started,
@@ -58,10 +72,13 @@ it("background phone computation publishes through the owner queue and discards 
     });
   });
   const ws = await clonedWorkspace();
+  mark("clone1");
   const otherRoot = join(tmp(), "kaitu");
   // Reuse the maintained clone while keeping both roots independently writable.
   cpSync(ws.root, otherRoot, { recursive: true });
+  mark("copy2");
   const other = new Workspace(otherRoot, { maintain: false });
+  mark("open2");
   const root = ws.root;
   addRecord(ws, "task", { title: "Old root" });
   addRecord(other, "task", { title: "New root" });
@@ -72,10 +89,12 @@ it("background phone computation publishes through the owner queue and discards 
     release = resolve;
   });
   let queued = false;
+  mark("start");
   const stop = startPhoneSnapshots(
     ws,
     (error) => errors.push(error),
     async (operation) => {
+      if (!queued) mark("ownerEntered");
       queued = true;
       await gate;
       return operation();
@@ -85,6 +104,7 @@ it("background phone computation publishes through the owner queue and discards 
     phase = "waiting-owner-queue";
     await expect.poll(() => queued, { timeout: 15000 }).toBe(true);
     expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
+    mark("swap");
     ws.root = other.root;
     release();
     phase = "waiting-new-root";
@@ -99,9 +119,11 @@ it("background phone computation publishes through the owner queue and discards 
         { timeout: 15000 },
       )
       .toEqual(["New root"]);
+    mark("visible");
     expect(errors).toEqual([]);
     phase = "closing";
     await stop();
+    mark("stopDone");
     ws.root = root;
     expect(ws.exists("phone/today.json") ? ws.readText("phone/today.json") : undefined).toBe(original);
     phase = "finished";
@@ -111,6 +133,8 @@ it("background phone computation publishes through the owner queue and discards 
     status.mockRestore();
     rmSync(root, { recursive: true, force: true });
     rmSync(other.root, { recursive: true, force: true });
+    mark("cleanup");
+    log("body+cleanup");
   }
 });
 
