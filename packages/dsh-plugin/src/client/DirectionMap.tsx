@@ -40,12 +40,16 @@ export function DirectionMap({
   const { feedback, renderGoal } = useGoalPlanning(planActions, "map");
   const [state, setState] = useState<DirectionMapState | null>(null);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const board = useRef<HTMLDivElement>(null);
   const [paths, setPaths] = useState<{ d: string; tone: string; dashed: boolean }[]>([]);
   const refresh = useCallback(() => {
     void load(locale)
-      .then(setState)
-      .catch(() => {});
+      .then((next) => {
+        setState(next);
+        setLoadError("");
+      })
+      .catch((error) => setLoadError(error instanceof Error ? error.message : String(error)));
   }, [load, locale]);
   useEffect(() => refresh(), [refresh]);
   // 正在看时读本机缓存，看完就停。
@@ -123,8 +127,8 @@ export function DirectionMap({
 
   const projects = input?.projects ?? [];
   // 还没有目标和项目时没有可看的，不放「让开图看一看」。
-  if (!state || (!goals.length && !projects.length)) return null;
-  const header = (
+  if (!goals.length && !projects.length && !loadError) return null;
+  const header = state && (
     <div className={css.lens}>
       <span>
         <b>{t("开图的看法", "Kaitu's view")}</b>
@@ -143,7 +147,7 @@ export function DirectionMap({
       </button>
     </div>
   );
-  const failure = error || state.error;
+  const failure = error || state?.error;
   const title = (slug: string) => projects.find((p) => p.slug === slug)?.title ?? slug;
   const last = (slug: string) => projects.find((p) => p.slug === slug)?.logs[0];
   // 依据写明出自哪里：哪个目标、哪个项目的哪天日志或下一步。
@@ -173,8 +177,16 @@ export function DirectionMap({
     <section className={css.map} aria-label={t("我在推进什么", "What I'm moving forward")}>
       {feedback}
       {header}
+      {loadError && (
+        <p className={css.error} role="alert">
+          {loadError}{" "}
+          <button type="button" className={css.link} onClick={refresh}>
+            {t("重试", "Retry")}
+          </button>
+        </p>
+      )}
       <ReadWarnings warnings={input?.warnings} />
-      {state.stale && (
+      {state?.stale && (
         <output className={css.stale}>
           {t(
             "这之后你的目标或项目有变化：卡片已按现在的资料画，对不上的看法已撤下。想更新就点「重新看一遍」。",
@@ -249,6 +261,7 @@ export function DirectionMap({
           </div>
           <div className={css.col}>
             <h3>{t("正在做", "Working on")}</h3>
+            {!state && !loadError && <output>{t("正在读取项目…", "Loading projects…")}</output>}
             {projects.map((project) => {
               const recent = last(project.slug);
               const own = links.filter((link) => link.project === project.slug);
@@ -289,7 +302,7 @@ export function DirectionMap({
           </div>
           <div className={css.col}>
             <h3>{t("下一步", "Next")}</h3>
-            {state.next.map((step) => (
+            {state?.next.map((step) => (
               <div
                 key={step.project}
                 data-node={`next:${step.project}`}
