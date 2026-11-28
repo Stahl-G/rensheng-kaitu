@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { KaituError } from "./errors.js";
+import { isCaptureSource } from "./inbox-notes.js";
 import { listRecordTypes } from "./modules.js";
 import { readRecords } from "./records.js";
 import { type ResultRow, collectResults, taskResult } from "./results.js";
@@ -90,12 +91,27 @@ export function completedAt(task: Task): number {
   return Number.isFinite(at) ? at : Number.NaN;
 }
 
+export interface PlanContext {
+  source?: string;
+  captureSource?: string;
+  current?: string;
+}
+export function planContext(task: Pick<Task, "source" | "notes">): PlanContext {
+  const source = task.source;
+  const current = noteLine(task.notes ?? "", "已知现状");
+  return {
+    ...(source ? { source } : {}),
+    ...(isCaptureSource(source) ? { captureSource: source } : {}),
+    ...(current ? { current } : {}),
+  };
+}
+
 export interface PlanGoal {
   id: string;
   title: string;
   area: string | null;
   origin: { source: GoalOrigin; date: string } | null;
-  next: { id: string; title: string; due: string | null; rev: number } | null;
+  next: ({ id: string; title: string; due: string | null; rev: number } & PlanContext) | null;
   results: number;
   lastResult: string | null;
 }
@@ -162,7 +178,15 @@ export function readPlans(
         title: goal.title,
         area: goal.area ?? null,
         origin: goalOrigin(goal.id),
-        next: open ? { id: open.id, title: open.title, due: open.due ?? null, rev: open.rev ?? 1 } : null,
+        next: open
+          ? {
+              id: open.id,
+              title: open.title,
+              due: open.due ?? null,
+              rev: open.rev ?? 1,
+              ...planContext(open),
+            }
+          : null,
         results: results.length,
         lastResult: results.length ? noteLine(results.at(-1)?.notes ?? "", "完成结果") : null,
       };

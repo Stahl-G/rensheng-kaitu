@@ -1114,6 +1114,7 @@ function Overview({
     resultAction,
     addGoalNext: props.addGoalNext,
     changeNext: props.changeOnboardingNext,
+    readOriginal: props.readOnboardingMatter,
     refresh,
   };
   const plansCard = data?.plans && (
@@ -1606,6 +1607,7 @@ function Overview({
                     : homeState
                 }
                 session={todaySession.current.board}
+                readOriginal={props.readOnboardingMatter}
                 resultAction={workspaceRoot && props.resultAction ? resultAction : undefined}
                 schedule={
                   data?.blocks.length ? (

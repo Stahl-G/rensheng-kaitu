@@ -8,10 +8,12 @@ import type {
 } from "@kaitu/core";
 import { useEffect, useRef, useState } from "react";
 import css from "./Onboarding.module.css";
+import { PlanDetails } from "./PlanReading.js";
 import v2 from "./Prototype.module.css";
-import { TodayGoal } from "./TodayPage.js";
+import todayStyles from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 import type { OnboardingServices } from "./onboarding-services.js";
+import { planHeadline } from "./plan-reading.js";
 
 const primary = `${v2.btn} ${v2["btn-primary"]}`;
 const quiet = `${v2.btn} ${v2["btn-quiet"]}`;
@@ -466,8 +468,6 @@ export function OnboardingNextCard(
   const { next } = props;
   const [action, setAction] = useState<"complete" | "defer" | "next" | null>(null);
   const [value, setValue] = useState("");
-  const [original, setOriginal] = useState<Matter | null>(null);
-  const [goalShown, setGoalShown] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const run = async (operation: () => Promise<unknown>) => {
@@ -481,7 +481,6 @@ export function OnboardingNextCard(
       setBusy(false);
     }
   };
-  const shown = next.kind === "goal" ? goalShown : !!original;
   return (
     <section
       id={`next-${next.id}`}
@@ -491,30 +490,20 @@ export function OnboardingNextCard(
       <span className={v2.eyebrow}>
         {next.status === "done" ? t("这一步已完成", "This step is done") : t("现在这件事", "One thing now")}
       </span>
-      <h2>{next.next}</h2>
-      <TodayGoal text={next.goal} />
+      <h2>{planHeadline(next.next, 72)}</h2>
+      <div className={todayStyles.actionMeta}>
+        <span>{planHeadline(next.goal, 48)}</span>
+      </div>
       {next.due && <p className={v2.small}>{t(`安排到 ${next.due}`, `Planned for ${next.due}`)}</p>}
-      <button
-        type="button"
-        className={v2.link}
-        disabled={busy}
-        onClick={() =>
-          next.kind === "goal"
-            ? setGoalShown(!goalShown)
-            : void run(async () => {
-                setOriginal(original ? null : await props.readOnboardingMatter(next.source));
-              })
-        }
-      >
-        {shown ? t("收起原始记录", "Hide original") : t("查看原始记录", "View original")}
-      </button>
-      {next.kind === "goal" && goalShown && (
-        <p className={css.original}>
-          {t("来自「你带来的规划」里的目标：", "From the goal in Your plans: ")}
-          {next.goal}
-        </p>
-      )}
-      {original && <pre className={css.original}>{original.text}</pre>}
+      <PlanDetails
+        goal={next.goal}
+        goalSource={next.goalId ? `me/goals.json#${next.goalId}` : undefined}
+        step={next.next}
+        source={next.source}
+        current={next.current}
+        captureSource={next.kind === "goal" ? undefined : next.source}
+        readOriginal={props.readOnboardingMatter}
+      />
       {next.status === "done" && (
         <>
           <output className={v2.small}>{t("已记好", "Saved")}</output>
