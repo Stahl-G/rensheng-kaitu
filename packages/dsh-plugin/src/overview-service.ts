@@ -129,6 +129,7 @@ import {
   readOnboardingMatter,
   readOverviewPage,
   readPhoto,
+  readPlanningGoals,
   readProjectArchitecture,
   readProjectPage,
   readProjectsPage,
@@ -1039,6 +1040,11 @@ export class KaituOverviewService extends TypertRemoteService {
   }
 
   /** 返回当前工作区的计划、历史、项目与带记录覆盖信息的指标。 */
+  @Remote("planningGoals")
+  async planningGoals(): Promise<{ root: string; goals: import("@kaitu/core").PlanGoal[] }> {
+    return readPlanningGoals(this.workspace);
+  }
+
   @Remote("overview")
   async overview(): Promise<OverviewData> {
     return readOverviewPage(this.workspace);

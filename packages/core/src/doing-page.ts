@@ -89,15 +89,19 @@ function topics(ws: Workspace, dir: string) {
     });
 }
 
+export function readDecisionTopics(ws: Workspace): DoingDecision[] {
+  return topics(ws, "decisions").map(({ file, title, status, due, error }) => ({
+    file,
+    title,
+    status,
+    due,
+    ...(error ? { error } : {}),
+  }));
+}
+
 export function readDoing(ws: Workspace): DoingData {
   return {
-    decisions: topics(ws, "decisions").map(({ file, title, status, due, error }) => ({
-      file,
-      title,
-      status,
-      due,
-      ...(error ? { error } : {}),
-    })),
+    decisions: readDecisionTopics(ws),
     learning: topics(ws, "learning").map(({ file, title, progress, next, error }) => ({
       ...(error ? { error } : {}),
       file,

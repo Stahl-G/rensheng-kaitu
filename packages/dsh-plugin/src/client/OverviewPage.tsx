@@ -70,6 +70,7 @@ export interface OverviewPageProps
     LibraryProps,
     Partial<LifeAtlasPageProps> {
   /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
+  loadPlanningGoals?: () => Promise<{ root: string; goals: import("@kaitu/core").PlanGoal[] }>;
   loadDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
   generateDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
   dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
@@ -682,6 +683,12 @@ function Overview({
     overviewReads.current?.invalidate();
     return refresh();
   }, [refresh]);
+  // The standalone direction board only shows planning and profile data. On leaving it,
+  // or when the workspace changes, refresh the full overview before reusing its other sections.
+  const planningRoot =
+    view === "explore" && explore === "directions" && !guideVisible && props.loadPlanningGoals
+      ? workspaceRoot
+      : undefined;
   useLayoutEffect(() => {
     if (!locale) return;
     const reads = createOverviewRefresh(async (current) => {
@@ -694,6 +701,24 @@ function Overview({
           if (current()) setError(err instanceof Error ? err.message : String(err));
         }
       };
+      if (planningRoot && props.loadPlanningGoals) {
+        try {
+          const board = await props.loadPlanningGoals();
+          if (!current()) return;
+          if (board.root === planningRoot) {
+            setData((previous) =>
+              previous?.root === board.root
+                ? { ...previous, plans: { ...previous.plans, goals: board.goals } }
+                : previous,
+            );
+            await update(props.loadMe, setPersonal);
+            return;
+          }
+        } catch {
+          // The full projection reports malformed rows or documents with its normal warnings.
+        }
+        if (!current()) return;
+      }
       await Promise.all([
         update(props.load, setData),
         update(props.loadCalendar, setCalendar),
@@ -715,7 +740,16 @@ function Overview({
       reads.invalidate();
       overviewReads.current = null;
     };
-  }, [locale, homeReady, props.load, props.loadCalendar, props.loadMe, props.loadOnboarding]);
+  }, [
+    locale,
+    homeReady,
+    planningRoot,
+    props.loadPlanningGoals,
+    props.load,
+    props.loadCalendar,
+    props.loadMe,
+    props.loadOnboarding,
+  ]);
   useEffect(
     () =>
       homeReady
