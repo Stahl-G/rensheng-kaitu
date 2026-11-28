@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { afterEach, expect, it } from "vitest";
-import { observePhoneConsumer, phoneConsumerStatus, selectPhoneConsumer } from "../src/organizer.js";
+import { afterEach, expect, it, vi } from "vitest";
+import { processInbox } from "../src/inbox.js";
+import {
+  observePhoneConsumer,
+  organizerStatus,
+  phoneConsumerStatus,
+  selectPhoneConsumer,
+  subscribeOrganizer,
+} from "../src/organizer.js";
 import { readOverviewPage } from "../src/overview-page.js";
 import { applyPhoneActions } from "../src/phone-actions.js";
 import { buildPhoneToday } from "../src/phone-projections.js";
@@ -11,11 +18,39 @@ const roots: string[] = [];
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
+it("reads a fresh workspace without taking ownership, then persists the ID when it processes an inbox file", async () => {
+  const ws = await clonedWorkspace();
+  roots.push(ws.root);
+  const stateFile = ".kaitu/organizer.json";
+  const before = vi.spyOn(ws, "writeJson");
+  const changed = vi.fn();
+  const unsubscribe = subscribeOrganizer(ws, changed);
+  try {
+    expect(ws.exists(stateFile)).toBe(false);
+    for (let i = 0; i < 2; i++) {
+      expect(phoneConsumerStatus(ws)).toEqual({ paused: false });
+      expect(organizerStatus(ws).consumer).toEqual({ paused: false });
+      expect(ws.exists(stateFile)).toBe(false);
+    }
+    expect(() => selectPhoneConsumer(ws, randomUUID())).toThrow("Unknown computer");
+    expect(before).not.toHaveBeenCalled();
+    expect(changed).not.toHaveBeenCalled();
+    ws.writeText("inbox/agents/synthetic-note.md", "# Synthetic test note");
+    expect((await processInbox(ws, { stableMs: 0 })).notes).toHaveLength(1);
+    const saved = ws.readJson<{ consumer: { deviceId: string } }>(stateFile);
+    expect(saved.consumer.deviceId).toMatch(/^[0-9a-f-]{36}$/);
+    before.mockClear();
+    expect(phoneConsumerStatus(ws)).toEqual({ ...saved.consumer, paused: false });
+    expect(phoneConsumerStatus(new Workspace(ws.root))).toEqual({ ...saved.consumer, paused: false });
+    expect(before).not.toHaveBeenCalled();
+  } finally {
+    unsubscribe();
+    before.mockRestore();
+  }
+});
 it("detects another pseudonymous consumer and pauses until a local choice without terminal receipts", async () => {
   const ws = await clonedWorkspace();
   roots.push(ws.root);
-  const local = phoneConsumerStatus(ws);
-  expect(phoneConsumerStatus(new Workspace(ws.root)).deviceId).toBe(local.deviceId);
   const snapshot = buildPhoneToday(await readOverviewPage(ws), new Date().toISOString(), ws);
   const other = randomUUID();
   ws.writeJson("phone/today.json", { ...snapshot, generator: { kind: "computer", device_id: other } });
@@ -24,7 +59,9 @@ it("detects another pseudonymous consumer and pauses until a local choice withou
   });
   expect(phoneConsumerStatus(ws)).toMatchObject({ paused: true, otherDeviceId: other });
   expect(ws.exists("phone/receipts.json")).toBe(false);
-  expect(selectPhoneConsumer(ws, other).paused).toBe(true);
+  const local = selectPhoneConsumer(ws, other);
+  expect(local.paused).toBe(true);
+  if (!local.deviceId) throw new Error("missing persisted device ID");
   expect(selectPhoneConsumer(new Workspace(ws.root), local.deviceId).paused).toBe(false);
   expect(phoneConsumerStatus(ws).paused).toBe(false);
   await applyPhoneActions(ws, "synthetic.actions.jsonl", "");
@@ -49,7 +86,7 @@ it("non-consumer organizer writes preserve another Workspace's latest pause and 
   const { organizerStatus, markOrganizerSeen, rememberComputerSnapshot, rememberOrganizer } = await import(
     "../src/organizer.js"
   );
-  const local = phoneConsumerStatus(ws);
+  const local = { deviceId: randomUUID() };
   ws.writeJson(
     ".kaitu/organizer.json",
     {

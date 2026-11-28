@@ -17,6 +17,7 @@ export function CloudOrganizer({
 }) {
   const t = useT();
   const status = data.organizer;
+  const consumer = status.consumer;
   const agent = status.agent;
   const away = status.away;
   const backup = data.backup.connection;
@@ -61,11 +62,11 @@ export function CloudOrganizer({
           </span>
         </span>
       </div>
-      {status.consumer?.otherDeviceId && (
+      {consumer?.otherDeviceId && (
         <div className={css.sum}>
           <b>{t("手机操作处理", "Phone action processing")}</b>
           <p>
-            {status.consumer.paused
+            {consumer.paused
               ? t("检测到另一台电脑，本机已暂停", "Another computer detected. Processing paused here.")
               : t("本机已允许处理", "Processing enabled here")}
           </p>
@@ -74,14 +75,14 @@ export function CloudOrganizer({
               <button
                 type="button"
                 className={css.btn}
-                onClick={() => void selectConsumer(status.consumer.deviceId)}
+                onClick={() => void selectConsumer(consumer.deviceId)}
               >
                 {t("由本机处理", "Process here")}
               </button>
               <button
                 type="button"
                 className={css.btn}
-                onClick={() => void selectConsumer(status.consumer.otherDeviceId as string)}
+                onClick={() => void selectConsumer(consumer.otherDeviceId as string)}
               >
                 {t("本机暂停，让另一台处理", "Pause here; use the other computer")}
               </button>

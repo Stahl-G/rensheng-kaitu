@@ -14,16 +14,15 @@ Windows 10 / 11 x64 的 EXE 使用同一份开图功能包，安装、构建与�
 
 ```sh
 pnpm build
-node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --dmg
+node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --dsh-root /path/to/deepseek-harness --dmg
 ```
 
-输入为官方 DSH **0.2.2-rc.4、arm64** 应用；脚本拒绝其他内核版本。后处理工具默认来自
-`~/Developer/deepseek-harness-0.2.2-rc.4` 已安装的依赖，另需 macOS 的 Xcode Command Line Tools。
+输入为官方 DSH **0.2.2-rc.4、arm64** 应用；脚本拒绝其他内核版本。用 `--dsh-root` 显式传入已装好依赖的 DSH 源码目录，源码和输入 App 的版本都必须匹配开图 CLI 锁定的 DSH 版本。另需 macOS 的 Xcode Command Line Tools。
 输入应用和 DSH 源码保持只读，输出为 `dist/Kaitu.app`、`dist/Kaitu.dmg`。
 省略 `--dmg` 只生成应用。未设置签名变量时使用 ad-hoc 签名。
 
 可用 `--output /你的目录/Kaitu.app` 更换输出位置，DMG 总是在同一目录；已有输出不会被覆盖。
-用 `--dsh-root /源码目录` 更换 DSH 工具来源。`--dry-run` 会列出操作步骤，并读取真实输入应用校验内核版本、主入口与 arm64 架构；不会复制、写入或签名，空 `.app` 目录不能通过校验。
+`--dry-run` 会列出操作步骤，并读取真实输入应用校验内核版本、主入口与 arm64 架构；不会复制、写入或签名，空 `.app` 目录不能通过校验。
 
 脚本替换名称、图标和菜单品牌，保留 DSH 内部协议版本；关于面板显示开图功能版本、离线随包的官方 Powered by DeepSeek Harness Badge，以及宿主实际 DSH 版本。
 插件与初始化器随应用打包，运行时不依赖本仓库。自动更新源、强制更新查询与 `dsh://` 注册会移除。
@@ -56,7 +55,7 @@ Mac 和 Windows 打包宿主默认嵌入 `packages/desktop/update-public-key.pem
 
 ```sh
 pnpm build
-node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
+node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --dsh-root /path/to/deepseek-harness \
   --payload-only dist/features-0.1.1 --payload-version 0.1.1
 node packages/desktop/package-update.mjs \
   --payload dist/features-0.1.1 --output dist/release-0.1.1 \
@@ -93,7 +92,7 @@ xcrun notarytool store-credentials kaitu-notary
 ```sh
 KAITU_SIGN_IDENTITY='Developer ID Application: 你的名称 (TEAMID)' \
 KAITU_NOTARY_PROFILE='kaitu-notary' \
-node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' \
+node packages/desktop/package-kaitu.mjs '/Applications/DeepSeek Harness.app' --dsh-root /path/to/deepseek-harness \
   --output dist/release/Kaitu.app --dmg
 ```
 

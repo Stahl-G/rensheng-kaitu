@@ -5,7 +5,12 @@ import { Worker } from "node:worker_threads";
 import { readExploration } from "./exploration.js";
 import { agentCanRead } from "./exposure.js";
 import { historyReadInputs } from "./history.js";
-import { computerPhoneGenerator, rememberComputerSnapshot, rememberOrganizer } from "./organizer.js";
+import {
+  computerPhoneGenerator,
+  ensurePhoneConsumer,
+  rememberComputerSnapshot,
+  rememberOrganizer,
+} from "./organizer.js";
 import { readOverviewPage } from "./overview-page.js";
 import { buildPhoneLibrary, buildPhoneMap, buildPhoneToday, buildPhoneWeek } from "./phone-projections.js";
 import { phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
@@ -144,6 +149,10 @@ export function publishPhoneSnapshots(
       prepared.daily ?? undefined,
       now,
     );
+  const publishingGenerator = generator ?? {
+    kind: "computer" as const,
+    device_id: ensurePhoneConsumer(ws).deviceId,
+  };
   let writes = 0;
   const cacheable = prepared.cacheable;
   const errors: Error[] = [];
@@ -151,7 +160,7 @@ export function publishPhoneSnapshots(
     const file = `phone/${name}.json`;
     try {
       if (!built) throw new Error(error);
-      const value = built;
+      const value = { ...built, generator: publishingGenerator };
       if (ws.exists(file)) {
         let previous: typeof value | undefined;
         try {
@@ -192,7 +201,7 @@ export function publishPhoneSnapshots(
         const value: Published = {
           resultContract: "single-line-v1",
           since: now.getTime(),
-          generator: JSON.stringify(generator ?? computerPhoneGenerator(ws)),
+          generator: JSON.stringify(publishingGenerator),
           outputs: [...prepared.snapshots.map((item) => item.name), "receipts"].map((name) => {
             const path = ws.resolve(`phone/${name}.json`);
             return [path, projectionFingerprint(path)];

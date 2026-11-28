@@ -16,7 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -35,7 +35,7 @@ const { values, positionals } = parseArgs({
     "dry-run": { type: "boolean", default: false },
     dmg: { type: "boolean", default: false },
     output: { type: "string" },
-    "dsh-root": { type: "string", default: join(homedir(), "Developer/deepseek-harness-0.2.2-rc.4") },
+    "dsh-root": { type: "string" },
     "update-config": { type: "string" },
     "update-public-key": { type: "string" },
     "payload-only": { type: "string" },
@@ -44,9 +44,27 @@ const { values, positionals } = parseArgs({
 });
 if (positionals.length !== 1) {
   throw new Error(
-    "用法：node packages/desktop/package-kaitu.mjs <DSH.app> [--output <Kaitu.app>] [--dmg] [--dry-run]",
+    "用法：node packages/desktop/package-kaitu.mjs <DSH.app> --dsh-root <DSH 源码目录> [--output <Kaitu.app>] [--dmg] [--dry-run]",
   );
 }
+const cli = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8"));
+const expectedDsh = cli.dependencies["@deepseek-ai/dsh"];
+if (!expectedDsh) throw new Error("packages/cli/package.json 缺少 @deepseek-ai/dsh 的固定版本");
+if (!values["dsh-root"]?.trim()) throw new Error(`请用 --dsh-root 指定 DSH ${expectedDsh} 的源码目录`);
+const dshRoot = resolve(values["dsh-root"]);
+const desktopManifest = join(dshRoot, "apps/desktop/package.json");
+let desktop;
+try {
+  desktop = JSON.parse(readFileSync(desktopManifest, "utf8"));
+} catch (cause) {
+  throw new Error(`--dsh-root 不是可读的 DSH 源码目录：${desktopManifest} 缺失或不是有效 JSON`, { cause });
+}
+if (desktop?.name !== "@deepseek-ai/dsh-desktop")
+  throw new Error(`--dsh-root 不是 DSH 桌面源码：${desktopManifest} 应为 @deepseek-ai/dsh-desktop`);
+if (desktop.version !== expectedDsh)
+  throw new Error(
+    `--dsh-root 的 DSH 版本不匹配：CLI 要求 ${expectedDsh}，源码为 ${desktop.version ?? "未知"}`,
+  );
 const source = resolve(positionals[0]);
 const output = resolve(values.output ?? join(root, "dist/Kaitu.app"));
 if (!source.endsWith(".app") || basename(output) !== "Kaitu.app")
@@ -63,8 +81,7 @@ if (identity && !identity.startsWith("Developer ID Application: "))
 if (notaryProfile && !identity) throw new Error("KAITU_NOTARY_PROFILE 需要同时设置 KAITU_SIGN_IDENTITY");
 const dmg = join(dirname(output), "Kaitu.dmg");
 if (values.dmg && existsSync(dmg)) throw new Error(`输出已存在，请另选目录：${dmg}`);
-const kaituVersion = JSON.parse(readFileSync(join(root, "packages/cli/package.json"), "utf8")).version;
-const version = kaituVersion;
+const version = cli.version;
 // Apple bundle fields use numeric versions; About and feature updates keep the full semver.
 const bundleVersion = version.split(/[-+]/, 1)[0];
 const bundleBuild = process.env.KAITU_BUNDLE_BUILD?.trim() || bundleVersion;
@@ -82,7 +99,7 @@ const updateConfig = values["payload-only"]
         (!values["update-config"] ? join(directory, "update-public-key.pem") : undefined),
     });
 const plan = [
-  `COPY ${source} → ${output}；校验 DSH 0.2.2-rc.4 / arm64 / 主入口`,
+  `COPY ${source} → ${output}；校验 DSH ${expectedDsh} / arm64 / 主入口`,
   `Info.plist: 人生开图 / ai.kaitu.app / ${bundleVersion} (build ${bundleBuild})；显示版本 ${version} / CFBundleExecutable=Kaitu / 图标与 ASAR 完整性`,
   "Frameworks: 按实际 helper 应用重命名 人生开图 Helper…、可执行文件与 plist，统一 ai.kaitu.app.helper… 标识",
   "app.asar: 替换桌面品牌与关于版本；加入独立 userData bootstrap，移除强更元数据与 dsh:// 协议",
@@ -114,10 +131,10 @@ const plan = [
 ];
 console.log(
   values["payload-only"]
-    ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 0.2.2-rc.4，不生成 App`
+    ? `构建开图功能包 ${payloadVersion} → ${resolve(values["payload-only"])}；DSH 固定 ${expectedDsh}，不生成 App`
     : plan.join("\n"),
 );
-const requireDsh = createRequire(join(resolve(values["dsh-root"]), "apps/desktop/package.json"));
+const requireDsh = createRequire(desktopManifest);
 const asarPath = requireDsh.resolve("@electron/asar", { paths: [requireDsh.resolve("app-builder-lib")] });
 const asar = requireDsh(asarPath);
 const writePayload = (payload) =>
@@ -132,7 +149,8 @@ const writePayload = (payload) =>
 const archive = join(source, "Contents/Resources/app.asar");
 const manifest = JSON.parse(asar.extractFile(archive, "package.json").toString());
 const dshVersion = manifest.version;
-if (dshVersion !== "0.2.2-rc.4") throw new Error(`仅支持 DSH 0.2.2-rc.4，输入为 ${dshVersion}`);
+if (dshVersion !== expectedDsh)
+  throw new Error(`输入 App 的 DSH 版本不匹配：CLI 要求 ${expectedDsh}，App 为 ${dshVersion}`);
 if (manifest.main !== "lib/main.js") throw new Error(`未知桌面入口：${manifest.main}`);
 const main = asar.extractFile(archive, manifest.main).toString();
 if (!main.includes("DeepSeek Harness")) throw new Error("找不到原生菜单品牌文案，拒绝静默跳过");
@@ -164,7 +182,7 @@ for (const path of asar.listPackage(archive)) {
     replacements += count;
   }
 }
-// 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求精确的 0.2.2-rc.4。
+// 保留 DSH 的版本：运行时描述符、Host 握手和 bundle 校验仍要求与 CLI 固定版本一致。
 // 开图版本只用于 Info.plist 和关于面板。
 const about = "applicationVersion: app.getVersion()";
 let brandedMain = withProductCopyright(changes.get("lib/main.js").toString());
@@ -386,7 +404,7 @@ async function signApplication(temporary) {
   const { signAsync } = requireDsh(
     requireDsh.resolve("@electron/osx-sign", { paths: [requireDsh.resolve("app-builder-lib")] }),
   );
-  const settings = join(resolve(values["dsh-root"]), "apps/desktop/scripts");
+  const settings = join(dshRoot, "apps/desktop/scripts");
   const calendarEntitlements = join(temporary, "calendar-entitlements.plist");
   writeFileSync(
     calendarEntitlements,
