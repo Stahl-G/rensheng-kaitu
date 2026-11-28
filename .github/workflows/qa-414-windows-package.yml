@@ -1,0 +1,110 @@
+name: QA 414 Windows install and start
+on:
+  push:
+    branches: [dot/qa-414-windows-install-10405]
+    paths: [.github/workflows/qa-414-windows-package.yml]
+permissions:
+  contents: read
+jobs:
+  package-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 20d09bb32f10d9c078c449a390d0f392dd501a81
+          path: kaitu
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: deepseek-ai/deepseek-harness
+          ref: 3f321d32bfe382212a8ed8785c1d47a5a300aa23
+          path: dsh
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify both exact inputs
+        run: |
+          if ((git -C kaitu rev-parse HEAD) -ne '20d09bb32f10d9c078c449a390d0f392dd501a81') { throw 'Not #414 exact head' }
+          if ((git -C dsh rev-parse HEAD) -ne '3f321d32bfe382212a8ed8785c1d47a5a300aa23') { throw 'Not DSH rc.4 pinned source' }
+      - name: Compile unsigned DSH directory
+        working-directory: dsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $tools = Join-Path $env:RUNNER_TEMP 'dsh-pnpm'
+          npm install --prefix "$tools" --no-audit --no-fund pnpm@11.28.5
+          $pnpm = Join-Path $tools 'node_modules/.bin/pnpm.cmd'
+          $env:Path = "$(Split-Path $pnpm);$env:Path"
+          & $pnpm install --frozen-lockfile
+          @(
+            'DSH_DESKTOP_APP_ID=com.deepseek.dsh',
+            'DSH_DESKTOP_AUTO_UPDATE_ENV=production',
+            'DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://download.deepseek.com'
+          ) | Set-Content -Encoding utf8 apps/desktop/.env.windows
+          & $pnpm --dir apps/desktop package:win:x64:dir --unsigned --check
+          & $pnpm --dir apps/desktop package:win:x64:dir --unsigned
+      - name: Create and verify unsigned NSIS candidate
+        working-directory: kaitu
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $upstream = Join-Path $env:GITHUB_WORKSPACE 'dsh/apps/desktop/.desktop-build/targets/win-x64'
+          $layouts = @(Get-ChildItem $upstream -Filter 'DeepSeek Harness.exe' -File -Recurse | Where-Object { Test-Path (Join-Path $_.DirectoryName 'resources/app.asar') } | Select-Object -ExpandProperty DirectoryName -Unique)
+          if ($layouts.Count -ne 1) { throw "Expected one upstream app layout; found $($layouts.Count)" }
+          $tools = Join-Path $env:RUNNER_TEMP 'kaitu-pnpm'
+          npm install --prefix "$tools" --no-audit --no-fund pnpm@11.22.0
+          $pnpm = Join-Path $tools 'node_modules/.bin/pnpm.cmd'
+          $env:Path = "$(Split-Path $pnpm);$env:Path"
+          & $pnpm install --frozen-lockfile
+          & $pnpm build
+          npm install --prefix .kaitu/windows-tools --no-audit --no-fund electron-builder@26.17.0 sharp@0.35.5 @electron/asar@3.4.1 rcedit@4.0.1 7zip-bin@5.2.0
+          node packages/desktop/package-windows.mjs "$($layouts[0])" --output dist/windows
+          $exe = Get-Item 'dist/windows/Kaitu-Setup-0.1.4-x64.exe'
+          $hostExe = Get-Item 'dist/windows/win-unpacked/Kaitu.exe'
+          $metadata = Get-Content -Raw dist/windows/build.json | ConvertFrom-Json
+          if ($exe.Length -le 1000000 -or $hostExe.VersionInfo.ProductVersion -ne '0.1.4' -or $metadata.version -ne '0.1.4' -or $metadata.dshVersion -ne '0.2.2-rc.4' -or $metadata.arch -ne 'x64' -or $metadata.signed) { throw 'Unexpected Windows build output' }
+          & .kaitu/windows-tools/node_modules/7zip-bin/win/x64/7za.exe t "$($exe.FullName)"
+          Get-Content dist/windows/build.json
+          Get-FileHash -Algorithm SHA256 "$($exe.FullName)"
+          # Keep only CI logs. No binary upload, no signing, no Release.
+      - name: Install and verify fresh Windows launch
+        working-directory: kaitu
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $r = Join-Path $env:RUNNER_TEMP 'kaitu-414'
+          $install = Join-Path $r 'installed'
+          $env:HOME = Join-Path $r 'home'
+          $env:USERPROFILE = $env:HOME
+          $env:LOCALAPPDATA = Join-Path $env:HOME 'AppData/Local'
+          $env:APPDATA = Join-Path $env:HOME 'AppData/Roaming'
+          $env:DSH_HOME = Join-Path $env:HOME 'dsh'
+          $env:DSH_AGENTS_HOME = Join-Path $env:HOME 'agents'
+          $env:KAITU_APP_HOME = Join-Path $r 'state'
+          $env:KAITU_DIR = Join-Path $r 'workspace'
+          $env:KAITU_LOCAL_STATE_DIR = Join-Path $env:HOME 'local-state'
+          $env:KAITU_APP_PORT = '0'
+          $env:KAITU_HOST_RESOURCES = $null
+          New-Item -ItemType Directory -Force -Path $r,$env:LOCALAPPDATA,$env:APPDATA,$env:DSH_AGENTS_HOME | Out-Null
+          $setup = (Get-Item dist/windows/Kaitu-Setup-0.1.4-x64.exe).FullName
+          $job = Start-Process -FilePath $setup -ArgumentList "/S /D=$install" -Wait -PassThru
+          if ($job.ExitCode -ne 0) { throw "NSIS returned $($job.ExitCode)" }
+          $installed = Join-Path $install 'Kaitu.exe'
+          if (!(Test-Path $installed -PathType Leaf)) { throw 'Expected installed Kaitu executable missing' }
+          if ((Get-Item $installed).VersionInfo.ProductVersion -ne '0.1.4') { throw 'Installed version mismatch' }
+          $log = Join-Path $env:KAITU_APP_HOME 'logs/startup.log'
+          $running = Start-Process -FilePath $installed -PassThru
+          try {
+            $until = [DateTime]::UtcNow.AddSeconds(60)
+            do {
+              Start-Sleep -Milliseconds 500
+              $running.Refresh()
+            } until ($running.HasExited -or ($running.MainWindowHandle -ne 0 -and (Test-Path $log)) -or [DateTime]::UtcNow -ge $until)
+            if ($running.HasExited -or $running.MainWindowHandle -eq 0 -or !(Test-Path $log)) { throw 'Installed app did not reach a visible first-run window' }
+            if (Test-Path (Join-Path $env:KAITU_DIR 'USER.md')) { throw 'Workspace was written before privacy acknowledgement' }
+            Write-Output 'Exact-build NSIS install and visible first-run window passed; no privacy acceptance or application flow attempted.'
+          } finally {
+            if (!$running.HasExited) {
+              [void]$running.CloseMainWindow()
+              if (!$running.WaitForExit(5000)) { Stop-Process -Id $running.Id -Force }
+            }
+          }
