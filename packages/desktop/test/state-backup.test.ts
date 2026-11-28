@@ -15,7 +15,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import {
   assertScheduleCompatible,
   backupStateRoot,
@@ -23,6 +23,35 @@ import {
   restoreDshState,
   stateInventory,
 } from "../state-backup.mjs";
+
+const telemetry = vi.hoisted(() => ({
+  active: false,
+  start: 0,
+  spans: [] as { stage: string; atMs: number; durationMs?: number }[],
+}));
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...actual,
+    execFileSync: (...args: unknown[]) => {
+      const began = performance.now();
+      try {
+        return Reflect.apply(actual.execFileSync, undefined, args);
+      } finally {
+        if (telemetry.active && (args[0] === "powershell.exe" || args[0] === "/bin/ps")) {
+          telemetry.spans.push({
+            stage: "enumerate-hosts",
+            atMs: Math.round(began - telemetry.start),
+            durationMs: Math.round(performance.now() - began),
+          });
+        }
+      }
+    },
+  };
+});
+function stage(name: string) {
+  telemetry.spans.push({ stage: name, atMs: Math.round(performance.now() - telemetry.start) });
+}
 
 const roots: string[] = [];
 afterEach(() => {
@@ -54,29 +83,45 @@ function fixture() {
 }
 
 it("backs up the complete old state once, before writes, and restores into a verified fresh directory", () => {
-  const { root, state } = fixture();
-  if (process.platform !== "win32") symlinkSync("../sessions", join(state, "unknown/link"));
-  const before = stateInventory(state);
-  const backup = prepareDshState(state, "0.2.2-rc.1");
-  expect(stateInventory(join(backup, "state"))).toEqual(before);
-  writeFileSync(
-    join(state, "storages/schedule.json"),
-    JSON.stringify({ unit: { name: "schedule", version: 2 }, global: null, tables: { tasks: {} } }),
-  );
-  expect(prepareDshState(state, "0.2.2-rc.1")).toBe(backup);
-  expect(prepareDshState(state, "0.2.2-rc.4")).toBe(backup);
-  expect(backupStateRoot(join(state, "ai"), state)).toBe(state);
-  expect(() => backupStateRoot(join(root, "unrelated"), state)).toThrow();
-  expect(prepareDshState(backupStateRoot(join(state, "ai"), state), "0.2.2-rc.1")).toBe(backup);
-  const restored = restoreDshState(backup, join(root, "restored"));
-  expect(stateInventory(restored)).toEqual(before);
-  expect(() => assertScheduleCompatible(restored, "0.2.1-rc.3")).not.toThrow();
-  expect(() => assertScheduleCompatible(state, "0.2.1-rc.3")).toThrow();
-  expect(() => restoreDshState(backup, state)).toThrow();
-  writeFileSync(join(backup, "state/unknown/future.bin"), "tampered");
-  expect(() => restoreDshState(backup, join(root, "broken-restore"))).toThrow();
-  expect(() => prepareDshState(state, "0.2.2-rc.1")).toThrow();
-  expect(existsSync(join(root, "broken-restore"))).toBe(false);
+  telemetry.start = performance.now();
+  telemetry.active = true;
+  telemetry.spans.length = 0;
+  try {
+    const { root, state } = fixture();
+    if (process.platform !== "win32") symlinkSync("../sessions", join(state, "unknown/link"));
+    const before = stateInventory(state);
+    const backup = prepareDshState(state, "0.2.2-rc.1", {
+      progress: ({ phase }) => {
+        if (phase !== "copy") stage(phase);
+      },
+    });
+    stage("prepared");
+    expect(stateInventory(join(backup, "state"))).toEqual(before);
+    writeFileSync(
+      join(state, "storages/schedule.json"),
+      JSON.stringify({ unit: { name: "schedule", version: 2 }, global: null, tables: { tasks: {} } }),
+    );
+    expect(prepareDshState(state, "0.2.2-rc.1")).toBe(backup);
+    expect(prepareDshState(state, "0.2.2-rc.4")).toBe(backup);
+    expect(backupStateRoot(join(state, "ai"), state)).toBe(state);
+    expect(() => backupStateRoot(join(root, "unrelated"), state)).toThrow();
+    expect(prepareDshState(backupStateRoot(join(state, "ai"), state), "0.2.2-rc.1")).toBe(backup);
+    stage("restore-begin");
+    const restored = restoreDshState(backup, join(root, "restored"));
+    stage("restore-end");
+    expect(stateInventory(restored)).toEqual(before);
+    expect(() => assertScheduleCompatible(restored, "0.2.1-rc.3")).not.toThrow();
+    expect(() => assertScheduleCompatible(state, "0.2.1-rc.3")).toThrow();
+    expect(() => restoreDshState(backup, state)).toThrow();
+    writeFileSync(join(backup, "state/unknown/future.bin"), "tampered");
+    expect(() => restoreDshState(backup, join(root, "broken-restore"))).toThrow();
+    expect(() => prepareDshState(state, "0.2.2-rc.1")).toThrow();
+    expect(existsSync(join(root, "broken-restore"))).toBe(false);
+  } finally {
+    stage("end");
+    telemetry.active = false;
+    console.error("Synthetic backup timing:", JSON.stringify(telemetry.spans));
+  }
 });
 
 it("refuses v2 without an older backup, malformed state and incomplete backup receipts without modifying the source", () => {
