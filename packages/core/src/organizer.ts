@@ -67,28 +67,38 @@ export function organizerStatus(ws: Workspace): OrganizerStatus {
     daily: s.daily,
     away,
     unread: !!away && !away.seen,
-    consumer: phoneConsumerStatus(ws),
+    consumer: consumerStatus(s.consumer),
   };
 }
 
 const devicePattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Per-workspace pseudonymous identity, not an ownership lock or action ledger. */
+type ConsumerStatus =
+  | { paused: false; deviceId?: never; otherDeviceId?: never; selectedDeviceId?: never }
+  | (NonNullable<OrganizerState["consumer"]> & { paused: boolean });
+
+function consumerStatus(c: OrganizerState["consumer"]): ConsumerStatus {
+  if (!c) return { paused: false };
+  return { ...c, paused: c.selectedDeviceId ? c.selectedDeviceId !== c.deviceId : !!c.otherDeviceId };
+}
 export function phoneConsumerStatus(ws: Workspace) {
+  return consumerStatus(state(ws).consumer);
+}
+/** Persist the workspace's pseudonymous identity only when acting for this computer. */
+export function ensurePhoneConsumer(ws: Workspace) {
   const s = state(ws);
   if (!s.consumer) {
     s.consumer = { deviceId: randomUUID() };
     store(ws, s);
   }
-  const c = s.consumer;
-  return { ...c, paused: c.selectedDeviceId ? c.selectedDeviceId !== c.deviceId : !!c.otherDeviceId };
+  return s.consumer;
 }
 export function selectPhoneConsumer(ws: Workspace, deviceId: string) {
-  const c = phoneConsumerStatus(ws);
-  if (deviceId !== c.deviceId && deviceId !== c.otherDeviceId) throw new Error("Unknown computer");
   const s = state(ws);
-  s.consumer = { deviceId: c.deviceId, otherDeviceId: c.otherDeviceId, selectedDeviceId: deviceId };
+  const c = s.consumer;
+  if (!c || (deviceId !== c.deviceId && deviceId !== c.otherDeviceId)) throw new Error("Unknown computer");
+  s.consumer = { ...c, selectedDeviceId: deviceId };
   store(ws, s);
-  return phoneConsumerStatus(ws);
+  return consumerStatus(s.consumer);
 }
 export function observePhoneConsumer(ws: Workspace, today?: string) {
   if (!today) return;
@@ -103,10 +113,10 @@ export function observePhoneConsumer(ws: Workspace, today?: string) {
   if (generator?.kind !== "computer") return;
   const id = generator.device_id;
   if (typeof id !== "string" || !devicePattern.test(id)) return;
-  const c = phoneConsumerStatus(ws);
-  if (id === c.deviceId || id === c.otherDeviceId) return;
   const s = state(ws);
-  s.consumer = { deviceId: c.deviceId, otherDeviceId: id };
+  const c = s.consumer;
+  if (id === c?.deviceId || id === c?.otherDeviceId) return;
+  s.consumer = { deviceId: c?.deviceId ?? randomUUID(), otherDeviceId: id };
   store(ws, s);
 }
 export function computerPhoneGenerator(ws: Workspace) {

@@ -11,13 +11,14 @@ it("desktop transports select only a known local consumer and preserve the setti
   const ws = await clonedWorkspace();
   const ctx = new Context();
   try {
-    const local = phoneConsumerStatus(ws);
     const other = randomUUID();
     const snapshot = buildPhoneToday(await readOverviewPage(ws), new Date().toISOString(), ws);
     observePhoneConsumer(
       ws,
       JSON.stringify({ ...snapshot, generator: { kind: "computer", device_id: other } }),
     );
+    const local = phoneConsumerStatus(ws);
+    if (!local.deviceId) throw new Error("missing persisted device ID");
     const service = new KaituOverviewService(ctx, { workspace: ws.root });
     expect((await service.organizerSeen()).consumer.paused).toBe(true);
     expect(await productRequest(ws, "selectPhoneConsumer", [local.deviceId])).toMatchObject({

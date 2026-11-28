@@ -25,7 +25,7 @@ import { importBatch } from "./importers/batch.js";
 import { INBOX_FORMATS } from "./inbox-formats.js";
 import { availableInboxPath, findInboxNote, moveInboxFile, noteAgent, noteMetadata } from "./inbox-notes.js";
 import { type MemoryInput, importMemories, memoryInput, memoryType, normalizedMemory } from "./memory.js";
-import { observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
+import { ensurePhoneConsumer, observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
 import { applyPhoneActions, phoneInboxName } from "./phone-actions.js";
 import { writePhoneReceipts } from "./phone-receipts.js";
 import { type ExperienceInput, addExperiences } from "./places.js";
@@ -658,5 +658,6 @@ export async function processInbox(ws: Workspace, options: { stableMs?: number }
   } finally {
     closeSync(fd);
     rmSync(lock, { force: true });
+    if (result.processed.length || result.notes.length) ensurePhoneConsumer(ws);
   }
 }

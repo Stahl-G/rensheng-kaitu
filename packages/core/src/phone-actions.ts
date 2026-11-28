@@ -13,7 +13,7 @@ import {
   normalizedMemory,
   replaceMemory,
 } from "./memory.js";
-import { observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
+import { ensurePhoneConsumer, observePhoneConsumer, phoneConsumerStatus } from "./organizer.js";
 import { type PhoneReceipt, phoneReceipts, writePhoneReceipts } from "./phone-receipts.js";
 import { commitRecordTransaction } from "./record-transaction.js";
 import { type StoredRecord, readRecords } from "./records.js";
@@ -424,4 +424,5 @@ export async function applyPhoneActions(ws: Workspace, file: string, text: strin
   }
   ws.writeJson(ledgerFile, seen, { internal: true });
   writePhoneReceipts(ws, receipts);
+  if (receipts.length) ensurePhoneConsumer(ws);
 }
