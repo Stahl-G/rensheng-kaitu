@@ -1,5 +1,5 @@
 import { isAbsolute } from "node:path";
-import { readDoing } from "./doing-page.js";
+import { readDecisionTopics } from "./doing-page.js";
 import { KaituError, type ReadWarning, readIssue, readWarning } from "./errors.js";
 import { type ExperienceSource, readSourceContent } from "./experience-source.js";
 import { explorationCommandSchema } from "./exploration-contract.js";
@@ -361,8 +361,8 @@ export function readExploration(ws: Workspace, options: { partial?: boolean } = 
   return {
     references: {
       projects: projects.filter((project) => !project.error).map((p) => ({ id: p.slug, title: p.title })),
-      decisions: readDoing(ws)
-        .decisions.map((d) => ({ path: d.file.replace(/STATUS\.md$/, "decision.md"), title: d.title }))
+      decisions: readDecisionTopics(ws)
+        .map((d) => ({ path: d.file.replace(/STATUS\.md$/, "decision.md"), title: d.title }))
         .filter((d) => ws.exists(d.path)),
     },
     ...(uniqueWarnings.length ? { warnings: uniqueWarnings } : {}),

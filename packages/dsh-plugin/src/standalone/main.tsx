@@ -161,6 +161,7 @@ const props: OverviewPageProps = {
   loadLifeAtlasProgress: () => call("lifeAtlasProgress"),
   generateLifeAtlas: (input) => call("lifeAtlasGenerate", input),
   changeLifeAtlas: (id, action) => call("lifeAtlasChange", id, action),
+  loadPlanningGoals: () => call("planningGoals"),
   loadDirectionMap: (locale) => call("directionMap", locale),
   generateDirectionMap: (locale) => call("directionMapGenerate", locale),
   dismissDirectionLink: (goal, project) => call("directionMapDismiss", goal, project),

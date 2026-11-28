@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { KaituError } from "./errors.js";
 import { isCaptureSource } from "./inbox-notes.js";
-import { type ResultRow, taskResult } from "./results.js";
+import { listRecordTypes } from "./modules.js";
+import { readRecords } from "./records.js";
+import { type ResultRow, collectResults, taskResult } from "./results.js";
 import { schemas } from "./schema.js";
 import type { Task } from "./tasks.js";
 import type { Goal, WorkbenchData } from "./workbench.js";
@@ -192,4 +194,16 @@ export function readPlans(
     projects: data.projects.filter((project) => project.stage === "active").length,
     directions: (data.records.direction ?? []).filter((row) => row.status === "active").length,
   };
+}
+
+/** Same goal cards as the overview, without reading unrelated health, notes or calendar data. */
+export function readPlanningGoals(ws: Workspace): { root: string; goals: PlanGoal[] } {
+  const types = listRecordTypes(ws);
+  const records: WorkbenchData["records"] = types.some((item) => item.type === "task")
+    ? { task: readRecords(ws, "task", {}, types) }
+    : {};
+  const goals = ws.exists("me/goals.json") ? ws.readJson<Goal[]>("me/goals.json") : [];
+  // Only task results can belong to a goal. The same revision history decides which ones count.
+  const results = collectResults(ws, { records, statuses: [] });
+  return { root: ws.root, goals: readPlans({ goals, records, projects: [] }, results).goals };
 }
