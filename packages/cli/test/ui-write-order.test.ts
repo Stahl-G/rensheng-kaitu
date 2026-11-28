@@ -18,7 +18,7 @@ import {
   snapshotNow,
   workspaceBackupStatus,
 } from "@kaitu/core";
-import { afterEach, expect, it, vi } from "vitest";
+import { type TestContext, expect, it, vi } from "vitest";
 import { fetchCalendar } from "../../core/src/calendar-fetch.js";
 import type { AskService } from "../src/ui/ask.js";
 import { startUi } from "../src/ui/server.js";
@@ -29,41 +29,73 @@ vi.mock("@kaitu/core", async (original) => {
   const core = await original<typeof import("@kaitu/core")>();
   return { ...core, snapshotNow: vi.fn(core.snapshotNow) };
 });
-const cleanup: (() => Promise<unknown>)[] = [];
-const beforeClose: (() => void)[] = [];
-afterEach(async () => {
-  const errors: unknown[] = [];
-  try {
-    // Vitest timeout does not unwind a test suspended on a promise.
-    for (const release of beforeClose.splice(0).reverse()) {
+// Vitest does not unwind a suspended test on timeout. Keep its cleanup and
+// gates with that test, not in arrays that the following test can inherit.
+function lifetime({ signal, onTestFinished }: TestContext) {
+  const cleanup: (() => Promise<unknown>)[] = [];
+  const beforeClose: (() => void)[] = [];
+  onTestFinished(async () => {
+    const errors: unknown[] = [];
+    for (const release of beforeClose.reverse()) {
       try {
         release();
       } catch (error) {
         errors.push(error);
       }
     }
-  } finally {
     vi.restoreAllMocks();
     vi.resetAllMocks();
+    for (const close of cleanup.reverse()) {
+      try {
+        await close();
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, "UI cleanup failed");
+  });
+  // Join startup even if it finishes after the test deadline. Its resources
+  // must close before the synthetic workspace is removed; its body must stop.
+  async function acquire<T>(pending: Promise<T>, close?: (resource: T) => Promise<unknown>) {
+    cleanup.push(() =>
+      pending.then(
+        (resource) => close?.(resource),
+        () => undefined,
+      ),
+    );
+    const resource = await pending;
+    signal.throwIfAborted();
+    return resource;
   }
-  for (const close of cleanup.splice(0).reverse()) {
+  function open(...args: Parameters<typeof startUi>) {
+    signal.throwIfAborted();
+    return acquire(startUi(...args), (ui) => ui.close());
+  }
+  async function wait(pending: Promise<void>) {
+    signal.throwIfAborted();
+    const cancelled = gate<void>();
+    const abort = () => cancelled.resolve();
+    signal.addEventListener("abort", abort, { once: true });
     try {
-      await close();
-    } catch (error) {
-      errors.push(error);
+      await Promise.race([pending, cancelled.promise]);
+      signal.throwIfAborted();
+    } finally {
+      signal.removeEventListener("abort", abort);
     }
   }
-  if (errors.length === 1) throw errors[0];
-  if (errors.length > 1) throw new AggregateError(errors, "UI cleanup failed");
-});
+  return { signal, cleanup, beforeClose, acquire, open, wait };
+}
 
-it("同时保存的原文都进入真实版本，搬往同步目录期间的写入排在搬迁后", async () => {
+it("同时保存的原文都进入真实版本，搬往同步目录期间的写入排在搬迁后", async (context) => {
+  const scope = lifetime(context);
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-snapshot-move-"));
-  cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
-  const ws = await initWorkspace(join(root, "source"));
+  scope.cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
+  const ws = await scope.acquire(initWorkspace(join(root, "source")));
   const snapshots: Promise<string | null>[] = [];
   let snapshotStarted = gate<void>();
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
+  scope.signal.throwIfAborted();
   vi.mocked(snapshotNow).mockImplementation((...args) => {
     const result = original.snapshotNow(...args);
     if (args[0] === ws) {
@@ -74,7 +106,8 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   });
   const entered = gate<void>();
   const resume = gate<void>();
-  const ui = await startUi(ws, {
+  scope.beforeClose.push(resume.resolve);
+  const ui = await scope.open(ws, {
     port: 0,
     open: false,
     versionDelayMs: 20,
@@ -84,13 +117,14 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
       await resume.promise;
     },
   });
-  cleanup.push(ui.close);
-  const post = (method: string, args: unknown[]) =>
-    fetch(`${ui.url}/api/product/${method}`, {
+  const post = (method: string, args: unknown[]) => {
+    scope.signal.throwIfAborted();
+    return fetch(`${ui.url}/api/product/${method}`, {
       method: "POST",
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(args),
     });
+  };
   const originals = new Map<string, string>();
   const captures = await Promise.all(
     Array.from({ length: 12 }, async (_, i) => {
@@ -108,7 +142,7 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   for (let index = 0; !version; index++) {
     if (index === snapshots.length) {
       snapshotStarted = gate<void>();
-      await snapshotStarted.promise;
+      await scope.wait(snapshotStarted.promise);
     }
     const oid = await snapshots[index];
     if (!oid) continue;
@@ -134,7 +168,7 @@ it("同时保存的原文都进入真实版本，搬往同步目录期间的写�
   expect(originals.size).toBe(12);
   const target = join(root, "sync");
   const moving = post("moveStorage", [target, true, "nutstore"]);
-  await entered.promise;
+  await scope.wait(entered.promise);
   let saved = false;
   const saving = post("capture", ["合成搬迁期间原文"]).then((response) => {
     saved = true;
@@ -169,26 +203,39 @@ function gate<T>() {
     resolve: (value: T) => resolve(value),
   };
 }
-async function setup(ask?: AskService, prepare?: (ws: Workspace) => Promise<void>) {
+async function setup(
+  scope: ReturnType<typeof lifetime>,
+  ask?: AskService,
+  prepare?: (ws: Workspace) => Promise<void>,
+) {
   const root = mkdtempSync(join(tmpdir(), "kaitu-ui-order-"));
-  cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
-  const ws = await initWorkspace(root);
-  const task = await addTask(ws, { title: "合成任务" });
-  const other = await addTask(ws, { title: "合成待取消" });
-  await prepare?.(ws);
-  const before = (await history(ws))[0]?.oid;
-  const ui = await startUi(ws, { port: 0, open: false, ask, versionDelayMs: 20, snapshotDelayMs: 20 });
-  cleanup.push(ui.close);
-  const post = (path: string, data: unknown) =>
-    fetch(`${ui.url}/api/${path}`, {
+  scope.cleanup.push(async () => rmSync(root, { recursive: true, force: true }));
+  const { ws, task, other, before } = await scope.acquire(
+    (async () => {
+      const ws = await initWorkspace(root);
+      const task = await addTask(ws, { title: "合成任务" });
+      const other = await addTask(ws, { title: "合成待取消" });
+      scope.signal.throwIfAborted();
+      await prepare?.(ws);
+      const before = (await history(ws))[0]?.oid;
+      return { ws, task, other, before };
+    })(),
+  );
+  const ui = await scope.open(ws, { port: 0, open: false, ask, versionDelayMs: 20, snapshotDelayMs: 20 });
+  const post = (path: string, data: unknown) => {
+    scope.signal.throwIfAborted();
+    return fetch(`${ui.url}/api/${path}`, {
       method: "POST",
       headers: { "X-Kaitu": "1", Origin: ui.url },
       body: JSON.stringify(data),
     });
+  };
   return { ws, task, other, before, post };
 }
 
-it("日历网络未返回时任务可完成和存版本，恢复后不应用旧拉取", async ({ signal }) => {
+it("日历网络未返回时任务可完成和存版本，恢复后不应用旧拉取", async (context) => {
+  const scope = lifetime(context);
+  const { signal } = scope;
   const fetched = gate<Buffer>();
   const started = gate<void>();
   vi.mocked(fetchCalendar).mockImplementation(() => {
@@ -203,15 +250,12 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
         `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:old-fetch\r\nDTSTART:${day}T120000Z\r\nDTEND:${day}T130000Z\r\nSUMMARY:Synthetic\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`,
       ),
     );
-  beforeClose.push(release);
+  scope.beforeClose.push(release);
   const snapshots: Promise<string | null>[] = [];
   let snapshotStarted = gate<void>();
-  const abortObservation = () => snapshotStarted.resolve();
-  signal.addEventListener("abort", abortObservation, { once: true });
-  beforeClose.push(() => signal.removeEventListener("abort", abortObservation));
   const original = await vi.importActual<typeof import("@kaitu/core")>("@kaitu/core");
   // Observe original background promises before startUi can begin saving.
-  const { ws, task, before, post } = await setup(undefined, async (workspace) => {
+  const { ws, task, before, post } = await setup(scope, undefined, async (workspace) => {
     vi.mocked(snapshotNow).mockImplementation((...args) => {
       const result = original.snapshotNow(...args);
       if (args[0] === workspace) {
@@ -224,8 +268,7 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
   signal.throwIfAborted();
   const calendar = post("product/addCalendarSubscription", ["https://calendar.example/test.ics", "测试"]);
   try {
-    await started.promise;
-    signal.throwIfAborted();
+    await scope.wait(started.promise);
     // 不释放网络 gate：旧的全局队列在这里无法完成。
     const done = await post("tasks/done", { id: task.record.id });
     signal.throwIfAborted();
@@ -238,8 +281,7 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
       signal.throwIfAborted();
       if (index === snapshots.length) {
         snapshotStarted = gate<void>();
-        await snapshotStarted.promise;
-        signal.throwIfAborted();
+        await scope.wait(snapshotStarted.promise);
       }
       let oid = await snapshots[index];
       signal.throwIfAborted();
@@ -268,7 +310,8 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
   expect(listTasks(ws, { status: "all" }).find((row) => row.id === task.record.id)?.status).toBe("open");
 });
 
-it("恢复期间的旧接口和产品接口写入排在恢复后，不被覆盖", async () => {
+it("恢复期间的旧接口和产品接口写入排在恢复后，不被覆盖", async (context) => {
+  const scope = lifetime(context);
   const entered = gate<void>();
   const resume = gate<void>();
   const ask = {
@@ -279,9 +322,10 @@ it("恢复期间的旧接口和产品接口写入排在恢复后，不被覆盖"
     relocate: () => {},
     close: async () => {},
   } as unknown as AskService;
-  const { ws, task, other, before, post } = await setup(ask);
+  scope.beforeClose.push(resume.resolve);
+  const { ws, task, other, before, post } = await setup(scope, ask);
   const restoring = post("product/restoreVersion", [before]);
-  await entered.promise;
+  await scope.wait(entered.promise);
   let writesDone = false;
   const writes = Promise.all([
     post("tasks/done", { id: task.record.id }),
@@ -306,11 +350,12 @@ it("恢复期间的旧接口和产品接口写入排在恢复后，不被覆盖"
   );
 });
 
-it.each(["projectBindGithub", "projectSync", "workspaceBackup"])(
+it.for(["projectBindGithub", "projectSync", "workspaceBackup"])(
   "%s 网络等待不挡任务，恢复丢弃迟到成功/失败，重试可读回",
-  async (method) => {
+  async (method, context) => {
+    const scope = lifetime(context);
     let slug = "";
-    const { ws, task, before, post } = await setup(undefined, async (ws) => {
+    const { ws, task, before, post } = await setup(scope, undefined, async (ws) => {
       ({ slug } = await createProject(ws, { title: "合成项目", kind: "personal" }));
       if (method === "projectSync") await setProject(ws, slug, { github: { repo: "Owner/demo" } });
     });
@@ -322,6 +367,7 @@ it.each(["projectBindGithub", "projectSync", "workspaceBackup"])(
           : [slug, "Owner/demo"];
     const originalFetch = globalThis.fetch;
     let waiting = gate<void>();
+    scope.beforeClose.push(() => waiting.resolve());
     let started = gate<void>();
     let fail = false;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -349,7 +395,7 @@ it.each(["projectBindGithub", "projectSync", "workspaceBackup"])(
       started = gate<void>();
       const pending = post(`product/${method}`, args);
       try {
-        await started.promise;
+        await scope.wait(started.promise);
         expect((await post("tasks/done", { id: task.record.id })).status).toBe(200);
         expect((await post("restore", { version: before })).status).toBe(200);
       } finally {
@@ -367,9 +413,11 @@ it.each(["projectBindGithub", "projectSync", "workspaceBackup"])(
   },
 );
 
-it("AI整理等待不挡任务，恢复后旧草稿不落盘，重试草稿可读回", async () => {
+it("AI整理等待不挡任务，恢复后旧草稿不落盘，重试草稿可读回", async (context) => {
+  const scope = lifetime(context);
   let source = "";
   const waiting = gate<void>();
+  scope.beforeClose.push(waiting.resolve);
   const started = gate<void>();
   let listener: (event: { type: string; data: Record<string, unknown> }) => void = () => {};
   const answer = { goal: "合成目标", current: "准备中", next: "完成合成第一步" };
@@ -400,12 +448,12 @@ it("AI整理等待不挡任务，恢复后旧草稿不落盘，重试草稿可�
     relocate: () => {},
     close: async () => {},
   } as unknown as AskService;
-  const { ws, task, before, post } = await setup(ask, async (ws) => {
+  const { ws, task, before, post } = await setup(scope, ask, async (ws) => {
     source = (await saveOnboardingMatter(ws, "合成原文")).source;
   });
   const pending = post("product/onboardingMatterOrganize", [source]);
   try {
-    await started.promise;
+    await scope.wait(started.promise);
     expect((await post("tasks/done", { id: task.record.id })).status).toBe(200);
     expect((await post("restore", { version: before })).status).toBe(200);
   } finally {
