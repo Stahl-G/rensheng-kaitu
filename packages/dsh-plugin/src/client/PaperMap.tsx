@@ -58,7 +58,7 @@ export function PaperMap({
   const t = useT();
   const [mode, setMode] = useState<FootprintState>(options?.offline ? "history" : "now");
   const [ready, setReady] = useState(false);
-  const [detailStatus, setDetailStatus] = useState<"loading" | "offline" | "unavailable" | null>(null);
+  const [detailStatus, setDetailStatus] = useState<"offline" | "unavailable" | null>(null);
   const [cityZoom, setCityZoom] = useState(false);
   const [failure, setFailure] = useState(false);
   const container = useRef<HTMLDivElement>(null);
@@ -262,7 +262,7 @@ export function PaperMap({
     let styleGeneration = 0;
     let remoteAttempted = false;
     let remoteLoaded = false;
-    let detailSource: string | undefined;
+    const detailSource = "paper-water-detail";
     let attributionInitialized = false;
     let m: LibreMap | undefined;
     let remoteStyle: StyleSpecification | undefined;
@@ -274,29 +274,29 @@ export function PaperMap({
       controller?.abort();
       controller = undefined;
     };
-    const failDetails = () => {
-      if (disposed) return;
+    const removeDetails = () => {
       stopDetails();
       remoteLoaded = false;
       // Removing the optional sources also cancels pending tile requests.
       for (const id of ["paper-hillshade", "detail-river", "detail-water"])
         if (m?.getLayer(id)) m.removeLayer(id);
-      for (const id of ["paper-terrain", detailSource]) if (id && m?.getSource(id)) m.removeSource(id);
-      detailSource = undefined;
-      if (m?.getLayer("paper-relief")) m.setPaintProperty("paper-relief", "raster-opacity", 1);
+      for (const id of ["paper-terrain", detailSource]) if (m?.getSource(id)) m.removeSource(id);
+    };
+    const failDetails = () => {
+      if (disposed) return;
+      removeDetails();
       setDetailStatus(navigator.onLine ? "unavailable" : "offline");
     };
     const waitForDetails = () => {
       if (detailTimer) return;
-      m?.setPaintProperty("paper-relief", "raster-opacity", 1);
-      setDetailStatus("loading");
+      setDetailStatus(null);
       detailTimer = setTimeout(failDetails, 8000);
     };
     const details = async () => {
       if (options?.offline) return;
       if (!m || m.getZoom() < 5 || remoteAttempted || !m.isStyleLoaded()) return;
       if (!navigator.onLine) {
-        setDetailStatus(navigator.onLine ? "unavailable" : "offline");
+        setDetailStatus("offline");
         return;
       }
       remoteAttempted = true;
@@ -319,18 +319,16 @@ export function PaperMap({
           setDetailStatus(null);
           return;
         }
-        const vector = Object.entries(remoteStyle.sources).find(([, source]) => source.type === "vector");
-        if (!vector || vector[1].type !== "vector") throw new Error("Vector map unavailable");
-        const [id, source] = vector;
-        detailSource = id;
-        if (!m.getSource(id)) m.addSource(id, { ...source, minzoom: 5 });
+        const source = Object.values(remoteStyle.sources).find((source) => source.type === "vector");
+        if (!source) throw new Error("Vector map unavailable");
+        if (!m.getSource(detailSource)) m.addSource(detailSource, { ...source, minzoom: 5 });
         const water = color("--map-sea");
         if (!m.getLayer("detail-water"))
           m.addLayer(
             {
               id: "detail-water",
               type: "fill",
-              source: id,
+              source: detailSource,
               "source-layer": "water",
               minzoom: 5,
               filter: ["!=", ["get", "brunnel"], "tunnel"],
@@ -346,7 +344,7 @@ export function PaperMap({
             {
               id: "detail-river",
               type: "line",
-              source: id,
+              source: detailSource,
               "source-layer": "waterway",
               minzoom: 6,
               filter: ["all", ["==", ["get", "class"], "river"], ["!=", ["get", "brunnel"], "tunnel"]],
@@ -389,12 +387,16 @@ export function PaperMap({
         if (!request.signal.aborted && generation === styleGeneration) failDetails();
       }
     };
-    retryDetails.current = () => {
-      if (disposed || detailTimer) return;
+    const retry = () => {
+      if (disposed) return;
+      // A source can retain missing tiles without raising an error (404).
+      // Recreate optional sources on reconnect rather than reusing that cache.
+      removeDetails();
       remoteAttempted = false;
       remoteStyle = undefined;
       void details();
     };
+    retryDetails.current = retry;
     const loadStyle = () => {
       cityPopup.current?.remove();
       ++styleGeneration;
@@ -425,10 +427,12 @@ export function PaperMap({
             ],
           }
         : (structuredClone(isDark() ? dark : light) as StyleSpecification);
+      // Local z0–3 paper tiles stay visible when overzoomed at city level.
+      // Optional layers never replace the base: MapLibre may report a source
+      // as loaded even when the viewport has no tiles (for example, tile 404s).
       const relief = style.layers.find((layer) => layer.id === "paper-relief");
       if (relief?.type === "raster") relief.paint = { ...relief.paint, "raster-opacity": 1 };
       remoteLoaded = false;
-      detailSource = undefined;
       m?.setStyle(style, { diff: false });
     };
     try {
@@ -522,20 +526,10 @@ export function PaperMap({
         if (
           detailTimer &&
           remoteLoaded &&
-          detailSource &&
           instance.isSourceLoaded(detailSource) &&
           instance.isSourceLoaded("paper-terrain")
         ) {
           stopDetails();
-          instance.setPaintProperty("paper-relief", "raster-opacity", [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            5,
-            1,
-            7,
-            0,
-          ]);
           setDetailStatus(null);
         }
       };
@@ -561,8 +555,9 @@ export function PaperMap({
         void details();
       });
       m.on("error", (e) => {
-        if ("sourceId" in e && e.sourceId === "paper-earth") setFailure(true);
-        else failDetails();
+        if (!("sourceId" in e)) return;
+        if (e.sourceId === "paper-earth") setFailure(true);
+        else if (e.sourceId === detailSource || e.sourceId === "paper-terrain") failDetails();
       });
       const popup = new Popup({ closeButton: false, closeOnClick: false, offset: 12 });
       cityPopup.current = popup;
@@ -602,12 +597,8 @@ export function PaperMap({
     const resize = new ResizeObserver(() => m?.resize());
     resize.observe(el);
     const offline = () => failDetails();
-    const online = () => {
-      remoteAttempted = false;
-      void details();
-    };
     window.addEventListener("offline", offline);
-    window.addEventListener("online", online);
+    window.addEventListener("online", retry);
     return () => {
       disposed = true;
       retryDetails.current = null;
@@ -615,7 +606,7 @@ export function PaperMap({
       observer.disconnect();
       resize.disconnect();
       window.removeEventListener("offline", offline);
-      window.removeEventListener("online", online);
+      window.removeEventListener("online", retry);
       meMarker.current?.remove();
       originLabel.current?.remove();
       cityPopup.current?.remove();
@@ -724,26 +715,11 @@ export function PaperMap({
           </button>
         </div>
       )}
-      {cityZoom && detailStatus && (
+      {cityZoom && (detailStatus === "offline" || detailStatus === "unavailable") && (
         <output className={css.mapNotice}>
-          {detailStatus === "loading"
-            ? t("正在加载城市细节…", "Loading city details…")
-            : detailStatus === "offline"
-              ? t(
-                  "需要联网才能看城市细节 · 全球底图仍可浏览",
-                  "Connect to view city details · The global map remains available",
-                )
-              : t(
-                  "城市细节暂不可用 · 全球底图仍可浏览",
-                  "City details are temporarily unavailable · The global map remains available",
-                )}
-          {detailStatus !== "offline" && (
-            <button
-              type="button"
-              className={css.control}
-              disabled={detailStatus === "loading"}
-              onClick={() => retryDetails.current?.()}
-            >
+          {t("离线底图", "Offline basemap")}
+          {detailStatus === "unavailable" && (
+            <button type="button" className={css.control} onClick={() => retryDetails.current?.()}>
               {t("重试城市细节", "Retry city details")}
             </button>
           )}
