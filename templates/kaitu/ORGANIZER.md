@@ -94,7 +94,7 @@
 
 ### 5. 能运行命令时
 
-v0.7 计划提供，发布前跳过本步。在资料位置根目录运行 `kaitu phone run --as "<你的名字>"`：用电脑上同一份代码完成第 1–3 步，还会处理 `.records.jsonl` 和健康文件，并生成 week.json、map.json。之后只做第 4 步。
+本机 CLI 的 `kaitu --help` 列出 phone run 时，在资料位置根目录运行 `kaitu phone run --dir . --as "<你的名字>"`：用电脑上同一份代码完成第 1–3 步，还会处理 `.records.jsonl` 和健康文件，并生成 week.json、map.json。之后只做第 4 步。
 
 ## 夜里：每日整理
 

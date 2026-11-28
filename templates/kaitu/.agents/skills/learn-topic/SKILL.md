@@ -14,14 +14,16 @@ description: 用户要学习或接着学时，用已有材料一次问一个小�
 
 ## 材料与记录
 
-- 主题已存在就沿用，不重复创建。DSH 里用 kaitu_learning（action、topic）；MCP 用 learning_list / learning_read / learning_start / learning_save；有命令行的 Agent 用 `kaitu learning list | read <主题> | start --json '…' | save --json '…'`，参数同这些工具；只能读写文件时直接读写同一 learning/<topic>/。
+- 主题已存在就沿用，不重复创建。DSH 里用 kaitu_learning（action、topic）；MCP 用 learning_list / learning_read / learning_start / learning_save；有命令行时，列出主题用 `kaitu learning list`，读取一个主题用 `kaitu learning read <主题>`。写入时按下面的格式替换示例值：
+  - 建主题：`kaitu learning start --json '{"title":"示例主题","topic":"example-topic"}'`。有来源时加 source 对象；用回执里的 topic 接着学。
+  - 记理解：`kaitu learning save --json '{"topic":"example-topic","understanding":"用户的原话","questions":"","next":"","operationId":"example-new-001"}'`。填入实际 topic、原话和新标识；questions、next 没有时用空字符串。
 - 新主题才整理用户提供的来源并建立 STATUS.md；联网仅用当前 Agent 具备的能力，不假装读过链接原文。
 - 总结时区分来源和用户实际表达，把真实理解、未解问题和一个下一步追加到 notes.md / STATUS.md；现有工具已处理校验和版本，不另要求用户运行 CLI。
 - 不直接修改长期目标或已确认日历；需要安排或调整长期目标时提出待确认变更。
 
 ## 带着理解继续学（参考 OpenMAIC 的提问流程）
 
-- 入口材料不够或需要核对最新记录时，用已有 kaitu_learning list/read，沿用指定 topic 与已有 sources、notes、next；start 只保存用户给的来源和已有摘要，不假装读过链接原文。没有这些工具的 Agent 直接读写同一份 Markdown。
+- 入口材料不够或需要核对最新记录时，用已有 kaitu_learning list/read，沿用指定 topic 与已有 sources、notes、next；start 只保存用户给的来源和已有摘要，不假装读过链接原文。没有这些工具时按 AGENTS.md 的文件权限读取；只有云盘投递权限就往 inbox/agents/ 新建笔记，不改学习正本。
 - 新主题可能尚无 notes.md，按首次学习处理，从已有来源开始；保存用户实际表达的理解时再创建笔记。
 - 分清三类证据：sources 是参考材料；notes 中明确归于学习者的“我的理解”和当前对话里的学习者原话才是其实际表达；AI 讲解、概念和例子不能转成学习者理解。没有笔记或明确表达时，说“还没有学习记录 / 尚不清楚你的理解”，不要把来源摘要称为“你上次说过 / 理解了”。保存 understanding 时只用可归于学习者的内容。
 - 反馈依据所给材料或当前例子中明确、可核对的推理；有争议或证据不足的解释列为待核实，不为确认用户的答案编造机制。

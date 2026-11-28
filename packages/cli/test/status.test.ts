@@ -25,6 +25,50 @@ it("status 汇总样例的今日待确认数量和近 7 天训练次数", async 
   }
 });
 
+it("工作区 AGENTS.md 列出的命令能在该工作区执行并给出真实回执", async () => {
+  const root = mkdtempSync(join(tmpdir(), "kaitu-agent-guide-"));
+  try {
+    const ws = await initWorkspace(root);
+    const examples: Record<string, string[]> = {
+      "reading-pack": [],
+      "task add": ["--title", "合成待办", "--by", "agent"],
+      "learning start": ["--json", JSON.stringify({ title: "示例主题", topic: "audit" })],
+      "learning save": [
+        "--json",
+        JSON.stringify({
+          topic: "audit",
+          understanding: "示例理解",
+          questions: "",
+          next: "",
+          operationId: "audit-01",
+        }),
+      ],
+      "record schema": ["meal"],
+      "record types": [],
+    };
+    const commands = [...ws.readText("AGENTS.md").matchAll(/\bkaitu ([a-z][a-z-]*(?: [a-z][a-z-]*)?)/g)].map(
+      (match) => match[1],
+    );
+    expect(new Set(commands)).toEqual(new Set(Object.keys(examples)));
+    for (const command of new Set(commands)) {
+      const { stdout } = await promisify(execFile)(process.execPath, [
+        "packages/cli/dist/main.js",
+        ...command.split(" "),
+        ...examples[command],
+        "--dir",
+        root,
+        "--json-out",
+      ]);
+      const result = JSON.parse(stdout);
+      if (command === "task add")
+        expect(result.record).toMatchObject({ status: "proposed", id: expect.any(String) });
+    }
+    expect(ws.readText("learning/audit/notes.md")).toContain("示例理解");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 it("版本库只读时 record add 仍保存数据并报告待补版本", async () => {
   const root = mkdtempSync(join(tmpdir(), "kaitu-readonly-"));
   const ws = await initWorkspace(root);
