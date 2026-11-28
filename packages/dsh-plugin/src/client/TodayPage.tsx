@@ -761,16 +761,12 @@ export function TodayStart({
   );
 }
 
-export function TodayGoal({ text, title = false }: { text: string; title?: boolean }) {
+function TodayGoal({ text }: { text: string }) {
   const t = useT();
   return (
-    <div className={`${todayCss.goal} ${title ? todayCss.goalTitle : ""}`}>
-      {!title && <span>{t("为了", "For")}</span>}
-      {title ? (
-        <b>{planHeadline(text)}</b>
-      ) : (
-        <span className={todayCss.goalLine}>{planHeadline(text, 48)}</span>
-      )}
+    <div className={todayCss.goal}>
+      <span>{t("为了", "For")}</span>
+      <span className={todayCss.goalLine}>{planHeadline(text, 48)}</span>
       <PlanDetails goal={text} />
     </div>
   );
