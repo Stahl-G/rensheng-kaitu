@@ -29,7 +29,7 @@ description: 用户要晚间复盘或回顾今天时，对照计划更新进展�
 14. 用 `kaitu memory update <文件名> --text "合并内容"` 合并条目。
 15. 用 `kaitu memory rm <文件名>` 删除已被合并的重复项。
 16. MEMORY.md 超过约 3k tokens 时收敛细节，详细信息留在模块或来源中。
-17. 通过 memory 命令刷新索引，不手改 MEMORY.md 中的条目链接。
+17. 记忆写入命令会刷新索引，不另跑刷新命令，不手改 MEMORY.md 中的条目链接。
 18. 按实际变化刷新 me/profile.md 的简短摘要。
 19. 运行 `kaitu validate`，修正结构错误。
 20. 最后运行 `kaitu snapshot -m "Agent 完成了晚间复盘"`。
