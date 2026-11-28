@@ -289,6 +289,7 @@ it("日历网络未返回时任务可完成和存版本，恢复后不应用旧�
         oid = await git.resolveRef({ fs, dir: ws.root, gitdir: historyDirectory(ws), ref: "HEAD" });
         signal.throwIfAborted();
       }
+      if (typeof oid !== "string" || !oid) throw new Error("No immutable commit for the task snapshot");
       const { blob } = await git.readBlob({
         fs,
         dir: ws.root,
