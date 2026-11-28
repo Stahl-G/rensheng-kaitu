@@ -70,7 +70,20 @@ test("SDK streams raw reasoning and attachments, blocks changes while busy, and 
       return createAskService({
         state: home,
         workspace: ws.root,
-        runtime: (mode, connection, textOnly) => sdk.runtime(mode, false, connection, textOnly),
+        runtime: async (mode, connection, textOnly) => {
+          mark("runtime.initialize.start");
+          const client = await sdk.runtime(mode, false, connection, textOnly);
+          mark("runtime.initialize.done");
+          return {
+            ...client,
+            async request(method, params) {
+              if (method === "session/prompt") mark("prompt.rpc.start");
+              const result = await client.request(method, params);
+              if (method === "session/prompt") mark("prompt.rpc.done");
+              return result;
+            },
+          };
+        },
         settings: (images) => sdk.settings(images),
         configure: (input) => sdk.configure(input),
         dispose: () => sdk.closeSupport(),

@@ -1,0 +1,25 @@
+name: Windows #414 SDK trace
+on:
+  push:
+    branches: [dot/414-windows-sdk-trace-10405]
+permissions:
+  contents: read
+jobs:
+  trace:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @kaitu/dsh-plugin build:testsite
+      - name: Exact deadline, isolated failing integration test
+        run: pnpm exec vitest run packages/desktop/test/sdk-stream.test.ts --maxWorkers=1 --no-file-parallelism --reporter=verbose --silent=false
+      - name: Original suite and worker settings
+        if: always() && !cancelled()
+        run: pnpm test
