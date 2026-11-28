@@ -31,6 +31,7 @@ import {
   readMe,
   readOnboardingMatter,
   readOverviewPage,
+  readPlanningGoals,
   recordOnboardingAiConnection,
   resetOnboarding,
   restore,
@@ -754,16 +755,19 @@ it("两个目标各有下一步：今天页卡片给还没做完的那一步，�
     expect(onboardingStatus(ws, options).next).toMatchObject({ id: a.id, status: "open" });
     await changeOnboardingNext(ws, a.id, a.rev, "complete", "A 做完了");
     const plans = (await readOverviewPage(ws)).plans.goals;
+    expect(readPlanningGoals(ws)).toEqual({ root: ws.root, goals: plans });
     expect(plans.map((goal) => [goal.title, goal.lastResult, goal.next])).toEqual([
       ["目标 A", "A 做完了", null],
       ["目标 B", "B 做完了", null],
     ]);
     await addGoalNext(ws, "note-20261001-aaaaaa", "A 的第二步");
     await addGoalNext(ws, "note-20261002-bbbbbb", "B 的第二步");
-    expect((await readOverviewPage(ws)).plans.goals.map((goal) => goal.next?.title)).toEqual([
-      "A 的第二步",
-      "B 的第二步",
-    ]);
+    const nextGoals = (await readOverviewPage(ws)).plans.goals;
+    expect(readPlanningGoals(ws).goals).toEqual(nextGoals);
+    expect(nextGoals.map((goal) => goal.next?.title)).toEqual(["A 的第二步", "B 的第二步"]);
+    // An external edit removing a goal must win over its old next step and results.
+    ws.writeJson("me/goals.json", [{ id: "note-20261002-bbbbbb", title: "目标 B", status: "active" }]);
+    expect(readPlanningGoals(ws).goals.map((goal) => goal.id)).toEqual(["note-20261002-bbbbbb"]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -1,8 +1,9 @@
 import type { PlanGoal, PlansData } from "@kaitu/core";
 import { useState, useSyncExternalStore } from "react";
+import { PlanDetails, type ReadPlanOriginal } from "./PlanReading.js";
 import css from "./Prototype.module.css";
-import { TodayGoal } from "./TodayPage.js";
 import { useT } from "./i18n.js";
+import { planHeadline } from "./plan-reading.js";
 import {
   type ResultTransport,
   type TodayBoardSession,
@@ -26,10 +27,11 @@ export interface GoalPlanActions {
   addGoalNext: (goalId: string, title: string) => Promise<unknown>;
   changeNext: (id: string, rev: number, action: string, value: string) => Promise<unknown>;
   refresh: () => Promise<void>;
+  readOriginal?: ReadPlanOriginal;
 }
 
 export function useGoalPlanning(
-  { resultSession, resultAction, addGoalNext, changeNext, refresh }: GoalPlanActions,
+  { resultSession, resultAction, addGoalNext, changeNext, refresh, readOriginal }: GoalPlanActions,
   layout: "list" | "map",
 ) {
   const t = useT();
@@ -103,21 +105,20 @@ export function useGoalPlanning(
     const name = AI_NAMES[goal.origin.source] ?? "AI";
     return t(`从 ${name} 搬来 · ${date}`, `From ${name} · ${date}`);
   };
+  const stepName =
+    layout === "list" ? planHeadline(editing?.next?.title ?? "") : (editing?.next?.title ?? "");
   const prompt =
     editing?.mode === "next"
       ? t("一个今天或这周就能做的下一步", "One next step you can take today or this week")
       : editing?.mode === "complete"
-        ? t(
-            `「${editing.next?.title ?? ""}」怎么样了？记一句结果`,
-            `How did “${editing.next?.title ?? ""}” go? One line`,
-          )
+        ? t(`「${stepName}」怎么样了？记一句结果`, `How did “${stepName}” go? One line`)
         : t("安排到哪一天", "Which day");
   const renderGoal = (goal: PlanGoal) => (
     <div key={goal.id} id={`plan-${goal.id}`}>
-      <div className={layout === "map" ? css.mapGoalPlan : css.row}>
+      <div className={layout === "map" ? css.mapGoalPlan : css.planRow}>
         <div className={`${css["row-title"]} ${css.stack}`}>
-          {layout === "list" && <TodayGoal text={goal.title} title />}
-          <span className={css.small} style={{ whiteSpace: "pre-wrap" }}>
+          {layout === "list" && <b className={css.planTitle}>{planHeadline(goal.title, 55)}</b>}
+          <span className={css.small}>
             {origin(goal)}
             {goal.results
               ? t(
@@ -125,14 +126,16 @@ export function useGoalPlanning(
                   ` · ${goal.results} result${goal.results > 1 ? "s" : ""} logged`,
                 )
               : ""}
-            {goal.lastResult ? t(` · 最近：${goal.lastResult}`, ` · latest: ${goal.lastResult}`) : ""}
+            {layout === "map" && goal.lastResult
+              ? t(` · 最近：${goal.lastResult}`, ` · latest: ${goal.lastResult}`)
+              : ""}
           </span>
         </div>
         {goal.next ? (
           <span className={css.planNext}>
-            <span className={css.chip}>
+            <span className={layout === "map" ? css.chip : css.planStep}>
               {t("下一步：", "Next: ")}
-              {goal.next.title}
+              {layout === "list" ? planHeadline(goal.next.title, 55) : goal.next.title}
               {goal.next.due ? t(` · ${goal.next.due}`, ` · ${goal.next.due}`) : ""}
             </span>
             <button
@@ -163,6 +166,18 @@ export function useGoalPlanning(
           </button>
         )}
       </div>
+      {layout === "list" && (
+        <PlanDetails
+          goal={goal.title}
+          goalSource={`me/goals.json#${goal.id}`}
+          step={goal.next?.title}
+          source={goal.next?.source}
+          current={goal.next?.current}
+          lastResult={goal.lastResult ?? undefined}
+          captureSource={goal.next?.captureSource}
+          readOriginal={readOriginal}
+        />
+      )}
       {editing?.goal === goal.id && (
         <form
           className={css["sub-form"]}

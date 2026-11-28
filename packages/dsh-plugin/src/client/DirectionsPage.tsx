@@ -438,9 +438,23 @@ export function DirectionsPage(props: DirectionsPageProps) {
         </button>
       </article>
     ));
+  // Goal actions and exploration history load independently. Keep this subtree mounted
+  // as that history arrives so a form opened immediately does not lose focus or its draft.
+  const planning = !selected && !form && (
+    <>
+      <h1>{t("方向", "Directions")}</h1>
+      {props.planningContent && (
+        <section className={css.planning} aria-label={t("想做成的事", "Things you want to get done")}>
+          <h2>{t("想做成的事", "Things you want to get done")}</h2>
+          {props.planningContent}
+        </section>
+      )}
+    </>
+  );
   if (!data)
     return (
-      <section className={css.page}>
+      <section className={css.page} aria-label={t("探索方向", "Directions")}>
+        {planning}
         {error ? (
           <p role="alert">
             {error}
@@ -464,6 +478,7 @@ export function DirectionsPage(props: DirectionsPageProps) {
     );
   return (
     <section className={css.page} aria-label={t("探索方向", "Directions")}>
+      {planning}
       <ReadWarnings warnings={data.warnings} />
       {error && (
         <p role="alert" className={base.notice}>
@@ -763,13 +778,6 @@ export function DirectionsPage(props: DirectionsPageProps) {
         </>
       ) : (
         <>
-          <h1>{t("方向", "Directions")}</h1>
-          {props.planningContent && (
-            <section className={css.planning} aria-label={t("想做成的事", "Things you want to get done")}>
-              <h2>{t("想做成的事", "Things you want to get done")}</h2>
-              {props.planningContent}
-            </section>
-          )}
           <header className={css.listHeader}>
             <h2 className={v2.eyebrow}>{t("你在探索的方向", "Directions you're exploring")}</h2>
             <button

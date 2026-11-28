@@ -1,9 +1,11 @@
 import type { HomeState, HomeThread } from "@kaitu/core";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { PlanDetails, type ReadPlanOriginal } from "./PlanReading.js";
 import css from "./Prototype.module.css";
 import styles from "./TodayPage.module.css";
 import { useLocale, useT } from "./i18n.js";
 import { todayNumber, todayProjectDate } from "./next-presentation.js";
+import { planHeadline } from "./plan-reading.js";
 
 import {
   type ResultTransport,
@@ -25,6 +27,7 @@ export function TodayBoard({
   resultAction,
   openProject,
   openGoal,
+  readOriginal,
   library,
   begin,
   ask,
@@ -38,6 +41,7 @@ export function TodayBoard({
   resultAction?: ResultTransport;
   openProject: (id: string) => void;
   openGoal?: (id: string) => void;
+  readOriginal?: ReadPlanOriginal;
   library: () => void;
   begin?: () => void;
   ask: (text: string) => void;
@@ -75,6 +79,10 @@ export function TodayBoard({
     steps.find((step) => step.key === selected) ??
     steps[0];
   const shown = receipt?.step ?? focus;
+  const shownThread = shown
+    ? threads.find((thread) => thread.next?.id === shown.id && thread.next.file === shown.file)
+    : undefined;
+  const shownContext = data.data?.steps?.find((step) => step.key === shown?.key)?.context;
   const result =
     (!showLatest ? operation.current?.text : undefined) ?? (focus ? (drafts[focus.key] ?? "") : "");
   const results = data.data?.results;
@@ -188,7 +196,7 @@ export function TodayBoard({
       )}
       {showLatest && operation.current && (
         <section className={styles.stepList} aria-label={t("上次结果待核实", "Previous result unconfirmed")}>
-          <strong>{operation.current.step.title}</strong>
+          <strong>{planHeadline(operation.current.step.title)}</strong>
           <button type="button" className={css.btn} disabled={!canEdit} onClick={() => void finish()}>
             {t("核对上次结果", "Check previous result")}
           </button>
@@ -201,11 +209,11 @@ export function TodayBoard({
           aria-label={t("当前事项", "Current step")}
         >
           <div className={styles.actionMeta}>
-            <span>{shown.parent}</span>
+            <span>{planHeadline(shown.parent, 48)}</span>
             {shown.due && <time dateTime={shown.due}>{shown.due}</time>}
           </div>
           <h2>
-            <mark>{shown.title}</mark>
+            <mark>{planHeadline(shown.title, 72)}</mark>
           </h2>
           {receipt ? (
             <div className={styles.completionReceipt} aria-live="polite">
@@ -312,6 +320,19 @@ export function TodayBoard({
               )}
             </>
           )}
+          <PlanDetails
+            key={shown.key}
+            goal={shown.parent}
+            step={shown.title}
+            goalSource={shownThread?.kind === "goal" ? `me/goals.json#${shownThread.id}` : shownThread?.file}
+            source={
+              shownContext?.source ??
+              (shown.file && shown.file !== "task" ? `${shown.file}#${shown.id}` : undefined)
+            }
+            current={shownContext?.current}
+            captureSource={shownContext?.captureSource}
+            readOriginal={readOriginal}
+          />
         </section>
       ) : (
         <section className={styles.actionCard}>
@@ -372,9 +393,9 @@ export function TodayBoard({
                     setReceipt();
                   }}
                 >
-                  {step.title}
+                  {planHeadline(step.title)}
                 </button>
-                <span>{step.parent}</span>
+                <span>{planHeadline(step.parent, 35)}</span>
                 {step.due && <time data-overdue={step.due < today}>{step.due}</time>}
               </div>
             ))}
@@ -413,8 +434,15 @@ export function TodayBoard({
               aria-label={t(`打开${thread.title}`, `Open ${thread.title}`)}
               onClick={() => openThread(thread)}
             >
-              <strong>{thread.title}</strong>
-              {thread.last && <span>{thread.last.text}</span>}
+              <strong>{planHeadline(thread.title, 54)}</strong>
+              {thread.next ? (
+                <span>
+                  {t("下一步：", "Next: ")}
+                  {planHeadline(thread.next.title)}
+                </span>
+              ) : (
+                thread.last && <span>{planHeadline(thread.last.text)}</span>
+              )}
               {thread.resultCount !== null && (
                 <small>{t(`${thread.resultCount} 条结果`, `${thread.resultCount} results`)}</small>
               )}

@@ -1,0 +1,53 @@
+.details {
+  min-width: 0;
+  text-align: start;
+}
+
+.details summary {
+  display: list-item;
+  width: fit-content;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.body {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.body ul {
+  display: grid;
+  gap: 4px;
+  padding-inline-start: 1.25em;
+  margin: 4px 0 0;
+  color: var(--ink2);
+}
+
+.body time {
+  margin-inline-end: 8px;
+  font-size: 0.875em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.raw {
+  padding-top: 8px;
+}
+
+.original pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  border-inline-start: 2px solid var(--line);
+  margin: 8px 0 14px;
+  padding-inline-start: 12px;
+}
+
+.original code {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
