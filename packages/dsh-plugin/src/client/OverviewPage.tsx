@@ -69,8 +69,8 @@ export interface OverviewPageProps
     CalendarPageProps,
     LibraryProps,
     Partial<LifeAtlasPageProps> {
-  /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
   loadPlanningGoals?: () => Promise<{ root: string; goals: import("@kaitu/core").PlanGoal[] }>;
+  /** 方向页「我在推进什么」：开图 App 提供；宿主没有时仍显示原来的进度图。 */
   loadDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
   generateDirectionMap?: (locale: Locale) => Promise<import("@kaitu/core").DirectionMapState>;
   dismissDirectionLink?: (goal: string, project: string) => Promise<import("@kaitu/core").DirectionMapState>;
